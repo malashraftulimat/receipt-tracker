@@ -30,10 +30,13 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   bool _navigating = false;
   String? _error;
 
+  /// Live preview works on Android/iOS **and** in the browser
+  /// (mobile_scanner's web implementation uses ZXing + getUserMedia).
+  /// Windows/macOS/Linux still fall back to image picking.
   bool get _hasLiveCamera =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
 
   @override
   void initState() {
