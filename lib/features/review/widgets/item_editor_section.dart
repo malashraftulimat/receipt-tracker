@@ -22,7 +22,7 @@ class ReceiptItemEditor {
               : formatAmountDigits(item!.totalPrice),
         ),
         taxRate = item?.taxRate {
-    this.categoryId = categoryId ?? item?.categoryId;
+    categoryId = categoryId ?? item?.categoryId;
   }
 
   final TextEditingController name;

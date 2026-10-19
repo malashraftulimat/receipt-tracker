@@ -74,9 +74,7 @@ class ReceiptDraft {
       tax8ItemsTotal: parsed.tax8ItemsTotal,
       tax10ItemsTotal: parsed.tax10ItemsTotal,
       dueDate: parsed.dueDate,
-      reminderAt: parsed.dueDate == null
-          ? null
-          : parsed.dueDate!.subtract(const Duration(days: 3)),
+      reminderAt: parsed.dueDate?.subtract(const Duration(days: 3)),
       pointBrand: parsed.pointBrand,
       pointAmount: parsed.pointAmount,
       barcodeId: resolvedBarcode,

@@ -733,7 +733,7 @@ class ReceiptParser {
       var totalPrice = amounts.last;
       if (quantityMatch != null && amounts.length == 1 && unitPrice != null) {
         // "2×198" style: the printed price is the unit price.
-        totalPrice = unitPrice! * quantity;
+        totalPrice = unitPrice * quantity;
       }
       unitPrice ??=
           quantity > 1 ? (totalPrice / quantity).round() : totalPrice;

@@ -135,7 +135,7 @@ class ReceiptRepository {
         ]);
       }
 
-      return getById(id);
+      return await getById(id);
     } on PostgrestException catch (error) {
       if (error.code == '23505') {
         // Lost a race against another device: look the existing row up again.

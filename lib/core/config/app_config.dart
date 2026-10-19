@@ -120,6 +120,7 @@ class AppConfig {
     }
 
     if (!_supabaseInitialized) {
+      // ignore: deprecated_member_use
       await Supabase.initialize(url: normalizedUrl, anonKey: trimmedKey);
       _supabaseInitialized = true;
     }

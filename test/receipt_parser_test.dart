@@ -30,7 +30,7 @@ void main() {
 
   group('total detection', () {
     test('prefers 税込合計 over line items', () {
-      final text = '''
+      const text = '''
 セブン-イレブン 渋谷店
 2026年10月19日
 おにぎり ¥150
@@ -68,7 +68,7 @@ void main() {
 
   group('tax detection', () {
     test('detects 8% and 10% simultaneously', () {
-      final text = '''
+      const text = '''
 スーパーマルエツ
 2026年10月19日 19:41
 （8%対象 ¥1,080） 消費税 ¥80

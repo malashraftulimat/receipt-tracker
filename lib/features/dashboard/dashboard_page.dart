@@ -64,11 +64,11 @@ class DashboardPage extends ConsumerWidget {
                     width: 1,
                     color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
                   ),
-                  SizedBox(
+                  const SizedBox(
                     width: 372,
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                      child: const AnalyticsPanel(),
+                      padding: EdgeInsets.fromLTRB(20, 8, 20, 32),
+                      child: AnalyticsPanel(),
                     ),
                   ),
                 ],

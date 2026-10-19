@@ -339,9 +339,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       tax8ItemsTotal: items.isEmpty ? _tax8ItemsTotal : itemsTax8,
       tax10ItemsTotal: items.isEmpty ? _tax10ItemsTotal : itemsTax10,
       dueDate: _dueDate,
-      reminderAt: _dueDate == null
-          ? null
-          : _dueDate!.subtract(const Duration(days: 3)),
+      reminderAt: _dueDate?.subtract(const Duration(days: 3)),
       pointBrand: _pointBrand.text.trim().isEmpty ? null : _pointBrand.text,
       pointAmount: parseYenInput(_pointAmount.text),
       barcodeId: _barcode.text,

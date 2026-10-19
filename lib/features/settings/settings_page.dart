@@ -326,24 +326,24 @@ class SettingsPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 14),
-          _Card(
+          const _Card(
             title: 'このアプリについて',
             children: <Widget>[
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.document_scanner_outlined),
-                title: const Text('スキャンエンジン'),
-                subtitle: const Text(
+                leading: Icon(Icons.document_scanner_outlined),
+                title: Text('スキャンエンジン'),
+                subtitle: Text(
                   '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\n'
                   'OCR: ML Kit（iOS・Android オンデバイス）/ Cloud Vision（Web・デスクトップ）',
                 ),
               ),
-              const Divider(height: 1),
+              Divider(height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.info_outline),
-                title: const Text('バージョン'),
-                subtitle: const Text('1.0.0 (Flutter / Riverpod / Supabase)'),
+                leading: Icon(Icons.info_outline),
+                title: Text('バージョン'),
+                subtitle: Text('1.0.0 (Flutter / Riverpod / Supabase)'),
               ),
             ],
           ),
