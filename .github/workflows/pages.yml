@@ -30,14 +30,15 @@ jobs:
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
 
-      - name: Build Flutter web
-        run: |
-          flutter build web --release --base-href=/Receipt-Tracker/
-          touch build/web/.nojekyll
-
       - uses: actions/configure-pages@v5
+        id: pages
         with:
           enablement: true
+
+      - name: Build Flutter web
+        run: |
+          flutter build web --release --base-href="${{ steps.pages.outputs.base_path }}/"
+          touch build/web/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
         with:
