@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/config/app_config.dart';
+import '../domain/models/app_user.dart';
 import '../domain/models/category.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
@@ -18,24 +21,38 @@ final supabaseClientProvider = Provider<SupabaseClient>(
   (ref) => Supabase.instance.client,
 );
 
+// Repositories resolve the Supabase client lazily so that local mode works
+// without ever initialising Supabase.
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => AuthRepository(ref.watch(supabaseClientProvider)),
+  (ref) => AuthRepository(),
 );
 
 final receiptRepositoryProvider = Provider<ReceiptRepository>(
-  (ref) => ReceiptRepository(ref.watch(supabaseClientProvider)),
+  (ref) => ReceiptRepository(),
 );
 
 final categoryRepositoryProvider = Provider<CategoryRepository>(
-  (ref) => CategoryRepository(ref.watch(supabaseClientProvider)),
+  (ref) => CategoryRepository(),
 );
 
 final storageRepositoryProvider = Provider<StorageRepository>(
-  (ref) => StorageRepository(ref.watch(supabaseClientProvider)),
+  (ref) => StorageRepository(),
 );
 
+bool get _hasOnDeviceOcr =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS);
+
 /// ML Kit on mobile, Supabase Edge Function on web / desktop.
+/// Local mode on web/desktop has no OCR engine (no server available).
 final ocrServiceProvider = Provider<OcrService>((ref) {
+  if (AppConfig.isLocal && !_hasOnDeviceOcr) {
+    return const UnavailableOcrService(
+      'ローカルモードではサーバーOCRを使えません。'
+      '「手入力で登録」を使うか、設定から Supabase に接続してください。',
+    );
+  }
   final service = createOcrService();
   ref.onDispose(service.dispose);
   return service;
@@ -49,9 +66,19 @@ final authStateProvider = StreamProvider<AuthState>(
   (ref) => ref.watch(supabaseClientProvider).auth.onAuthStateChange,
 );
 
-final currentUserProvider = Provider<User?>((ref) {
+/// Synthetic user for on-device (local) mode.
+const AppUser localAuthUser = AppUser(
+  id: 'local-user',
+  email: 'ローカルモード（この端末のみ）',
+);
+
+final currentUserProvider = Provider<AppUser?>((ref) {
+  if (AppConfig.isLocal) return localAuthUser;
+
   ref.watch(authStateProvider); // rebuild on sign-in / sign-out / refresh
-  return ref.watch(supabaseClientProvider).auth.currentUser;
+  final user = ref.watch(supabaseClientProvider).auth.currentUser;
+  if (user == null) return null;
+  return AppUser(id: user.id, email: user.email ?? '');
 });
 
 final userIdProvider = Provider<String?>(

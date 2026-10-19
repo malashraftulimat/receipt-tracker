@@ -13,9 +13,9 @@ class ReceiptTrackerApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!AppConfig.isConfigured) {
-      // No Supabase credentials yet (sideloaded APK / plain web build):
-      // let the user connect to their project once.
+    if (!AppConfig.isConfigured && !AppConfig.isLocal) {
+      // No Supabase credentials and no local mode yet:
+      // let the user choose how to store data (server sync or on-device).
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,

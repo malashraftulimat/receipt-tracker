@@ -3,16 +3,24 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
+import '../services/local_store.dart';
 
-/// Receipt image storage (`receipts` bucket, `<userId>/<timestamp>.jpg`).
+/// Receipt image storage.
+///
+/// Supabase: `receipts` bucket, `<userId>/<timestamp>.jpg`.
+/// Local mode: data URI in SharedPreferences (or memory for large files).
 class StorageRepository {
-  StorageRepository(this._client);
+  StorageRepository([this._client]);
 
-  final SupabaseClient _client;
+  final SupabaseClient? _client;
+
+  SupabaseClient get _supabase => _client ?? Supabase.instance.client;
 
   Future<String> uploadReceiptImage(String userId, Uint8List bytes) async {
+    if (AppConfig.isLocal) return LocalStore.instance.saveImage(bytes);
+
     final path = '$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
-    await _client.storage.from(AppConfig.receiptBucket).uploadBinary(
+    await _supabase.storage.from(AppConfig.receiptBucket).uploadBinary(
           path,
           bytes,
           fileOptions: const FileOptions(
@@ -23,13 +31,23 @@ class StorageRepository {
     return path;
   }
 
-  Future<String> signedUrl(String path) {
-    return _client.storage
+  /// Returns a URL the UI can display.
+  Future<String> signedUrl(String path) async {
+    if (AppConfig.isLocal) {
+      return await LocalStore.instance.resolveImage(path) ?? path;
+    }
+    return _supabase.storage
         .from(AppConfig.receiptBucket)
         .createSignedUrl(path, AppConfig.signedUrlTtlSeconds);
   }
 
   Future<void> deleteImage(String path) async {
-    await _client.storage.from(AppConfig.receiptBucket).remove(<String>[path]);
+    if (AppConfig.isLocal) {
+      await LocalStore.instance.deleteImage(path);
+      return;
+    }
+    await _supabase.storage
+        .from(AppConfig.receiptBucket)
+        .remove(<String>[path]);
   }
 }

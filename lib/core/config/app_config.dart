@@ -1,13 +1,18 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/services/local_store.dart';
+
+enum AppMode { supabase, local }
+
 /// Runtime + build-time configuration.
 ///
-/// Credentials can be supplied in two ways:
-///  1. Compile time (recommended for CI / app-store builds):
+/// Credentials can be supplied in three ways:
+///  1. Compile time (CI / store builds):
 ///     `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...`
-///  2. First launch: the in-app "接続設定" screen, persisted in
-///     SharedPreferences (handy for a sideloaded APK or a web build).
+///  2. First launch: the in-app "接続設定" screen, persisted in SharedPreferences.
+///  3. Local mode (no account, no server): everything is stored in
+///     SharedPreferences / localStorage on this device.
 class AppConfig {
   const AppConfig._();
 
@@ -17,6 +22,7 @@ class AppConfig {
 
   static const String prefsUrlKey = 'supabase_url';
   static const String prefsAnonKey = 'supabase_anon_key';
+  static const String prefsModeKey = 'backend_mode';
 
   static const String receiptBucket = 'receipts';
   static const String ocrFunction = 'ocr';
@@ -25,6 +31,11 @@ class AppConfig {
   static String? _url;
   static String? _anonKey;
   static bool _supabaseInitialized = false;
+  static AppMode _mode = AppMode.supabase;
+
+  static AppMode get mode => _mode;
+
+  static bool get isLocal => _mode == AppMode.local;
 
   static String? get supabaseUrl =>
       (_url ?? defineUrl).isEmpty ? null : (_url ?? defineUrl);
@@ -36,9 +47,18 @@ class AppConfig {
 
   static bool get supabaseInitialized => _supabaseInitialized;
 
-  /// Loads credentials from SharedPreferences (falling back to dart-defines)
-  /// and initialises Supabase when both values are present.
+  /// Loads the previously chosen mode and credentials from SharedPreferences
+  /// (falling back to dart-defines) and initialises Supabase if possible.
   static Future<bool> bootstrap(SharedPreferences prefs) async {
+    _mode = prefs.getString(prefsModeKey) == AppMode.local.name
+        ? AppMode.local
+        : AppMode.supabase;
+
+    if (_mode == AppMode.local) {
+      await LocalStore.instance.seedDefaults();
+      return true;
+    }
+
     final url = defineUrl.isNotEmpty
         ? defineUrl
         : (prefs.getString(prefsUrlKey) ?? '');
@@ -87,17 +107,34 @@ class AppConfig {
     // Only expose the credentials once the client exists.
     _url = normalizedUrl;
     _anonKey = trimmedKey;
+    _mode = AppMode.supabase;
 
     if (persist) {
       await prefs.setString(prefsUrlKey, normalizedUrl);
       await prefs.setString(prefsAnonKey, trimmedKey);
+      await prefs.remove(prefsModeKey);
     }
+  }
+
+  /// Switches to on-device storage (no account required).
+  static Future<void> useLocalMode(SharedPreferences prefs) async {
+    _mode = AppMode.local;
+    await LocalStore.instance.seedDefaults();
+    await prefs.setString(prefsModeKey, AppMode.local.name);
+  }
+
+  /// Switches back to Supabase (shows the setup screen if no credentials).
+  static Future<void> useSupabaseMode(SharedPreferences prefs) async {
+    _mode = AppMode.supabase;
+    await prefs.remove(prefsModeKey);
   }
 
   /// Removes persisted credentials (a restart is required to reconnect).
   static Future<void> clearStoredCredentials(SharedPreferences prefs) async {
     await prefs.remove(prefsUrlKey);
     await prefs.remove(prefsAnonKey);
+    await prefs.remove(prefsModeKey);
+    await LocalStore.instance.clearAll();
   }
 
   static String _normalizeUrl(String value) {

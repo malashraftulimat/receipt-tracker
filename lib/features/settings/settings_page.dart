@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app.dart';
+import '../../core/config/app_config.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
+import '../../data/services/local_store.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -23,6 +27,68 @@ class SettingsPage extends ConsumerWidget {
         SnackBar(content: Text('失敗しました: $error')),
       );
     }
+  }
+
+  Future<void> _restartApp() async {
+    runApp(const ProviderScope(child: ReceiptTrackerApp()));
+  }
+
+  Future<void> _switchToLocal(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ローカルモードに切り替えますか？'),
+        content: const Text(
+          'レシートとカテゴリはこの端末（ブラウザ）にのみ保存されます。'
+          'サーバー上のデータはそのまま残り、いつでも戻せます。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('切り替える'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final prefs = await SharedPreferences.getInstance();
+    await LocalStore.instance.seedDefaults();
+    await AppConfig.useLocalMode(prefs);
+    await _restartApp();
+  }
+
+  Future<void> _switchToSupabase(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    await AppConfig.useSupabaseMode(prefs);
+    await _restartApp();
+  }
+
+  Future<void> _clearLocalData(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ローカルデータを削除しますか？'),
+        content: const Text('この端末に保存したレシート・画像・カテゴリをすべて削除します。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await LocalStore.instance.clearAll();
+    await LocalStore.instance.seedDefaults();
+    await _restartApp();
   }
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
@@ -52,6 +118,7 @@ class SettingsPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final user = ref.watch(currentUserProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final isLocal = AppConfig.isLocal;
 
     return Scaffold(
       appBar: AppBar(title: const Text('設定')),
@@ -75,9 +142,11 @@ class SettingsPage extends ConsumerWidget {
                     color: theme.colorScheme.primary,
                   ),
                 ),
-                title: Text(user?.email ?? '未ログイン'),
+                title: Text(isLocal ? 'ローカルモード' : (user?.email ?? '未ログイン')),
                 subtitle: Text(
-                  'すべての端末でレシート・画像・カテゴリが同期されます',
+                  isLocal
+                      ? 'データはこの端末にのみ保存されます（アカウント不要）'
+                      : 'すべての端末でレシート・画像・カテゴリが同期されます',
                   style: theme.textTheme.labelSmall,
                 ),
                 trailing: IconButton(
@@ -96,15 +165,17 @@ class SettingsPage extends ConsumerWidget {
                   icon: const Icon(Icons.copy_all_outlined, size: 18),
                 ),
               ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _signOut(context, ref),
-                  icon: const Icon(Icons.logout),
-                  label: const Text('ログアウト'),
+              if (!isLocal) ...<Widget>[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _signOut(context, ref),
+                    icon: const Icon(Icons.logout),
+                    label: const Text('ログアウト'),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 14),
@@ -155,14 +226,46 @@ class SettingsPage extends ConsumerWidget {
               const Divider(height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.cloud_sync_outlined),
-                title: const Text('同期について'),
-                subtitle: const Text(
-                  'Supabase の Postgres / Storage に保存され、'
-                  'サインインしたすべての端末へリアルタイムに反映されます。',
+                leading: Icon(
+                  isLocal ? Icons.phone_android : Icons.cloud_sync_outlined,
                 ),
-                onTap: null,
+                title: Text(
+                  isLocal ? 'ローカル保存（この端末のみ）' : 'Supabase と同期中',
+                ),
+                subtitle: Text(
+                  isLocal
+                      ? 'レシートはブラウザの localStorage に保存されます。'
+                          '他の端末とは共有されません。'
+                      : 'Postgres / Storage に保存され、すべての端末で共有されます。',
+                ),
               ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  isLocal ? Icons.cloud_outlined : Icons.storage_outlined,
+                ),
+                title: Text(
+                  isLocal ? 'Supabase に接続する' : 'ローカルモードに切り替える',
+                ),
+                subtitle: Text(
+                  isLocal
+                      ? 'アカウントを作成して複数端末で同期できます'
+                      : 'サーバーを使わず、この端末だけに保存します',
+                ),
+                onTap: () =>
+                    isLocal ? _switchToSupabase(context) : _switchToLocal(context),
+              ),
+              if (isLocal) ...<Widget>[
+                const Divider(height: 1),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.delete_sweep_outlined),
+                  title: const Text('ローカルデータを削除'),
+                  subtitle: const Text('この端末のレシート・画像・カテゴリを消去します'),
+                  onTap: () => _clearLocalData(context),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 14),

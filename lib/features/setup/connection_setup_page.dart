@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/responsive.dart';
+import '../../data/services/local_store.dart';
 
 /// First-launch screen for builds that were not compiled with
 /// `--dart-define=SUPABASE_URL/...` (e.g. a sideloaded APK or a web bundle).
@@ -29,6 +30,26 @@ class _ConnectionSetupPageState extends State<ConnectionSetupPage> {
     _urlController.dispose();
     _keyController.dispose();
     super.dispose();
+  }
+
+  Future<void> _startLocalMode() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await LocalStore.instance.seedDefaults();
+      await AppConfig.useLocalMode(prefs);
+      if (!mounted) return;
+      runApp(const ProviderScope(child: ReceiptTrackerApp()));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = error.toString();
+      });
+    }
   }
 
   Future<void> _connect() async {
@@ -165,6 +186,12 @@ class _ConnectionSetupPageState extends State<ConnectionSetupPage> {
                           )
                         : const Icon(Icons.cloud_done_outlined),
                     label: Text(_busy ? '接続しています…' : '接続して開始'),
+                  ),
+                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _startLocalMode,
+                    icon: const Icon(Icons.phone_android),
+                    label: const Text('アカウントなしで使う（この端末に保存）'),
                   ),
                   const SizedBox(height: 18),
                   Container(

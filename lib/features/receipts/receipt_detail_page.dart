@@ -11,6 +11,7 @@ import '../../domain/models/receipt.dart';
 import '../dashboard/analytics_provider.dart';
 import '../dashboard/widgets/receipt_tile.dart';
 import '../review/review_page.dart';
+import '../shared/stored_image.dart';
 
 class ReceiptDetailPage extends ConsumerWidget {
   const ReceiptDetailPage({super.key, required this.receiptId});
@@ -409,12 +410,12 @@ class _ReceiptImage extends ConsumerWidget {
                 insetPadding: const EdgeInsets.all(16),
                 child: InteractiveViewer(
                   maxScale: 4,
-                  child: Image.network(value, fit: BoxFit.contain),
+                  child: StoredImage(url: value, fit: BoxFit.contain),
                 ),
               ),
             ),
-            child: Image.network(
-              value,
+            child: StoredImage(
+              url: value,
               fit: BoxFit.cover,
               width: double.infinity,
             ),

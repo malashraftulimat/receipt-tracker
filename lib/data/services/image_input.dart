@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/config/app_config.dart';
+
 /// Camera on Android / iOS, gallery picker on web & desktop.
 class ImageInput {
   const ImageInput._();
@@ -13,12 +15,14 @@ class ImageInput {
           defaultTargetPlatform == TargetPlatform.iOS);
 
   static Future<XFile?> pickReceiptImage({bool forceGallery = false}) {
+    // Local mode keeps the photo in localStorage, so downscale a bit more.
+    final local = AppConfig.isLocal;
     return _picker.pickImage(
       source: supportsCamera && !forceGallery
           ? ImageSource.camera
           : ImageSource.gallery,
-      imageQuality: 92,
-      maxWidth: 2400,
+      imageQuality: local ? 72 : 92,
+      maxWidth: local ? 1500 : 2400,
       preferredCameraDevice: CameraDevice.rear,
     );
   }

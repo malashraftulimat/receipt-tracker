@@ -34,3 +34,28 @@ abstract class OcrService {
 
 /// Resolves the implementation for the current platform.
 OcrService createOcrService() => platform.createOcrService();
+
+/// Used when OCR cannot run: local (offline) mode on web/desktop, where the
+/// only engine is the Supabase edge function.
+class UnavailableOcrService implements OcrService {
+  const UnavailableOcrService(this.message);
+
+  final String message;
+
+  @override
+  Future<OcrResult> recognize(Uint8List bytes) async {
+    throw OcrUnavailableException(message);
+  }
+
+  @override
+  Future<void> dispose() async {}
+}
+
+class OcrUnavailableException implements Exception {
+  const OcrUnavailableException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}

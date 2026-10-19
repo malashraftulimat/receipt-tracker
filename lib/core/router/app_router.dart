@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/providers.dart';
+import '../config/app_config.dart';
 import '../../features/auth/auth_page.dart';
 import '../../features/categories/categories_page.dart';
 import '../../features/dashboard/dashboard_page.dart';
@@ -13,18 +17,23 @@ import '../../features/settings/settings_page.dart';
 import 'app_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final client = ref.watch(supabaseClientProvider);
-
   // Re-run redirects whenever the session changes.
   final refresh = ValueNotifier<int>(0);
-  final subscription =
-      client.auth.onAuthStateChange.listen((_) => refresh.value++);
+  StreamSubscription<AuthState>? subscription;
+
+  if (!AppConfig.isLocal) {
+    final client = ref.watch(supabaseClientProvider);
+    subscription =
+        client.auth.onAuthStateChange.listen((_) => refresh.value++);
+  }
   ref.onDispose(() {
-    subscription.cancel();
+    subscription?.cancel();
     refresh.dispose();
   });
 
-  bool signedIn() => client.auth.currentUser != null;
+  // Local mode has a synthetic user and never touches Supabase.
+  bool signedIn() =>
+      AppConfig.isLocal || Supabase.instance.client.auth.currentUser != null;
 
   return GoRouter(
     initialLocation: '/dashboard',

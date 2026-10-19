@@ -15,6 +15,21 @@ Everything is reviewed and editable before saving.
 
 ---
 
+## Live website
+
+**https://malashraftulimat.github.io/receipt-tracker/**
+
+Opens in any phone or desktop browser. On first launch choose:
+
+* **アカウントなしで使う（この端末に保存）** — instant local mode: no signup, no server.
+  Receipts, categories and photos are stored in the browser (`localStorage`).
+* **Supabase に接続** — paste your Project URL + anon key for multi-device sync.
+
+Live barcode scanning works in Chrome/Edge/Safari over HTTPS; OCR on the web
+uses the `ocr` edge function (local mode only offers manual entry there).
+
+---
+
 ## 0. Built applications (where the platform copies are)
 
 | What | Where |
@@ -190,7 +205,7 @@ per-platform prerequisites and signing.
 
 ```bash
 flutter pub get
-flutter run                     # pick a device, then paste your Supabase URL/key
+flutter run                     # pick a device, then choose local mode or paste keys
 
 # or bake the credentials in (no setup screen):
 flutter run --dart-define=SUPABASE_URL=https://xxx.supabase.co \

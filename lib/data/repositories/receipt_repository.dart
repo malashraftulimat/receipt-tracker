@@ -1,8 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/config/app_config.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/models/receipt_filter.dart';
+import '../services/local_store.dart';
 
 /// Thrown when a receipt with the same barcode already exists.
 class DuplicateReceiptException implements Exception {
@@ -15,21 +17,26 @@ class DuplicateReceiptException implements Exception {
   String toString() => 'DuplicateReceiptException($barcode)';
 }
 
+/// Talks to Supabase, or to [LocalStore] when local mode is active.
 class ReceiptRepository {
-  ReceiptRepository(this._client);
+  ReceiptRepository([this._client]);
 
-  final SupabaseClient _client;
+  final SupabaseClient? _client;
+
+  SupabaseClient get _supabase => _client ?? Supabase.instance.client;
 
   static const String _selectWithCategory = '*, category:categories(*)';
 
   String get _userId {
-    final user = _client.auth.currentUser;
+    final user = _supabase.auth.currentUser;
     if (user == null) throw StateError('Not signed in');
     return user.id;
   }
 
   Future<List<Receipt>> fetch(ReceiptFilter filter) async {
-    var query = _client.from('receipts').select(_selectWithCategory);
+    if (AppConfig.isLocal) return LocalStore.instance.fetchReceipts(filter);
+
+    var query = _supabase.from('receipts').select(_selectWithCategory);
 
     if (filter.categoryId != null) {
       query = query.eq('category_id', filter.categoryId!);
@@ -56,7 +63,13 @@ class ReceiptRepository {
   }
 
   Future<Receipt> getById(String id) async {
-    final row = await _client
+    if (AppConfig.isLocal) {
+      final receipt = await LocalStore.instance.receiptById(id);
+      if (receipt == null) throw StateError('レシートが見つかりません');
+      return receipt;
+    }
+
+    final row = await _supabase
         .from('receipts')
         .select(_selectWithCategory)
         .eq('id', id)
@@ -65,7 +78,11 @@ class ReceiptRepository {
   }
 
   Future<String?> findIdByBarcode(String barcode) async {
-    final rows = await _client
+    if (AppConfig.isLocal) {
+      return LocalStore.instance.findIdByBarcode(barcode);
+    }
+
+    final rows = await _supabase
         .from('receipts')
         .select('id')
         .eq('barcode_id', barcode)
@@ -76,6 +93,17 @@ class ReceiptRepository {
 
   Future<Receipt> create(ReceiptDraft draft, {String? imagePath}) async {
     final barcode = draft.barcodeId?.trim();
+
+    if (AppConfig.isLocal) {
+      if (barcode != null && barcode.isNotEmpty) {
+        final existingId = await LocalStore.instance.findIdByBarcode(barcode);
+        if (existingId != null) {
+          throw DuplicateReceiptException(barcode, existingId: existingId);
+        }
+      }
+      return LocalStore.instance.createReceipt(draft, imagePath);
+    }
+
     if (barcode != null && barcode.isNotEmpty) {
       final existingId = await findIdByBarcode(barcode);
       if (existingId != null) {
@@ -84,7 +112,7 @@ class ReceiptRepository {
     }
 
     try {
-      final row = await _client
+      final row = await _supabase
           .from('receipts')
           .insert(<String, dynamic>{
             'user_id': _userId,
@@ -106,7 +134,11 @@ class ReceiptRepository {
   }
 
   Future<Receipt> update(String id, Map<String, dynamic> patch) async {
-    final row = await _client
+    if (AppConfig.isLocal) {
+      return LocalStore.instance.updateReceipt(id, patch);
+    }
+
+    final row = await _supabase
         .from('receipts')
         .update(patch)
         .eq('id', id)
@@ -116,6 +148,10 @@ class ReceiptRepository {
   }
 
   Future<void> delete(String id) async {
-    await _client.from('receipts').delete().eq('id', id);
+    if (AppConfig.isLocal) {
+      await LocalStore.instance.deleteReceipt(id);
+      return;
+    }
+    await _supabase.from('receipts').delete().eq('id', id);
   }
 }

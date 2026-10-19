@@ -13,6 +13,7 @@ import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/parser/receipt_parser.dart';
 import '../dashboard/analytics_provider.dart';
+import '../shared/stored_image.dart';
 
 /// Arguments passed through `context.push('/review', extra: ...)`.
 class ReviewArgs {
@@ -915,7 +916,7 @@ class _ImagePanel extends ConsumerWidget {
             style: theme.textTheme.bodySmall,
           ),
         ),
-        data: (value) => Image.network(value, fit: BoxFit.cover),
+        data: (value) => StoredImage(url: value, fit: BoxFit.cover),
       );
     } else {
       content = Center(
