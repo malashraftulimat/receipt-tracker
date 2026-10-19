@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/providers.dart';
 import '../config/app_config.dart';
 import '../../features/auth/auth_page.dart';
+import '../../features/budget/budget_page.dart';
 import '../../features/categories/categories_page.dart';
 import '../../features/dashboard/dashboard_page.dart';
 import '../../features/receipts/receipt_detail_page.dart';
@@ -75,6 +76,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             name: 'settings',
             builder: (context, state) => const SettingsPage(),
+          ),
+          GoRoute(
+            path: '/budget',
+            name: 'budget',
+            builder: (context, state) => const BudgetPage(),
           ),
         ],
       ),

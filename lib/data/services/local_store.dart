@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/category.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
+import '../../domain/models/monthly_budget.dart';
 import '../../domain/models/receipt_filter.dart';
 
 /// On-device persistence used by "ローカルモード" (no Supabase, no account).
@@ -22,11 +23,13 @@ class LocalStore {
 
   static const String receiptsKey = 'local_receipts_v1';
   static const String categoriesKey = 'local_categories_v1';
+  static const String budgetsKey = 'local_budgets_v1';
 
   /// Local accounts keep separate data: keys are suffixed with the user id.
   String _userId = 'local-user';
   String get _receiptsKey => '${receiptsKey}_$_userId';
   String get _categoriesKey => '${categoriesKey}_$_userId';
+  String get _budgetsKey => '${budgetsKey}_$_userId';
 
   void useUser(String userId) => _userId = userId;
 
@@ -209,7 +212,7 @@ class LocalStore {
     final row = <String, dynamic>{
       'id': 'r-${DateTime.now().microsecondsSinceEpoch}',
       'user_id': localUserId,
-      ...draft.toRow(),
+      ...draft.toRow(includeItems: true),
       'image_path': imagePath ?? draft.imagePath,
       'created_at': now,
       'updated_at': now,
@@ -272,6 +275,47 @@ class LocalStore {
   }
 
   // -------------------------------------------------------------------------
+  // Budgets
+  // -------------------------------------------------------------------------
+
+  Future<MonthlyBudget?> fetchBudget(DateTime month) async {
+    final rows = await _readList(_budgetsKey);
+    for (final row in rows) {
+      final budget = MonthlyBudget.fromJson(row);
+      if (budget.month.year == month.year &&
+          budget.month.month == month.month) {
+        return budget;
+      }
+    }
+    return null;
+  }
+
+  Future<MonthlyBudget> saveBudget(MonthlyBudget budget) async {
+    final rows = await _readList(_budgetsKey);
+    final first = DateTime(budget.month.year, budget.month.month, 1);
+    final row = <String, dynamic>{
+      ...budget.toRow(),
+      'id': budget.id ?? 'b-${DateTime.now().microsecondsSinceEpoch}',
+      'user_id': localUserId,
+      'month': first.toUtc().toIso8601String(),
+    };
+    final index = rows.indexWhere((existing) {
+      final existingMonth =
+          DateTime.tryParse(existing['month']?.toString() ?? '')?.toLocal();
+      return existingMonth != null &&
+          existingMonth.year == first.year &&
+          existingMonth.month == first.month;
+    });
+    if (index >= 0) {
+      rows[index] = row;
+    } else {
+      rows.add(row);
+    }
+    await _writeList(_budgetsKey, rows);
+    return MonthlyBudget.fromJson(row);
+  }
+
+  // -------------------------------------------------------------------------
   // Images
   // -------------------------------------------------------------------------
 
@@ -324,6 +368,7 @@ class LocalStore {
     for (final key in prefs.getKeys().toList()) {
       if (key.startsWith(receiptsKey) ||
           key.startsWith(categoriesKey) ||
+          key.startsWith(budgetsKey) ||
           key.startsWith(_imagePrefix)) {
         await prefs.remove(key);
       }

@@ -32,6 +32,12 @@ create table if not exists public.receipts (
   tax_10_amount   integer,
   tax_8_base      integer,
   tax_10_base     integer,
+  tax_8_items_total  integer,          -- sum of 8% (reduced) item rows
+  tax_10_items_total integer,          -- sum of 10% (standard) item rows
+  due_date        timestamptz,         -- 支払期限 / 振込用紙 deadline
+  reminder_at     timestamptz,         -- optional reminder
+  point_brand     text,                -- dポイント / Ponta / Tポイント / 楽天
+  point_amount    integer,
   barcode_id      text,                           -- JAN-13 / Code128 / invoice ref
   category_id     uuid references public.categories (id) on delete set null,
   note            text,
@@ -54,6 +60,46 @@ create index if not exists receipts_user_date_idx
 create index if not exists receipts_category_idx
   on public.receipts (category_id);
 
+create index if not exists receipts_due_date_idx
+  on public.receipts (user_id, due_date)
+  where due_date is not null;
+
+-- ---------------------------------------------------------------------------
+-- 1b. Monthly budget / savings plan
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.budgets (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users (id) on delete cascade,
+  month          timestamptz not null,          -- first day of the month (UTC)
+  salary         integer not null default 0,    -- 手取り月収
+  savings_goal   integer not null default 0,    -- 毎月の貯蓄目標
+  fixed_expenses integer not null default 0,    -- 家賃・光熱費・サブスク
+  note           text,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  unique (user_id, month)
+);
+
+-- ---------------------------------------------------------------------------
+-- 1c. Itemized receipt lines
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.receipt_items (
+  id          uuid primary key default gen_random_uuid(),
+  receipt_id  uuid not null references public.receipts (id) on delete cascade,
+  name        text not null,
+  quantity    integer not null default 1,
+  unit_price  integer,
+  total_price integer not null default 0,
+  tax_rate    integer check (tax_rate in (8, 10) or tax_rate is null),
+  category_id uuid references public.categories (id) on delete set null,
+  sort_order  integer not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists receipt_items_receipt_idx
+  on public.receipt_items (receipt_id, sort_order);
 -- ---------------------------------------------------------------------------
 -- 2. updated_at trigger
 -- ---------------------------------------------------------------------------
@@ -73,12 +119,19 @@ create trigger receipts_touch_updated_at
   before update on public.receipts
   for each row execute function public.touch_updated_at();
 
+drop trigger if exists budgets_touch_updated_at on public.budgets;
+create trigger budgets_touch_updated_at
+  before update on public.budgets
+  for each row execute function public.touch_updated_at();
+
 -- ---------------------------------------------------------------------------
 -- 3. Row Level Security
 -- ---------------------------------------------------------------------------
 
 alter table public.categories enable row level security;
 alter table public.receipts   enable row level security;
+alter table public.budgets    enable row level security;
+alter table public.receipt_items enable row level security;
 
 drop policy if exists categories_owner_all on public.categories;
 create policy categories_owner_all on public.categories
@@ -86,6 +139,24 @@ create policy categories_owner_all on public.categories
 
 drop policy if exists receipts_owner_all on public.receipts;
 create policy receipts_owner_all on public.receipts
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists receipt_items_owner_all on public.receipt_items;
+create policy receipt_items_owner_all on public.receipt_items
+  for all using (
+    exists (
+      select 1 from public.receipts r
+      where r.id = receipt_id and r.user_id = auth.uid()
+    )
+  ) with check (
+    exists (
+      select 1 from public.receipts r
+      where r.id = receipt_id and r.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists budgets_owner_all on public.budgets;
+create policy budgets_owner_all on public.budgets
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------

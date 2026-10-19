@@ -26,8 +26,8 @@ Opens in any phone or desktop browser. On first launch choose:
   the browser (`localStorage`) and are scoped per account.
 * **Supabase に接続** — paste your Project URL + anon key for multi-device sync.
 
-Live barcode scanning works in Chrome/Edge/Safari over HTTPS; OCR on the web
-uses the `ocr` edge function (local mode only offers manual entry there).
+On the web, receipts are captured with the file picker and OCR runs through the
+`ocr` edge function (live barcode scanning is available in the Android/iOS app).
 
 ---
 
@@ -281,3 +281,25 @@ change amounts, 8%/10% tax lines, tax-inclusive bases and reference numbers.
 - Realtime subscriptions are not enabled by default (the dashboard refetches on
   pull-to-refresh / provider invalidation). Add
   `client.from('receipts').stream(primaryKey: ['id'])` for live multi-device updates.
+
+---
+
+## Itemized receipts & budgets (v1.1)
+
+* **Line-item extraction** — `ReceiptParser` pulls item rows above the total:
+  names, quantities (`2個`, `2×198`), unit/total prices and per-item tax
+  (`※`/`軽減` → 8%, `(10%)` → 10%). Stored in `receipt_items`.
+* **Dynamic editor** — the review screen lists items as editable rows with
+  add/delete, tax selector and per-item category; totals are cross-checked
+  against 合計 with a green check or a discrepancy warning + “合計に合わせる”.
+* **Auto-categorisation** — `CategoryGuesser` maps merchant/item keywords to the
+  default categories (食費 / 外食 / 日用品 / 光熱費 / 交通費 / 娯楽 / 医療).
+* **Budgets** — monthly salary, savings goal and fixed costs; disposable income
+  = salary − savings − fixed; live remaining / daily allowance / pacing status
+  on the dashboard (auto-deducted from saved receipts).
+* **Long receipts** — multi-shot capture mode with overlap-aware OCR merging
+  (`ReceiptTextMerger`).
+* **Japanese extras** — 支払期限 extraction with reminders, loyalty points
+  (dポイント / Ponta / Tポイント / 楽天ポイント), reduced-rate item totals.
+* **Export & analytics** — UTF-8 CSV (Excel-friendly) export from settings and a
+  month-over-month cumulative comparison chart.

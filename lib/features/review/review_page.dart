@@ -11,7 +11,10 @@ import '../../data/services/image_input.dart';
 import '../../domain/models/category.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
+import '../../domain/models/receipt_item.dart';
+import '../../domain/parser/category_guesser.dart';
 import '../../domain/parser/receipt_parser.dart';
+import 'widgets/item_editor_section.dart';
 import '../dashboard/analytics_provider.dart';
 import '../shared/stored_image.dart';
 
@@ -48,6 +51,8 @@ class ReviewPage extends ConsumerStatefulWidget {
 
 class _ReviewPageState extends ConsumerState<ReviewPage> {
   final _formKey = GlobalKey<FormState>();
+  final List<ReceiptItemEditor> _items = <ReceiptItemEditor>[];
+  bool _autoTagged = false;
 
   late final ReceiptDraft? _initial;
   late final TextEditingController _merchant;
@@ -57,11 +62,16 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   late final TextEditingController _tax10;
   late final TextEditingController _barcode;
   late final TextEditingController _note;
+  late final TextEditingController _pointBrand;
+  late final TextEditingController _pointAmount;
 
   late DateTime _purchasedAt;
   String? _categoryId;
   int? _tax8Base;
   int? _tax10Base;
+  int? _tax8ItemsTotal;
+  int? _tax10ItemsTotal;
+  DateTime? _dueDate;
   Uint8List? _imageBytes;
   String? _imagePath;
   String? _rawOcrText;
@@ -106,16 +116,28 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     );
     _barcode = TextEditingController(text: draft?.barcodeId ?? '');
     _note = TextEditingController(text: draft?.note ?? '');
+    _pointBrand = TextEditingController(text: draft?.pointBrand ?? '');
+    _pointAmount = TextEditingController(
+      text: draft?.pointAmount == null
+          ? ''
+          : formatAmountDigits(draft!.pointAmount!),
+    );
 
     _purchasedAt = draft?.purchasedAt ?? DateTime.now();
     _categoryId = draft?.categoryId;
     _tax8Base = draft?.tax8Base;
     _tax10Base = draft?.tax10Base;
+    _tax8ItemsTotal = draft?.tax8ItemsTotal;
+    _tax10ItemsTotal = draft?.tax10ItemsTotal;
+    _dueDate = draft?.dueDate;
     _imageBytes = widget.args.imageBytes;
     _imagePath = draft?.imagePath;
     _rawOcrText = draft?.rawOcrText;
     _source = draft?.source ?? ReceiptSource.manual;
     _warnings = widget.args.parsed?.warnings ?? const <String>[];
+    for (final item in draft?.items ?? const <ReceiptItem>[]) {
+      _items.add(ReceiptItemEditor(item: item));
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkDuplicate());
   }
@@ -129,9 +151,68 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     _tax10.dispose();
     _barcode.dispose();
     _note.dispose();
+    _pointBrand.dispose();
+    _pointAmount.dispose();
+    for (final item in _items) {
+      item.dispose();
+    }
     super.dispose();
   }
 
+  void _addItem() {
+    setState(() => _items.add(ReceiptItemEditor()));
+  }
+
+  void _removeItem(int index) {
+    setState(() {
+      _items[index].dispose();
+      _items.removeAt(index);
+    });
+  }
+
+  void _matchTotalToItems() {
+    final itemsTotal = _items.fold<int>(
+      0,
+      (sum, item) => sum + item.totalValue,
+    );
+    if (itemsTotal > 0) {
+      _total.text = formatAmountDigits(itemsTotal);
+    }
+  }
+
+  /// Suggests categories from item names / merchant when none is chosen.
+  void _autoTagItems(List<ExpenseCategory> categories) {
+    if (categories.isEmpty) return;
+    String? idFor(String? name) {
+      if (name == null) return null;
+      for (final category in categories) {
+        if (category.name == name) return category.id;
+      }
+      return null;
+    }
+
+    var changed = false;
+    final guessed = CategoryGuesser.guessFromMany(<String>[
+      _merchant.text,
+      for (final item in _items) item.name.text,
+    ]);
+    final receiptCategory = idFor(guessed);
+    if (_categoryId == null && receiptCategory != null) {
+      _categoryId = receiptCategory;
+      changed = true;
+    }
+
+    for (final item in _items) {
+      if (item.categoryId != null) continue;
+      final itemCategory = idFor(CategoryGuesser.guess(item.name.text));
+      if (itemCategory != null) {
+        item.categoryId = itemCategory;
+        changed = true;
+      }
+    }
+
+    if (changed && mounted) setState(() {});
+  }
   // -------------------------------------------------------------------------
   // Duplicate guard
   // -------------------------------------------------------------------------
@@ -235,6 +316,17 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final repository = ref.read(receiptRepositoryProvider);
     final storage = ref.read(storageRepositoryProvider);
 
+    final items = <ReceiptItem>[
+      for (var i = 0; i < _items.length; i++)
+        if (_items[i].name.text.trim().isNotEmpty) _items[i].toItem(i),
+    ];
+    final itemsTax8 = items
+        .where((item) => item.taxRate == 8)
+        .fold<int>(0, (sum, item) => sum + item.totalPrice);
+    final itemsTax10 = items
+        .where((item) => item.taxRate == 10)
+        .fold<int>(0, (sum, item) => sum + item.totalPrice);
+
     final draft = ReceiptDraft(
       merchant: _merchant.text,
       purchasedAt: _purchasedAt,
@@ -244,11 +336,20 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       tax10Amount: parseYenInput(_tax10.text),
       tax8Base: _tax8Base,
       tax10Base: _tax10Base,
+      tax8ItemsTotal: items.isEmpty ? _tax8ItemsTotal : itemsTax8,
+      tax10ItemsTotal: items.isEmpty ? _tax10ItemsTotal : itemsTax10,
+      dueDate: _dueDate,
+      reminderAt: _dueDate == null
+          ? null
+          : _dueDate!.subtract(const Duration(days: 3)),
+      pointBrand: _pointBrand.text.trim().isEmpty ? null : _pointBrand.text,
+      pointAmount: parseYenInput(_pointAmount.text),
       barcodeId: _barcode.text,
       categoryId: _categoryId,
       note: _note.text,
       imagePath: _imagePath,
       rawOcrText: _rawOcrText,
+      items: items,
       source: _source,
     );
 
@@ -266,6 +367,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             ...draft.toRow(),
             'image_path': imagePath,
           },
+          items: items,
         );
       } else {
         saved = await repository.create(draft, imagePath: imagePath);
@@ -275,6 +377,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       ref.invalidate(receiptsProvider);
       ref.invalidate(analyticsProvider);
       ref.invalidate(receiptByIdProvider(saved.id));
+      ref.invalidate(upcomingDueProvider);
+      ref.invalidate(
+        budgetSummaryProvider(
+          DateTime(saved.purchasedAt.year, saved.purchasedAt.month),
+        ),
+      );
       setState(() => _saving = false);
       context.pop(saved);
     } on DuplicateReceiptException catch (error) {
@@ -399,6 +507,13 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final categories =
         ref.watch(categoriesProvider).valueOrNull ?? const <ExpenseCategory>[];
 
+    if (!_autoTagged && categories.isNotEmpty) {
+      _autoTagged = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _autoTagItems(categories);
+      });
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -471,6 +586,61 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                       ),
               ),
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _pickDueDate,
+                    icon: const Icon(Icons.event_available_outlined, size: 18),
+                    label: Text(
+                      _dueDate == null
+                          ? '支払期限を設定（振込用紙）'
+                          : '支払期限 ${formatDateShortJa(_dueDate!)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                if (_dueDate != null)
+                  IconButton(
+                    tooltip: '支払期限をクリア',
+                    onPressed: () => setState(() => _dueDate = null),
+                    icon: const Icon(Icons.close, size: 18),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: TextFormField(
+                    controller: _pointBrand,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'ポイント種別',
+                      hintText: 'dポイント / Ponta など',
+                      prefixIcon: Icon(Icons.stars_outlined),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 130,
+                  child: TextFormField(
+                    controller: _pointAmount,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: <TextInputFormatter>[
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'ポイント数',
+                      suffixText: 'pt',
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerLeft,
@@ -514,6 +684,18 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               ],
             ),
           ],
+        ),
+        const SizedBox(height: 14),
+        ItemEditorSection(
+          items: _items,
+          categories: categories,
+          totalAmount: parseYenInput(_total.text) ?? 0,
+          taxTotal: (parseYenInput(_tax8.text) ?? 0) +
+              (parseYenInput(_tax10.text) ?? 0),
+          onAdd: _addItem,
+          onRemove: _removeItem,
+          onChanged: () => setState(() {}),
+          onMatchTotal: _matchTotalToItems,
         ),
         const SizedBox(height: 14),
         _Section(
@@ -617,6 +799,19 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         ],
       ],
     );
+  }
+
+  Future<void> _pickDueDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 14)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      helpText: '支払期限を選択',
+      locale: const Locale('ja'),
+    );
+    if (picked == null) return;
+    setState(() => _dueDate = picked);
   }
 
   Future<void> _pickDate() async {

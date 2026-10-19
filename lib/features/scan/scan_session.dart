@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum ScanMode { barcode, ocr, auto }
+enum ScanMode { barcode, ocr, auto, longReceipt }
 
 extension ScanModeLabels on ScanMode {
   String get label {
@@ -11,6 +11,8 @@ extension ScanModeLabels on ScanMode {
         return 'レシートOCR';
       case ScanMode.auto:
         return '自動';
+      case ScanMode.longReceipt:
+        return '長レシート';
     }
   }
 
@@ -22,6 +24,8 @@ extension ScanModeLabels on ScanMode {
         return 'レシート全体が入るように撮影してください';
       case ScanMode.auto:
         return 'バーコードを検出し、続けてレシート文字も読み取ります';
+      case ScanMode.longReceipt:
+        return '上から順に分割撮影。つなぎ目の重複は自動で除去します';
     }
   }
 }

@@ -4,6 +4,7 @@ import '../../core/config/app_config.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/models/receipt_filter.dart';
+import '../../domain/models/receipt_item.dart';
 import '../services/local_store.dart';
 
 /// Thrown when a receipt with the same barcode already exists.
@@ -25,7 +26,8 @@ class ReceiptRepository {
 
   SupabaseClient get _supabase => _client ?? Supabase.instance.client;
 
-  static const String _selectWithCategory = '*, category:categories(*)';
+  static const String _selectWithCategory =
+      '*, category:categories(*), items:receipt_items(*)';
 
   String get _userId {
     final user = _supabase.auth.currentUser;
@@ -112,16 +114,28 @@ class ReceiptRepository {
     }
 
     try {
-      final row = await _supabase
+      final inserted = await _supabase
           .from('receipts')
           .insert(<String, dynamic>{
             'user_id': _userId,
             ...draft.toRow(),
             'image_path': imagePath ?? draft.imagePath,
           })
-          .select(_selectWithCategory)
+          .select('id')
           .single();
-      return Receipt.fromJson(row);
+      final id = inserted['id'] as String;
+
+      if (draft.items.isNotEmpty) {
+        await _supabase.from('receipt_items').insert(<Map<String, dynamic>>[
+          for (var i = 0; i < draft.items.length; i++)
+            <String, dynamic>{
+              ...draft.items[i].toRow(receiptId: id),
+              'sort_order': i,
+            },
+        ]);
+      }
+
+      return getById(id);
     } on PostgrestException catch (error) {
       if (error.code == '23505') {
         // Lost a race against another device: look the existing row up again.
@@ -133,18 +147,41 @@ class ReceiptRepository {
     }
   }
 
-  Future<Receipt> update(String id, Map<String, dynamic> patch) async {
+  Future<Receipt> update(
+    String id,
+    Map<String, dynamic> patch, {
+    List<ReceiptItem>? items,
+  }) async {
     if (AppConfig.isLocal) {
-      return LocalStore.instance.updateReceipt(id, patch);
+      return LocalStore.instance.updateReceipt(
+        id,
+        <String, dynamic>{
+          ...patch,
+          if (items != null)
+            'items': <Map<String, dynamic>>[
+              for (var i = 0; i < items.length; i++)
+                <String, dynamic>{...items[i].toJson(), 'sort_order': i},
+            ],
+        },
+      );
     }
 
-    final row = await _supabase
-        .from('receipts')
-        .update(patch)
-        .eq('id', id)
-        .select(_selectWithCategory)
-        .single();
-    return Receipt.fromJson(row);
+    await _supabase.from('receipts').update(patch).eq('id', id);
+
+    if (items != null) {
+      await _supabase.from('receipt_items').delete().eq('receipt_id', id);
+      if (items.isNotEmpty) {
+        await _supabase.from('receipt_items').insert(<Map<String, dynamic>>[
+          for (var i = 0; i < items.length; i++)
+            <String, dynamic>{
+              ...items[i].toRow(receiptId: id),
+              'sort_order': i,
+            },
+        ]);
+      }
+    }
+
+    return getById(id);
   }
 
   Future<void> delete(String id) async {

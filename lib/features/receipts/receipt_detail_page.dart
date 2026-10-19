@@ -11,6 +11,7 @@ import '../../domain/models/receipt.dart';
 import '../dashboard/analytics_provider.dart';
 import '../dashboard/widgets/receipt_tile.dart';
 import '../review/review_page.dart';
+import 'widgets/receipt_item_row.dart';
 import '../shared/stored_image.dart';
 
 class ReceiptDetailPage extends ConsumerWidget {
@@ -278,8 +279,60 @@ class _DetailBody extends StatelessWidget {
                       label: '消費税合計',
                       value: formatYen(receipt.taxTotal),
                     ),
+                  if (receipt.tax8ItemsTotal != null)
+                    _InfoRow(
+                      label: '8%対象商品の合計（推定）',
+                      value: formatYen(receipt.tax8ItemsTotal!),
+                    ),
+                  if (receipt.tax10ItemsTotal != null)
+                    _InfoRow(
+                      label: '10%対象商品の合計（推定）',
+                      value: formatYen(receipt.tax10ItemsTotal!),
+                    ),
                 ],
               ),
+              if (receipt.items.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 14),
+                _InfoCard(
+                  title: '明細（商品）',
+                  children: <Widget>[
+                    for (final item in receipt.items)
+                      ReceiptItemRow(item: item),
+                  ],
+                ),
+              ],
+              if (receipt.dueDate != null) ...<Widget>[
+                const SizedBox(height: 14),
+                _InfoCard(
+                  title: '支払期限',
+                  children: <Widget>[
+                    _DueDateRow(dueDate: receipt.dueDate!),
+                    if (receipt.reminderAt != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          'リマインダー: ${formatDateJa(receipt.reminderAt!)}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              if (receipt.pointAmount != null) ...<Widget>[
+                const SizedBox(height: 14),
+                _InfoCard(
+                  title: 'ポイント',
+                  children: <Widget>[
+                    _InfoRow(
+                      label: receipt.pointBrand ?? 'ポイント',
+                      value: '${receipt.pointAmount} pt',
+                      emphasized: true,
+                    ),
+                  ],
+                ),
+              ],
               if (receipt.barcodeId != null) ...<Widget>[
                 const SizedBox(height: 14),
                 _InfoCard(
@@ -422,6 +475,65 @@ class _ReceiptImage extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DueDateRow extends StatelessWidget {
+  const _DueDateRow({required this.dueDate});
+
+  final DateTime dueDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final days = target.difference(today).inDays;
+
+    final Color color;
+    final String label;
+    if (days < 0) {
+      color = theme.colorScheme.error;
+      label = '\${-days} 日過ぎています';
+    } else if (days == 0) {
+      color = theme.colorScheme.error;
+      label = '今日が期限です';
+    } else if (days <= 3) {
+      color = const Color(0xFFEF6C00);
+      label = 'あと \$days 日';
+    } else {
+      color = theme.colorScheme.primary;
+      label = 'あと \$days 日';
+    }
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            formatDateJa(dueDate),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

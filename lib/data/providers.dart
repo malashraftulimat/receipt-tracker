@@ -6,9 +6,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/app_config.dart';
 import '../domain/models/app_user.dart';
 import '../domain/models/category.dart';
+import '../domain/models/monthly_budget.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
 import 'repositories/auth_repository.dart';
+import 'repositories/budget_repository.dart';
 import 'repositories/category_repository.dart';
 import 'repositories/receipt_repository.dart';
 import 'repositories/storage_repository.dart';
@@ -39,6 +41,10 @@ final categoryRepositoryProvider = Provider<CategoryRepository>(
 
 final storageRepositoryProvider = Provider<StorageRepository>(
   (ref) => StorageRepository(),
+);
+
+final budgetRepositoryProvider = Provider<BudgetRepository>(
+  (ref) => BudgetRepository(),
 );
 
 bool get _hasOnDeviceOcr =>
@@ -184,9 +190,91 @@ final receiptsProvider = FutureProvider<List<Receipt>>((ref) async {
   return ref.watch(receiptRepositoryProvider).fetch(filter);
 });
 
+
+// ---------------------------------------------------------------------------
+// Budgets
+// ---------------------------------------------------------------------------
+
+/// Stored plan for a month (null when never configured).
+final budgetProvider = FutureProvider.family<MonthlyBudget?, DateTime>(
+  (ref, month) async {
+    final userId = ref.watch(userIdProvider);
+    if (userId == null) return null;
+    return ref.watch(budgetRepositoryProvider).fetchMonth(month);
+  },
+);
+
+/// Plan + actual spending + pacing for a month.
+final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
+  (ref, month) async {
+    final userId = ref.watch(userIdProvider);
+    final first = DateTime(month.year, month.month, 1);
+    final now = DateTime.now();
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+
+    var daysElapsed = 0;
+    if (first.year == now.year && first.month == now.month) {
+      daysElapsed = now.day;
+    } else if (first.isBefore(DateTime(now.year, now.month, 1))) {
+      daysElapsed = daysInMonth;
+    }
+
+    final budget = await ref.watch(budgetProvider(first).future);
+
+    var spent = 0;
+    var receiptCount = 0;
+    var todaySpent = 0;
+
+    if (userId != null) {
+      final receipts = await ref
+          .watch(receiptRepositoryProvider)
+          .fetch(ReceiptFilter(month: first));
+      for (final receipt in receipts) {
+        spent += receipt.totalAmount;
+        receiptCount += 1;
+        final date = receipt.purchasedAt;
+        if (date.year == now.year &&
+            date.month == now.month &&
+            date.day == now.day) {
+          todaySpent += receipt.totalAmount;
+        }
+      }
+    }
+
+    return BudgetSummary(
+      month: first,
+      budget: budget,
+      spent: spent,
+      receiptCount: receiptCount,
+      daysInMonth: daysInMonth,
+      daysElapsed: daysElapsed,
+      todaySpent: todaySpent,
+    );
+  },
+);
+
 final receiptByIdProvider = FutureProvider.family<Receipt, String>(
   (ref, id) => ref.watch(receiptRepositoryProvider).getById(id),
 );
+
+
+/// Receipts with a 支払期限, sorted by the closest deadline.
+final upcomingDueProvider = FutureProvider<List<Receipt>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <Receipt>[];
+
+  final now = DateTime.now();
+  final receipts = await ref.watch(receiptRepositoryProvider).fetch(
+    ReceiptFilter(
+      from: DateTime(now.year, now.month - 1, 1),
+      to: DateTime(now.year, now.month + 3, 1),
+    ),
+  );
+
+  final due = receipts.where((receipt) => receipt.dueDate != null).toList();
+  due.sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
+  return due;
+});
 
 /// Signed URL for a stored receipt image path.
 final signedImageUrlProvider = FutureProvider.family<String, String>(

@@ -13,6 +13,7 @@ import '../../data/services/image_input.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/parser/receipt_parser.dart';
+import '../../domain/parser/receipt_text_merger.dart';
 import '../review/review_page.dart';
 import 'scan_session.dart';
 
@@ -28,15 +29,17 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   MobileScannerController? _scanner;
   bool _processing = false;
   bool _navigating = false;
+  final List<String> _chunkTexts = <String>[];
+  final List<Uint8List> _chunkImages = <Uint8List>[];
   String? _error;
 
-  /// Live preview works on Android/iOS **and** in the browser
-  /// (mobile_scanner's web implementation uses ZXing + getUserMedia).
-  /// Windows/macOS/Linux still fall back to image picking.
+  /// Live preview is Android/iOS only. On web the platform view overflows its
+  /// widget bounds and swallows taps meant for the controls, so the browser
+  /// uses image-pick OCR + manual entry instead.
   bool get _hasLiveCamera =>
-      kIsWeb ||
-      defaultTargetPlatform == TargetPlatform.android ||
-      defaultTargetPlatform == TargetPlatform.iOS;
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   @override
   void initState() {
@@ -161,6 +164,72 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Long receipt: capture overlapping chunks and merge the OCR text
+  // -------------------------------------------------------------------------
+
+  Future<void> _captureChunk() async {
+    if (_processing || _navigating) return;
+
+    setState(() {
+      _processing = true;
+      _error = null;
+    });
+    await _stopScanner();
+
+    try {
+      final file = await ImageInput.pickReceiptImage();
+      if (file == null) return;
+
+      final bytes = await file.readAsBytes();
+      final result = await ref.read(ocrServiceProvider).recognize(bytes);
+      if (!mounted) return;
+
+      setState(() {
+        _chunkTexts.add(result.text);
+        _chunkImages.add(bytes);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${_chunkTexts.length} 枚目を読み取りました。続きを撮影してください'),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _processing = false);
+      await _startScanner();
+    }
+  }
+
+  void _clearChunks() {
+    if (_chunkTexts.isEmpty && _chunkImages.isEmpty) return;
+    setState(() {
+      _chunkTexts.clear();
+      _chunkImages.clear();
+    });
+  }
+
+  Future<void> _mergeChunks() async {
+    if (_chunkTexts.isEmpty || _processing || _navigating) return;
+
+    final merged = const ReceiptTextMerger().merge(_chunkTexts);
+    final barcode = ref.read(scanSessionProvider).barcode;
+    final parsed = const ReceiptParser().parse(
+      merged,
+      scannedBarcode: barcode,
+    );
+    final draft = ReceiptDraft.fromParsed(
+      parsed,
+      barcodeId: barcode,
+      source: barcode == null ? ReceiptSource.ocr : ReceiptSource.barcode,
+    );
+    final cover = _chunkImages.isEmpty ? null : _chunkImages.first;
+
+    _clearChunks();
+    await _openReview(draft, cover, parsed: parsed);
+  }
   Future<void> _openReview(
     ReceiptDraft draft,
     Uint8List? imageBytes, {
@@ -299,7 +368,16 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                     _ErrorBanner(message: _error!),
                   ],
                   const SizedBox(height: 14),
-                  _ActionButtons(
+                  if (session.mode == ScanMode.longReceipt)
+                    _LongReceiptControls(
+                      chunkCount: _chunkTexts.length,
+                      busy: _processing,
+                      onAdd: _captureChunk,
+                      onMerge: _mergeChunks,
+                      onClear: _clearChunks,
+                    )
+                  else
+                    _ActionButtons(
                     mode: session.mode,
                     hasBarcode: session.barcode != null,
                     busy: _processing,
@@ -676,6 +754,67 @@ class _NoCameraView extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LongReceiptControls extends StatelessWidget {
+  const _LongReceiptControls({
+    required this.chunkCount,
+    required this.busy,
+    required this.onAdd,
+    required this.onMerge,
+    required this.onClear,
+  });
+
+  final int chunkCount;
+  final bool busy;
+  final VoidCallback onAdd;
+  final VoidCallback onMerge;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            const Icon(Icons.receipt_long, color: Colors.white70, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              '取り込み済み: $chunkCount 枚',
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+            const Spacer(),
+            if (chunkCount > 0)
+              TextButton(
+                onPressed: busy ? null : onClear,
+                child: const Text('クリア'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: busy ? null : onAdd,
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: Text(
+                  busy
+                      ? '読み取り中…'
+                      : (chunkCount == 0 ? '1枚目を撮影' : '次のチャンクを撮影'),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: busy || chunkCount == 0 ? null : onMerge,
+              child: const Text('結合して確認'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

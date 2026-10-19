@@ -69,6 +69,11 @@ class AnalyticsPanel extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             _ChartCard(
+              title: '前月比（累計支出）',
+              child: _MonthComparison(data: data),
+            ),
+            const SizedBox(height: 14),
+            _ChartCard(
               title: 'よく使う店舗',
               child: data.topMerchants.isEmpty
                   ? const _EmptyChart(message: 'データがありません')
@@ -379,6 +384,169 @@ class _CategoryBreakdown extends StatelessWidget {
                 ),
               ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MonthComparison extends StatelessWidget {
+  const _MonthComparison({required this.data});
+
+  final AnalyticsData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (data.currentDaily.isEmpty) {
+      return const _EmptyChart(message: 'データがありません');
+    }
+
+    final maxValue = math.max(
+      data.currentDaily.isEmpty ? 0 : data.currentDaily.last,
+      data.previousDaily.isEmpty ? 0 : data.previousDaily.last,
+    );
+    final maxY = math.max(1000.0, maxValue * 1.15).toDouble();
+    final maxX = data.currentDaily.length.toDouble();
+    final increased = data.momDelta > 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Icon(
+              increased ? Icons.trending_up : Icons.trending_down,
+              size: 18,
+              color: increased
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                data.previousMonthTotal == 0
+                    ? '先月のデータがありません'
+                    : '先月より ${formatYen(data.momDelta.abs())} '
+                        '${increased ? '多い' : '少ない'}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (data.previousMonthTotal > 0)
+              Text(
+                '${data.momPercent >= 0 ? '+' : ''}'
+                '${data.momPercent.toStringAsFixed(1)}%',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: increased
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.primary,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 140,
+          child: LineChart(
+            LineChartData(
+              minX: 1,
+              maxX: maxX,
+              minY: 0,
+              maxY: maxY,
+              gridData: const FlGridData(show: false),
+              borderData: FlBorderData(show: false),
+              titlesData: const FlTitlesData(
+                leftTitles:
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles:
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles:
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              lineTouchData: const LineTouchData(enabled: false),
+              lineBarsData: <LineChartBarData>[
+                LineChartBarData(
+                  spots: <FlSpot>[
+                    for (var i = 0; i < data.currentDaily.length; i++)
+                      FlSpot((i + 1).toDouble(), data.currentDaily[i].toDouble()),
+                  ],
+                  isCurved: false,
+                  barWidth: 2.4,
+                  color: theme.colorScheme.primary,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  ),
+                ),
+                LineChartBarData(
+                  spots: <FlSpot>[
+                    for (var i = 0; i < data.previousDaily.length; i++)
+                      FlSpot(
+                        (i + 1).toDouble(),
+                        data.previousDaily[i].toDouble(),
+                      ),
+                  ],
+                  isCurved: false,
+                  barWidth: 1.6,
+                  color: theme.colorScheme.outline,
+                  dashArray: const <int>[4, 4],
+                  dotData: const FlDotData(show: false),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: <Widget>[
+            _LegendDot(color: theme.colorScheme.primary, label: '今月'),
+            const SizedBox(width: 14),
+            _LegendDot(color: theme.colorScheme.outline, label: '先月'),
+            const Spacer(),
+            Text(
+              '${data.monthCount}件 / ${data.previousMonthCount}件',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: 14,
+          height: 3,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
     );

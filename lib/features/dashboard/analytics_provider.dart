@@ -45,6 +45,10 @@ class AnalyticsData {
     required this.monthCount,
     required this.sixMonthTotal,
     required this.topMerchants,
+    this.previousMonthTotal = 0,
+    this.previousMonthCount = 0,
+    this.currentDaily = const <int>[],
+    this.previousDaily = const <int>[],
   });
 
   final List<MonthTotal> months;
@@ -53,6 +57,21 @@ class AnalyticsData {
   final int monthCount;
   final int sixMonthTotal;
   final List<MerchantTotal> topMerchants;
+
+  /// Month-over-month comparison (current vs previous month).
+  final int previousMonthTotal;
+  final int previousMonthCount;
+
+  /// Cumulative spend per day of month (index 0 = day 1).
+  final List<int> currentDaily;
+  final List<int> previousDaily;
+
+  int get momDelta => monthTotal - previousMonthTotal;
+
+  double get momPercent {
+    if (previousMonthTotal <= 0) return 0;
+    return (monthTotal - previousMonthTotal) / previousMonthTotal * 100;
+  }
 
   int get average => monthCount == 0 ? 0 : monthTotal ~/ monthCount;
 
@@ -151,9 +170,36 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
       .toList()
     ..sort((a, b) => b.amount.compareTo(a.amount));
 
+  // --- month-over-month ---------------------------------------------------
+  final previousMonth = DateTime(now.year, now.month - 1);
+  final previousMonthReceipts = receipts.where((receipt) {
+    final date = receipt.purchasedAt;
+    return date.year == previousMonth.year && date.month == previousMonth.month;
+  }).toList(growable: false);
+
+  final previousMonthTotal =
+      previousMonthReceipts.fold<int>(0, (sum, r) => sum + r.totalAmount);
+
+  List<int> dailyCumulative(int year, int month) {
+    final days = DateTime(year, month + 1, 0).day;
+    final daily = List<int>.filled(days, 0);
+    for (final receipt in receipts) {
+      final date = receipt.purchasedAt;
+      if (date.year != year || date.month != month) continue;
+      final index = date.day - 1;
+      if (index >= 0 && index < days) daily[index] += receipt.totalAmount;
+    }
+    var running = 0;
+    return <int>[for (final value in daily) running += value];
+  }
+
   return AnalyticsData(
     months: months,
     slices: slices,
+    previousMonthTotal: previousMonthTotal,
+    previousMonthCount: previousMonthReceipts.length,
+    currentDaily: dailyCumulative(now.year, now.month),
+    previousDaily: dailyCumulative(previousMonth.year, previousMonth.month),
     monthTotal: currentMonth.fold<int>(0, (sum, r) => sum + r.totalAmount),
     monthCount: currentMonth.length,
     sixMonthTotal: receipts.fold<int>(0, (sum, r) => sum + r.totalAmount),

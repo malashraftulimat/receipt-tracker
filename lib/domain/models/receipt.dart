@@ -1,4 +1,5 @@
 import 'category.dart';
+import 'receipt_item.dart';
 
 enum ReceiptSource { barcode, ocr, manual }
 
@@ -37,12 +38,19 @@ class Receipt {
     this.tax10Amount,
     this.tax8Base,
     this.tax10Base,
+    this.tax8ItemsTotal,
+    this.tax10ItemsTotal,
+    this.dueDate,
+    this.reminderAt,
+    this.pointBrand,
+    this.pointAmount,
     this.barcodeId,
     this.categoryId,
     this.note,
     this.imagePath,
     this.source = ReceiptSource.manual,
     this.rawOcrText,
+    this.items = const <ReceiptItem>[],
     required this.createdAt,
     required this.updatedAt,
     this.category,
@@ -61,6 +69,18 @@ class Receipt {
   final int? tax8Base;
   final int? tax10Base;
 
+  /// Sum of item lines detected as 8% (reduced rate) / 10% (standard rate).
+  final int? tax8ItemsTotal;
+  final int? tax10ItemsTotal;
+
+  /// 振込用紙 / utility bill deadline (支払期限).
+  final DateTime? dueDate;
+  final DateTime? reminderAt;
+
+  /// Loyalty points printed on the receipt (dポイント, Ponta, Tポイント, ...).
+  final String? pointBrand;
+  final int? pointAmount;
+
   /// JAN-13 / Code 128 value or invoice reference number.
   final String? barcodeId;
   final String? categoryId;
@@ -68,6 +88,11 @@ class Receipt {
   final String? imagePath;
   final ReceiptSource source;
   final String? rawOcrText;
+
+  /// Item rows (商品明細). Persisted in `receipt_items` on Supabase and inline
+  /// in the receipt JSON for local mode.
+  final List<ReceiptItem> items;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -75,6 +100,17 @@ class Receipt {
   final ExpenseCategory? category;
 
   int get taxTotal => (tax8Amount ?? 0) + (tax10Amount ?? 0);
+
+  int get itemsTotal =>
+      items.fold<int>(0, (sum, item) => sum + item.totalPrice);
+
+  int get itemsTax8Total => items
+      .where((item) => item.taxRate == 8)
+      .fold<int>(0, (sum, item) => sum + item.totalPrice);
+
+  int get itemsTax10Total => items
+      .where((item) => item.taxRate == 10)
+      .fold<int>(0, (sum, item) => sum + item.totalPrice);
 
   bool get hasTaxBreakdown => tax8Amount != null || tax10Amount != null;
 
@@ -102,6 +138,12 @@ class Receipt {
       tax10Amount: (json['tax_10_amount'] as num?)?.toInt(),
       tax8Base: (json['tax_8_base'] as num?)?.toInt(),
       tax10Base: (json['tax_10_base'] as num?)?.toInt(),
+      tax8ItemsTotal: (json['tax_8_items_total'] as num?)?.toInt(),
+      tax10ItemsTotal: (json['tax_10_items_total'] as num?)?.toInt(),
+      dueDate: _parseDate(json['due_date']),
+      reminderAt: _parseDate(json['reminder_at']),
+      pointBrand: json['point_brand'] as String?,
+      pointAmount: (json['point_amount'] as num?)?.toInt(),
       barcodeId: json['barcode_id'] as String?,
       categoryId: json['category_id'] as String?,
       note: json['note'] as String?,
@@ -111,11 +153,27 @@ class Receipt {
       createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
       updatedAt: _parseDate(json['updated_at']) ?? DateTime.now(),
       category: category,
+      items: _parseItems(json),
     );
+  }
+
+  static List<ReceiptItem> _parseItems(Map<String, dynamic> json) {
+    final raw = json['items'] ?? json['receipt_items'];
+    if (raw is! List) return const <ReceiptItem>[];
+    final items = raw
+        .whereType<Map>()
+        .map((row) => ReceiptItem.fromJson(Map<String, dynamic>.from(row)))
+        .toList();
+    items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return items;
   }
 
   Receipt copyWith({
     String? merchant,
+    DateTime? dueDate,
+    DateTime? reminderAt,
+    String? pointBrand,
+    int? pointAmount,
     DateTime? purchasedAt,
     int? totalAmount,
     int? subtotalAmount,
@@ -127,6 +185,7 @@ class Receipt {
     String? imagePath,
     ReceiptSource? source,
     String? rawOcrText,
+    List<ReceiptItem>? items,
     ExpenseCategory? category,
   }) {
     return Receipt(
@@ -140,12 +199,19 @@ class Receipt {
       tax10Amount: tax10Amount ?? this.tax10Amount,
       tax8Base: tax8Base,
       tax10Base: tax10Base,
+      tax8ItemsTotal: tax8ItemsTotal,
+      tax10ItemsTotal: tax10ItemsTotal,
+      dueDate: dueDate ?? this.dueDate,
+      reminderAt: reminderAt ?? this.reminderAt,
+      pointBrand: pointBrand ?? this.pointBrand,
+      pointAmount: pointAmount ?? this.pointAmount,
       barcodeId: barcodeId ?? this.barcodeId,
       categoryId: categoryId ?? this.categoryId,
       note: note ?? this.note,
       imagePath: imagePath ?? this.imagePath,
       source: source ?? this.source,
       rawOcrText: rawOcrText ?? this.rawOcrText,
+      items: items ?? this.items,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       category: category ?? this.category,

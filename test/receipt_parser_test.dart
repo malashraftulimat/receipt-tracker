@@ -133,9 +133,116 @@ void main() {
     });
   });
 
+  group('Japanese financial extras', () {
+    test('detects the payment deadline on a utility bill', () {
+      final result = parser.parse('''
+東京電力パワーグリッド
+2026年10月5日
+ご請求金額 6,540円
+支払期限 2026年10月31日
+''');
+      expect(result.totalAmount, 6540);
+      expect(result.dueDate, DateTime(2026, 10, 31));
+    });
+
+    test('accepts a deadline without a year', () {
+      final result = parser.parse(
+        '払込票\nご請求金額 3,200円\n支払期限 10月31日',
+      );
+      expect(result.dueDate?.month, 10);
+      expect(result.dueDate?.day, 31);
+    });
+
+    test('detects loyalty points and their brand', () {
+      final result = parser.parse(
+        'イオン\n合計 1,200円\ndポイント 今回 15ポイント',
+      );
+      expect(result.pointBrand, 'dポイント');
+      expect(result.pointAmount, 15);
+    });
+
+    test('detects generic earned points', () {
+      final result = parser.parse(
+        '店舗\n合計 980円\n獲得ポイント 120',
+      );
+      expect(result.pointAmount, 120);
+    });
+
+    test('sums reduced-rate (※) items separately', () {
+      final result = parser.parse('''
+スーパー
+牛乳 ¥198 ※
+パン ¥158 ※
+洗剤 (10%) ¥398
+合計 ¥754
+''');
+      expect(result.tax8ItemsTotal, 356);
+      expect(result.tax10ItemsTotal, 398);
+    });
+  });
+
+  itemTests();
+
   test('returns warnings when nothing can be parsed', () {
     final result = parser.parse('読み取り失敗');
     expect(result.totalAmount, isNull);
     expect(result.warnings, isNotEmpty);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Itemized receipts
+// ---------------------------------------------------------------------------
+
+void itemTests() {
+  const parser = ReceiptParser();
+
+  group('line items', () {
+    test('extracts item name, quantity and tax markers', () {
+      final parsed = parser.parse('''
+スーパーマルエツ
+2026年10月19日
+牛乳 198 ※
+パン 2個 396 ※
+洗剤 398
+合計 992
+''');
+
+      expect(parsed.items.length, 3);
+      expect(parsed.items[0].name, '牛乳');
+      expect(parsed.items[0].totalPrice, 198);
+      expect(parsed.items[0].taxRate, 8);
+      expect(parsed.items[0].quantity, 1);
+
+      expect(parsed.items[1].name, 'パン');
+      expect(parsed.items[1].quantity, 2);
+      expect(parsed.items[1].totalPrice, 396);
+      expect(parsed.items[1].unitPrice, 198);
+
+      expect(parsed.items[2].name, '洗剤');
+      expect(parsed.items[2].totalPrice, 398);
+      expect(parsed.items[2].taxRate, isNull);
+    });
+
+    test('parses the 2 x 198 format', () {
+      final parsed = parser.parse('店\nお茶 2×198\n合計 396');
+      expect(parsed.items.single.name, 'お茶');
+      expect(parsed.items.single.quantity, 2);
+      expect(parsed.items.single.unitPrice, 198);
+      expect(parsed.items.single.totalPrice, 396);
+    });
+
+    test('ignores totals, tax summaries and payment lines', () {
+      final parsed = parser.parse('''
+店
+商品A 500
+消費税(10%) 50
+合計 550
+お預り 1000
+お釣 450
+''');
+      expect(parsed.items.length, 1);
+      expect(parsed.items.single.name, '商品A');
+    });
   });
 }

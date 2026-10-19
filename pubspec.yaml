@@ -34,6 +34,7 @@ dependencies:
 
   # Misc
   crypto: ^3.0.3
+  web: ^1.0.0
   path_provider: ^2.1.4
   fl_chart: ^0.69.0
   # `any` lets flutter_localizations pin the intl version that matches your SDK.

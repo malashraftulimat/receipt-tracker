@@ -7,6 +7,8 @@ import '../../core/config/app_config.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
+import '../../data/services/export_service.dart';
+import '../../domain/models/receipt_filter.dart';
 import '../../data/services/local_auth.dart';
 import '../../data/services/local_store.dart';
 
@@ -29,6 +31,36 @@ class SettingsPage extends ConsumerWidget {
     }
   }
 
+  Future<void> _exportCsv(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool currentMonthOnly,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final now = DateTime.now();
+      final filter = currentMonthOnly
+          ? ReceiptFilter(month: DateTime(now.year, now.month))
+          : const ReceiptFilter();
+      final receipts = await ref.read(receiptRepositoryProvider).fetch(filter);
+      if (receipts.isEmpty) {
+        messenger.showSnackBar(const SnackBar(content: Text('対象のレシートがありません')));
+        return;
+      }
+
+      final filename = currentMonthOnly
+          ? ExportService.filenameForMonth(now)
+          : ExportService.allFilename();
+      final result = await ExportService.export(receipts, filename: filename);
+      messenger.showSnackBar(
+        SnackBar(content: Text('CSVを書き出しました: $result')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('書き出しに失敗しました: $error')),
+      );
+    }
+  }
   Future<void> _switchToLocal(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -231,6 +263,23 @@ class SettingsPage extends ConsumerWidget {
               ),
               const Divider(height: 1),
               ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.file_download_outlined),
+                title: const Text('CSVエクスポート（今月）'),
+                subtitle: const Text('Excel / Numbers で開ける UTF-8 CSV'),
+                onTap: () =>
+                    _exportCsv(context, ref, currentMonthOnly: true),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.table_view_outlined),
+                title: const Text('CSVエクスポート（全期間）'),
+                subtitle: const Text('すべてのレシートを1ファイルにまとめます'),
+                onTap: () =>
+                    _exportCsv(context, ref, currentMonthOnly: false),
+              ),
+              const Divider(height: 1),              ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
                   isLocal ? Icons.phone_android : Icons.cloud_sync_outlined,
