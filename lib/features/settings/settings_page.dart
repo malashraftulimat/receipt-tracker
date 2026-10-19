@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../app.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/responsive.dart';
@@ -31,11 +29,7 @@ class SettingsPage extends ConsumerWidget {
     }
   }
 
-  Future<void> _restartApp() async {
-    runApp(const ProviderScope(child: ReceiptTrackerApp()));
-  }
-
-  Future<void> _switchToLocal(BuildContext context) async {
+  Future<void> _switchToLocal(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -57,15 +51,11 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    final prefs = await SharedPreferences.getInstance();
-    await AppConfig.useLocalMode(prefs);
-    await _restartApp();
+    await ref.read(appModeProvider.notifier).switchToLocal();
   }
 
-  Future<void> _switchToSupabase(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await AppConfig.useSupabaseMode(prefs);
-    await _restartApp();
+  Future<void> _switchToSupabase(BuildContext context, WidgetRef ref) async {
+    await ref.read(appModeProvider.notifier).switchToSupabase();
   }
 
   Future<void> _clearLocalData(BuildContext context, WidgetRef ref) async {
@@ -270,7 +260,9 @@ class SettingsPage extends ConsumerWidget {
                       : 'サーバーを使わず、この端末だけに保存します',
                 ),
                 onTap: () =>
-                    isLocal ? _switchToSupabase(context) : _switchToLocal(context),
+                    isLocal
+                        ? _switchToSupabase(context, ref)
+                        : _switchToLocal(context, ref),
               ),
               if (isLocal) ...<Widget>[
                 const Divider(height: 1),

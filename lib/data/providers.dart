@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
@@ -60,6 +61,33 @@ final ocrServiceProvider = Provider<OcrService>((ref) {
 });
 
 // ---------------------------------------------------------------------------
+// Backend mode (Supabase sync vs on-device local mode)
+// ---------------------------------------------------------------------------
+
+class AppModeController extends Notifier<AppMode> {
+  @override
+  AppMode build() => AppConfig.mode;
+
+  Future<void> switchToLocal() async {
+    final prefs = await SharedPreferences.getInstance();
+    await AppConfig.useLocalMode(prefs);
+    state = AppMode.local;
+  }
+
+  Future<void> switchToSupabase() async {
+    final prefs = await SharedPreferences.getInstance();
+    await AppConfig.useSupabaseMode(prefs);
+    state = AppMode.supabase;
+  }
+
+  /// Re-reads the mode after [AppConfig.connect] changed it.
+  void refresh() => state = AppConfig.mode;
+}
+
+final appModeProvider =
+    NotifierProvider<AppModeController, AppMode>(AppModeController.new);
+
+// ---------------------------------------------------------------------------
 // Auth state
 // ---------------------------------------------------------------------------
 
@@ -85,7 +113,8 @@ final localSessionProvider =
 );
 
 final currentUserProvider = Provider<AppUser?>((ref) {
-  if (AppConfig.isLocal) return ref.watch(localSessionProvider);
+  final mode = ref.watch(appModeProvider);
+  if (mode == AppMode.local) return ref.watch(localSessionProvider);
 
   ref.watch(authStateProvider); // rebuild on sign-in / sign-out / refresh
   final user = ref.watch(supabaseClientProvider).auth.currentUser;

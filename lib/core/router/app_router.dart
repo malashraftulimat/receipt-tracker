@@ -17,6 +17,9 @@ import '../../features/settings/settings_page.dart';
 import 'app_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
+  // Rebuild the router when the storage mode changes.
+  ref.watch(appModeProvider);
+
   // Re-run redirects whenever the session changes.
   final refresh = ValueNotifier<int>(0);
   StreamSubscription<AuthState>? subscription;

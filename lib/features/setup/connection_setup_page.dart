@@ -2,20 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../app.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/responsive.dart';
+import '../../data/providers.dart';
 
 /// First-launch screen for builds that were not compiled with
 /// `--dart-define=SUPABASE_URL/...` (e.g. a sideloaded APK or a web bundle).
-class ConnectionSetupPage extends StatefulWidget {
+class ConnectionSetupPage extends ConsumerStatefulWidget {
   const ConnectionSetupPage({super.key});
 
   @override
-  State<ConnectionSetupPage> createState() => _ConnectionSetupPageState();
+  ConsumerState<ConnectionSetupPage> createState() =>
+      _ConnectionSetupPageState();
 }
 
-class _ConnectionSetupPageState extends State<ConnectionSetupPage> {
+class _ConnectionSetupPageState extends ConsumerState<ConnectionSetupPage> {
   final _formKey = GlobalKey<FormState>();
   final _urlController = TextEditingController();
   final _keyController = TextEditingController();
@@ -37,10 +38,7 @@ class _ConnectionSetupPageState extends State<ConnectionSetupPage> {
       _error = null;
     });
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await AppConfig.useLocalMode(prefs);
-      if (!mounted) return;
-      runApp(const ProviderScope(child: ReceiptTrackerApp()));
+      await ref.read(appModeProvider.notifier).switchToLocal();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -65,8 +63,8 @@ class _ConnectionSetupPageState extends State<ConnectionSetupPage> {
         prefs: prefs,
       );
       if (!mounted) return;
-      // Re-bootstrap the whole app with the freshly initialised client.
-      runApp(const ProviderScope(child: ReceiptTrackerApp()));
+      // The app rebuilds with the Supabase router once the mode is published.
+      ref.read(appModeProvider.notifier).refresh();
     } catch (error) {
       if (!mounted) return;
       setState(() {
