@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/responsive.dart';
-import '../../data/services/local_store.dart';
 
 /// First-launch screen for builds that were not compiled with
 /// `--dart-define=SUPABASE_URL/...` (e.g. a sideloaded APK or a web bundle).
@@ -39,7 +38,6 @@ class _ConnectionSetupPageState extends State<ConnectionSetupPage> {
     });
     try {
       final prefs = await SharedPreferences.getInstance();
-      await LocalStore.instance.seedDefaults();
       await AppConfig.useLocalMode(prefs);
       if (!mounted) return;
       runApp(const ProviderScope(child: ReceiptTrackerApp()));
@@ -191,7 +189,7 @@ class _ConnectionSetupPageState extends State<ConnectionSetupPage> {
                   OutlinedButton.icon(
                     onPressed: _busy ? null : _startLocalMode,
                     icon: const Icon(Icons.phone_android),
-                    label: const Text('アカウントなしで使う（この端末に保存）'),
+                    label: const Text('この端末だけで使う（ローカルアカウント）'),
                   ),
                   const SizedBox(height: 18),
                   Container(

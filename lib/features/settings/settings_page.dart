@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app.dart';
@@ -8,6 +9,7 @@ import '../../core/config/app_config.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
+import '../../data/services/local_auth.dart';
 import '../../data/services/local_store.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -56,7 +58,6 @@ class SettingsPage extends ConsumerWidget {
     );
     if (confirmed != true) return;
     final prefs = await SharedPreferences.getInstance();
-    await LocalStore.instance.seedDefaults();
     await AppConfig.useLocalMode(prefs);
     await _restartApp();
   }
@@ -67,7 +68,7 @@ class SettingsPage extends ConsumerWidget {
     await _restartApp();
   }
 
-  Future<void> _clearLocalData(BuildContext context) async {
+  Future<void> _clearLocalData(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -86,9 +87,13 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
+    final account = AppConfig.localUser;
     await LocalStore.instance.clearAll();
-    await LocalStore.instance.seedDefaults();
-    await _restartApp();
+    if (account != null) await LocalAuth.instance.deleteAccount(account.id);
+    await LocalAuth.instance.signOut();
+    ref.read(localSessionProvider.notifier).setUser(null);
+    if (!context.mounted) return;
+    context.go('/auth');
   }
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
@@ -96,7 +101,11 @@ class SettingsPage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ログアウトしますか？'),
-        content: const Text('データはサーバーに保存されています。次回ログインで復元されます。'),
+        content: Text(
+          AppConfig.isLocal
+              ? 'ローカルアカウントからログアウトします。データはこの端末に残ります。'
+              : 'データはサーバーに保存されています。次回ログインで復元されます。',
+        ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -110,6 +119,15 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
+
+    if (AppConfig.isLocal) {
+      await LocalAuth.instance.signOut();
+      ref.read(localSessionProvider.notifier).setUser(null);
+      if (!context.mounted) return;
+      context.go('/auth');
+      return;
+    }
+
     await ref.read(authRepositoryProvider).signOut();
   }
 
@@ -142,10 +160,10 @@ class SettingsPage extends ConsumerWidget {
                     color: theme.colorScheme.primary,
                   ),
                 ),
-                title: Text(isLocal ? 'ローカルモード' : (user?.email ?? '未ログイン')),
+                title: Text(user?.email ?? '未ログイン'),
                 subtitle: Text(
                   isLocal
-                      ? 'データはこの端末にのみ保存されます（アカウント不要）'
+                      ? 'ローカルアカウント（この端末のみ・他の端末とは同期しません）'
                       : 'すべての端末でレシート・画像・カテゴリが同期されます',
                   style: theme.textTheme.labelSmall,
                 ),
@@ -165,17 +183,15 @@ class SettingsPage extends ConsumerWidget {
                   icon: const Icon(Icons.copy_all_outlined, size: 18),
                 ),
               ),
-              if (!isLocal) ...<Widget>[
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _signOut(context, ref),
-                    icon: const Icon(Icons.logout),
-                    label: const Text('ログアウト'),
-                  ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _signOut(context, ref),
+                  icon: const Icon(Icons.logout),
+                  label: const Text('ログアウト'),
                 ),
-              ],
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -263,7 +279,7 @@ class SettingsPage extends ConsumerWidget {
                   leading: const Icon(Icons.delete_sweep_outlined),
                   title: const Text('ローカルデータを削除'),
                   subtitle: const Text('この端末のレシート・画像・カテゴリを消去します'),
-                  onTap: () => _clearLocalData(context),
+                  onTap: () => _clearLocalData(context, ref),
                 ),
               ],
             ],

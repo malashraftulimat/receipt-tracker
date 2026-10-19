@@ -1,7 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/services/local_auth.dart';
 import '../../data/services/local_store.dart';
+import '../../domain/models/app_user.dart';
 
 enum AppMode { supabase, local }
 
@@ -33,6 +35,9 @@ class AppConfig {
   static bool _supabaseInitialized = false;
   static AppMode _mode = AppMode.supabase;
 
+  /// Signed-in account when running in local mode.
+  static AppUser? localUser;
+
   static AppMode get mode => _mode;
 
   static bool get isLocal => _mode == AppMode.local;
@@ -55,7 +60,11 @@ class AppConfig {
         : AppMode.supabase;
 
     if (_mode == AppMode.local) {
-      await LocalStore.instance.seedDefaults();
+      localUser = await LocalAuth.instance.restoreSession();
+      if (localUser != null) {
+        LocalStore.instance.useUser(localUser!.id);
+        await LocalStore.instance.seedDefaults();
+      }
       return true;
     }
 
@@ -116,10 +125,11 @@ class AppConfig {
     }
   }
 
-  /// Switches to on-device storage (no account required).
+  /// Switches to on-device storage. The user then signs up / signs in with a
+  /// local account (see [LocalAuth]).
   static Future<void> useLocalMode(SharedPreferences prefs) async {
     _mode = AppMode.local;
-    await LocalStore.instance.seedDefaults();
+    localUser = null;
     await prefs.setString(prefsModeKey, AppMode.local.name);
   }
 

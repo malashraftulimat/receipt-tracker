@@ -21,8 +21,9 @@ Everything is reviewed and editable before saving.
 
 Opens in any phone or desktop browser. On first launch choose:
 
-* **アカウントなしで使う（この端末に保存）** — instant local mode: no signup, no server.
-  Receipts, categories and photos are stored in the browser (`localStorage`).
+* **この端末だけで使う（ローカルアカウント）** — email + password sign-up stored
+  on-device (salted SHA-256), no server. Receipts, categories and photos live in
+  the browser (`localStorage`) and are scoped per account.
 * **Supabase に接続** — paste your Project URL + anon key for multi-device sync.
 
 Live barcode scanning works in Chrome/Edge/Safari over HTTPS; OCR on the web

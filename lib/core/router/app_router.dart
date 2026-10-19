@@ -31,9 +31,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     refresh.dispose();
   });
 
-  // Local mode has a synthetic user and never touches Supabase.
-  bool signedIn() =>
-      AppConfig.isLocal || Supabase.instance.client.auth.currentUser != null;
+  // Local mode uses an on-device account and never touches Supabase.
+  bool signedIn() => AppConfig.isLocal
+      ? AppConfig.localUser != null
+      : Supabase.instance.client.auth.currentUser != null;
 
   return GoRouter(
     initialLocation: '/dashboard',

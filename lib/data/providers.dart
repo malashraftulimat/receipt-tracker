@@ -11,6 +11,7 @@ import 'repositories/auth_repository.dart';
 import 'repositories/category_repository.dart';
 import 'repositories/receipt_repository.dart';
 import 'repositories/storage_repository.dart';
+import 'services/local_store.dart';
 import 'services/ocr/ocr_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -66,14 +67,25 @@ final authStateProvider = StreamProvider<AuthState>(
   (ref) => ref.watch(supabaseClientProvider).auth.onAuthStateChange,
 );
 
-/// Synthetic user for on-device (local) mode.
-const AppUser localAuthUser = AppUser(
-  id: 'local-user',
-  email: 'ローカルモード（この端末のみ）',
+/// Holds the signed-in account for on-device (local) mode.
+class LocalSessionController extends Notifier<AppUser?> {
+  @override
+  AppUser? build() => AppConfig.localUser;
+
+  void setUser(AppUser? user) {
+    AppConfig.localUser = user;
+    if (user != null) LocalStore.instance.useUser(user.id);
+    state = user;
+  }
+}
+
+final localSessionProvider =
+    NotifierProvider<LocalSessionController, AppUser?>(
+  LocalSessionController.new,
 );
 
 final currentUserProvider = Provider<AppUser?>((ref) {
-  if (AppConfig.isLocal) return localAuthUser;
+  if (AppConfig.isLocal) return ref.watch(localSessionProvider);
 
   ref.watch(authStateProvider); // rebuild on sign-in / sign-out / refresh
   final user = ref.watch(supabaseClientProvider).auth.currentUser;

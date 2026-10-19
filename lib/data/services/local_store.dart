@@ -22,6 +22,14 @@ class LocalStore {
 
   static const String receiptsKey = 'local_receipts_v1';
   static const String categoriesKey = 'local_categories_v1';
+
+  /// Local accounts keep separate data: keys are suffixed with the user id.
+  String _userId = 'local-user';
+  String get _receiptsKey => '${receiptsKey}_$_userId';
+  String get _categoriesKey => '${categoriesKey}_$_userId';
+
+  void useUser(String userId) => _userId = userId;
+
   static const String _imagePrefix = 'local_image_';
 
   /// ~1.2 MB of base64 text (~900 KB image) fits comfortably in localStorage.
@@ -64,10 +72,10 @@ class LocalStore {
   // Categories
   // -------------------------------------------------------------------------
 
-  Future<List<Map<String, dynamic>>> categoryRows() => _readList(categoriesKey);
+  Future<List<Map<String, dynamic>>> categoryRows() => _readList(_categoriesKey);
 
   Future<List<ExpenseCategory>> fetchCategories() async {
-    final rows = await _readList(categoriesKey);
+    final rows = await _readList(_categoriesKey);
     final categories = rows.map(ExpenseCategory.fromJson).toList();
     categories.sort((a, b) {
       final byOrder = a.sortOrder.compareTo(b.sortOrder);
@@ -77,10 +85,10 @@ class LocalStore {
   }
 
   Future<void> seedDefaults() async {
-    final rows = await _readList(categoriesKey);
+    final rows = await _readList(_categoriesKey);
     if (rows.isNotEmpty) return;
     final now = DateTime.now().toUtc().toIso8601String();
-    await _writeList(categoriesKey, <Map<String, dynamic>>[
+    await _writeList(_categoriesKey, <Map<String, dynamic>>[
       for (final template in ExpenseCategory.templates)
         <String, dynamic>{
           'id': 'default-${template.sortOrder}',
@@ -96,7 +104,7 @@ class LocalStore {
     required String color,
     required String icon,
   }) async {
-    final rows = await _readList(categoriesKey);
+    final rows = await _readList(_categoriesKey);
     final row = <String, dynamic>{
       'id': 'cat-${DateTime.now().microsecondsSinceEpoch}',
       'user_id': localUserId,
@@ -108,12 +116,12 @@ class LocalStore {
       'created_at': DateTime.now().toUtc().toIso8601String(),
     };
     rows.add(row);
-    await _writeList(categoriesKey, rows);
+    await _writeList(_categoriesKey, rows);
     return ExpenseCategory.fromJson(row);
   }
 
   Future<ExpenseCategory> updateCategory(ExpenseCategory category) async {
-    final rows = await _readList(categoriesKey);
+    final rows = await _readList(_categoriesKey);
     var updated = <String, dynamic>{...category.toJson()};
     for (var i = 0; i < rows.length; i++) {
       if (rows[i]['id'] == category.id) {
@@ -122,17 +130,17 @@ class LocalStore {
         break;
       }
     }
-    await _writeList(categoriesKey, rows);
+    await _writeList(_categoriesKey, rows);
     return ExpenseCategory.fromJson(updated);
   }
 
   Future<void> deleteCategory(String id) async {
-    final rows = await _readList(categoriesKey);
+    final rows = await _readList(_categoriesKey);
     rows.removeWhere((row) => row['id'] == id);
-    await _writeList(categoriesKey, rows);
+    await _writeList(_categoriesKey, rows);
 
     // Detach receipts that pointed at the deleted category.
-    final receipts = await _readList(receiptsKey);
+    final receipts = await _readList(_receiptsKey);
     var changed = false;
     for (final row in receipts) {
       if (row['category_id'] == id) {
@@ -140,7 +148,7 @@ class LocalStore {
         changed = true;
       }
     }
-    if (changed) await _writeList(receiptsKey, receipts);
+    if (changed) await _writeList(_receiptsKey, receipts);
   }
 
   // -------------------------------------------------------------------------
@@ -148,8 +156,8 @@ class LocalStore {
   // -------------------------------------------------------------------------
 
   Future<List<Receipt>> fetchReceipts(ReceiptFilter filter) async {
-    final categories = await _readList(categoriesKey);
-    final rows = await _readList(receiptsKey);
+    final categories = await _readList(_categoriesKey);
+    final rows = await _readList(_receiptsKey);
 
     final start = filter.rangeStart;
     final end = filter.rangeEnd;
@@ -178,17 +186,17 @@ class LocalStore {
   }
 
   Future<Receipt?> receiptById(String id) async {
-    final rows = await _readList(receiptsKey);
+    final rows = await _readList(_receiptsKey);
     for (final row in rows) {
       if (row['id'] == id) {
-        return _toReceipt(row, await _readList(categoriesKey));
+        return _toReceipt(row, await _readList(_categoriesKey));
       }
     }
     return null;
   }
 
   Future<String?> findIdByBarcode(String barcode) async {
-    final rows = await _readList(receiptsKey);
+    final rows = await _readList(_receiptsKey);
     for (final row in rows) {
       if (row['barcode_id'] == barcode) return row['id'] as String?;
     }
@@ -196,7 +204,7 @@ class LocalStore {
   }
 
   Future<Receipt> createReceipt(ReceiptDraft draft, String? imagePath) async {
-    final rows = await _readList(receiptsKey);
+    final rows = await _readList(_receiptsKey);
     final now = DateTime.now().toUtc().toIso8601String();
     final row = <String, dynamic>{
       'id': 'r-${DateTime.now().microsecondsSinceEpoch}',
@@ -207,12 +215,12 @@ class LocalStore {
       'updated_at': now,
     };
     rows.add(row);
-    await _writeList(receiptsKey, rows);
-    return _toReceipt(row, await _readList(categoriesKey));
+    await _writeList(_receiptsKey, rows);
+    return _toReceipt(row, await _readList(_categoriesKey));
   }
 
   Future<Receipt> updateReceipt(String id, Map<String, dynamic> patch) async {
-    final rows = await _readList(receiptsKey);
+    final rows = await _readList(_receiptsKey);
     Map<String, dynamic>? updated;
     for (var i = 0; i < rows.length; i++) {
       if (rows[i]['id'] != id) continue;
@@ -225,21 +233,21 @@ class LocalStore {
       rows[i] = updated;
       break;
     }
-    await _writeList(receiptsKey, rows);
+    await _writeList(_receiptsKey, rows);
     if (updated == null) {
       throw StateError('レシートが見つかりません');
     }
-    return _toReceipt(updated, await _readList(categoriesKey));
+    return _toReceipt(updated, await _readList(_categoriesKey));
   }
 
   Future<void> deleteReceipt(String id) async {
-    final rows = await _readList(receiptsKey);
+    final rows = await _readList(_receiptsKey);
     String? imagePath;
     for (final row in rows) {
       if (row['id'] == id) imagePath = row['image_path'] as String?;
     }
     rows.removeWhere((row) => row['id'] == id);
-    await _writeList(receiptsKey, rows);
+    await _writeList(_receiptsKey, rows);
     if (imagePath != null) await deleteImage(imagePath);
   }
 
@@ -313,10 +321,12 @@ class LocalStore {
   Future<void> clearAll() async {
     final prefs = await _p;
     _memoryImages.clear();
-    await prefs.remove(receiptsKey);
-    await prefs.remove(categoriesKey);
     for (final key in prefs.getKeys().toList()) {
-      if (key.startsWith(_imagePrefix)) await prefs.remove(key);
+      if (key.startsWith(receiptsKey) ||
+          key.startsWith(categoriesKey) ||
+          key.startsWith(_imagePrefix)) {
+        await prefs.remove(key);
+      }
     }
   }
 }
