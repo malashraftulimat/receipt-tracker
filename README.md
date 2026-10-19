@@ -303,3 +303,26 @@ change amounts, 8%/10% tax lines, tax-inclusive bases and reference numbers.
   (dポイント / Ponta / Tポイント / 楽天ポイント), reduced-rate item totals.
 * **Export & analytics** — UTF-8 CSV (Excel-friendly) export from settings and a
   month-over-month cumulative comparison chart.
+
+---
+
+## Built-in Supabase credentials (skip the setup screen)
+
+The web build can ship with the project baked in, so users land on the
+**login screen** immediately:
+
+1. `lib/core/config/supabase_defaults.dart` — replace
+   `https://YOUR-PROJECT.supabase.co` and `YOUR-ANON-KEY`.
+2. Or set the repository secrets **`SUPABASE_URL`** / **`SUPABASE_ANON_KEY`**;
+   the *Deploy website (GitHub Pages)* workflow passes them as `--dart-define`
+   at build time.
+3. Or build locally:
+   `flutter build web --release --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...`
+
+Priority: built-ins / dart-defines → credentials saved in the browser →
+manual setup screen. If the built-in values are missing/invalid the setup
+screen is still shown as a fallback (the app is never bricked).
+
+> Note: a browser that previously chose **ローカルモード** keeps that choice
+> (stored in localStorage). Clear site data or use 設定 → Supabase に接続 to
+> return to the Supabase login.

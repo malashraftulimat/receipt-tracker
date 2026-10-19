@@ -36,8 +36,17 @@ jobs:
           enablement: true
 
       - name: Build Flutter web
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          flutter build web --release --base-href="${{ steps.pages.outputs.base_path }}/"
+          ARGS=(--release)
+          ARGS+=("--base-href=${{ steps.pages.outputs.base_path }}/")
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            ARGS+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
+            ARGS+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
+          fi
+          flutter build web "${ARGS[@]}"
           touch build/web/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

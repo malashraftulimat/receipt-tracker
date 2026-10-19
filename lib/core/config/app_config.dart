@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/services/local_auth.dart';
+import 'supabase_defaults.dart';
 import '../../data/services/local_store.dart';
 import '../../domain/models/app_user.dart';
 
@@ -18,9 +19,8 @@ enum AppMode { supabase, local }
 class AppConfig {
   const AppConfig._();
 
-  static const String defineUrl = String.fromEnvironment('SUPABASE_URL');
-  static const String defineAnonKey =
-      String.fromEnvironment('SUPABASE_ANON_KEY');
+  static const String defineUrl = SupabaseDefaults.url;
+  static const String defineAnonKey = SupabaseDefaults.anonKey;
 
   static const String prefsUrlKey = 'supabase_url';
   static const String prefsAnonKey = 'supabase_anon_key';
@@ -43,10 +43,10 @@ class AppConfig {
   static bool get isLocal => _mode == AppMode.local;
 
   static String? get supabaseUrl =>
-      (_url ?? defineUrl).isEmpty ? null : (_url ?? defineUrl);
+      (_url ?? '').isEmpty ? null : _url;
 
   static String? get supabaseAnonKey =>
-      (_anonKey ?? defineAnonKey).isEmpty ? null : (_anonKey ?? defineAnonKey);
+      (_anonKey ?? '').isEmpty ? null : _anonKey;
 
   static bool get isConfigured => supabaseUrl != null && supabaseAnonKey != null;
 
@@ -68,12 +68,23 @@ class AppConfig {
       return true;
     }
 
-    final url = defineUrl.isNotEmpty
-        ? defineUrl
-        : (prefs.getString(prefsUrlKey) ?? '');
-    final anonKey = defineAnonKey.isNotEmpty
-        ? defineAnonKey
-        : (prefs.getString(prefsAnonKey) ?? '');
+    // 1) built-in / --dart-define credentials win on the hosted web build.
+    if (SupabaseDefaults.isUsable) {
+      try {
+        await connect(
+          url: SupabaseDefaults.url,
+          anonKey: SupabaseDefaults.anonKey,
+          prefs: prefs,
+          persist: false,
+        );
+        return true;
+      } catch (_) {
+        // Invalid built-ins: fall back to saved credentials / setup screen.
+      }
+    }
+
+    final url = prefs.getString(prefsUrlKey) ?? '';
+    final anonKey = prefs.getString(prefsAnonKey) ?? '';
 
     if (url.trim().isEmpty || anonKey.trim().isEmpty) return false;
 
