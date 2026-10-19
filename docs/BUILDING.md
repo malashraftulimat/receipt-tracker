@@ -145,6 +145,54 @@ GitHub runners and uploads them as artifacts:
 Set `SUPABASE_URL` / `SUPABASE_ANON_KEY` as repository **secrets** to bake the
 credentials in; otherwise the produced app will show the in-app 接続設定 screen.
 
+### Publish this repo and run the build
+
+```bash
+git remote add origin https://github.com/<your-account>/receipt-tracker.git
+git push -u origin main
+```
+
+Then on GitHub:
+
+1. **Settings → Secrets and variables → Actions → New repository secret**
+   * `SUPABASE_URL` — `https://xxxx.supabase.co`
+   * `SUPABASE_ANON_KEY` — the anon / publishable key
+
+   (Skippable — without them the app opens the in-app 接続設定 screen.)
+
+2. **Actions → Build apps → Run workflow** (branch `main`).
+3. Wait ~8–15 min, then download the artifacts from the run page:
+
+   | Artifact | Contents |
+   | --- | --- |
+   | `android-apk` | `app-release.apk` (universal) |
+   | `windows-desktop` | `receipt_tracker-windows.zip` (exe + DLLs + data) |
+   | `ios-unsigned` | `receipt_tracker-ios-unsigned.zip` (`Runner.app`) |
+   | `web` | static site for Netlify/Vercel/S3 |
+
+   Sign the iOS `.app` with your Apple team in Xcode, or add a signing step
+   (`flutter build ipa`) with certificates stored as secrets.
+
+   With the `gh` CLI the same thing is:
+
+   ```bash
+   gh repo create receipt-tracker --private --source=. --push
+   gh secret set SUPABASE_URL -b"https://xxxx.supabase.co"
+   gh secret set SUPABASE_ANON_KEY -b"eyJhbGciOi..."
+   gh workflow run build.yml
+   gh run list --workflow=build.yml
+   gh run download <run-id>
+   ```
+
+> The built APKs in `dist/android/` are intentionally **not committed**
+> (the universal APK is 103 MB, above GitHub's 100 MB file limit). CI regenerates
+> them, and local builds land in `build/app/outputs/flutter-apk/`.
+
+> First push identity check: if git complains, set
+> `git config user.name "Your Name"` and `git config user.email "you@example.com"`.
+> The initial commit was created with a placeholder identity — you can amend it
+> with `git commit --amend --reset-author --no-edit` after setting yours.
+
 ---
 
 ## Quick local verification
