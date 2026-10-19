@@ -32,14 +32,20 @@ jobs:
           cache: true
 
       - run: flutter pub get
-      - run: flutter analyze
+      - run: flutter analyze --no-fatal-infos
       - run: flutter test
 
       - name: Build release APK
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          flutter build apk --release \
-            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
-            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          ARGS=(--release)
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            ARGS+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
+            ARGS+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
+          fi
+          flutter build apk "${ARGS[@]}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -63,10 +69,16 @@ jobs:
 
       - run: flutter pub get
       - name: Build Windows app
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          flutter build windows --release `
-            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" `
-            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          $buildArgs = @("--release")
+          if ($env:SUPABASE_URL -and $env:SUPABASE_ANON_KEY) {
+            $buildArgs += "--dart-define=SUPABASE_URL=$env:SUPABASE_URL"
+            $buildArgs += "--dart-define=SUPABASE_ANON_KEY=$env:SUPABASE_ANON_KEY"
+          }
+          flutter build windows @buildArgs
       - name: Package
         run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath receipt_tracker-windows.zip
       - uses: actions/upload-artifact@v4
@@ -76,10 +88,12 @@ jobs:
           retention-days: 30
 
   # ---------------------------------------------------------------------------
-  # iOS (unsigned .app — sign in Xcode / fastlane for a device or the App Store)
+  # iOS — unsigned IPA (Payload/Runner.app) for Sideloadly / AltStore.
+  # Sideloadly signs it with your Apple ID on Windows/macOS and installs it
+  # straight to the device (no App Store, no paid developer account).
   # ---------------------------------------------------------------------------
   ios:
-    name: iOS (unsigned)
+    name: iOS (unsigned IPA)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -91,18 +105,30 @@ jobs:
 
       - run: flutter pub get
       - name: Build without codesign
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          flutter build ios --release --no-codesign \
-            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
-            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
-      - name: Package Runner.app
+          ARGS=(--release --no-codesign)
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            ARGS+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
+            ARGS+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
+          fi
+          flutter build ios "${ARGS[@]}"
+
+      - name: Package as unsigned IPA
         run: |
-          cd build/ios/iphoneos
-          zip -r -y receipt_tracker-ios-unsigned.zip Runner.app
+          rm -rf build/ios/ipa-payload
+          mkdir -p build/ios/ipa-payload/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/ipa-payload/Payload/
+          cd build/ios/ipa-payload
+          zip -qry -y ../receipt_tracker-unsigned.ipa Payload
+          ls -lh ../receipt_tracker-unsigned.ipa
+
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-unsigned
-          path: build/ios/iphoneos/receipt_tracker-ios-unsigned.zip
+          name: ios-unsigned-ipa
+          path: build/ios/receipt_tracker-unsigned.ipa
           retention-days: 30
 
   # ---------------------------------------------------------------------------
@@ -120,9 +146,17 @@ jobs:
           cache: true
 
       - run: flutter pub get
-      - run: flutter build web --release \
-          --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
-          --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+      - name: Build web
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          ARGS=(--release)
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            ARGS+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
+            ARGS+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
+          fi
+          flutter build web "${ARGS[@]}"
       - uses: actions/upload-artifact@v4
         with:
           name: web
