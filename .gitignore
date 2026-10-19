@@ -1,0 +1,33 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Secrets
+.env
+.env.*
+google-services.json
+GoogleService-Info.plist
+
+# Platform build artefacts
+android/.gradle/
+android/local.properties
+ios/Pods/
+macos/Pods/
+
+# Build outputs that are too large / platform-specific for git
+dist/android/*.apk
+dist/*.zip
+
+# Signing material (never commit)
+android/key.properties
+*.jks
+*.keystore

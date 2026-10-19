@@ -1,0 +1,48 @@
+name: receipt_tracker
+description: >-
+  Japanese paper receipt / invoice tracker with a dual 1D-barcode + OCR scanner,
+  multi-device sync (Supabase) and expense analytics.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Navigation (declarative, deep-link friendly)
+  go_router: ^14.2.7
+
+  # Backend: auth + Postgres + storage + edge functions
+  supabase_flutter: ^2.6.0
+
+  # Scanning engine
+  mobile_scanner: ^5.2.3                     # 1D barcodes (JAN/EAN-13, Code 128, ...)
+  google_mlkit_text_recognition: ^0.13.0     # on-device OCR (Android / iOS, ja + en)
+
+  # Camera / gallery input (camera on mobile, file picker on desktop & web)
+  image_picker: ^1.1.2
+
+  # Misc
+  path_provider: ^2.1.4
+  fl_chart: ^0.69.0
+  # `any` lets flutter_localizations pin the intl version that matches your SDK.
+  intl: any
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
