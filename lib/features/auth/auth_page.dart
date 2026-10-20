@@ -247,8 +247,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 ),
                 const SizedBox(height: 8),
                 AppText(
-                  'レシート画像とデータはアカウントに紐づけて暗号化保存され、'
-                  'すべての端末で同期されます。',
+                  'レシートデータはアカウントに紐づけて暗号化保存され、'
+                  'すべての端末で同期されます。写真は保存されません。',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),

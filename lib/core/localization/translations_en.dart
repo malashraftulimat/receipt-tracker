@@ -18,8 +18,7 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   'メールアドレスを入力してください': 'Please enter your email address',
   'メールアドレスの形式が正しくありません': 'Invalid email address format',
   'パスワード': 'Password',
-  'パスワードは6文字以上で入力してください':
-      'Password must be at least 6 characters',
+  'パスワードは6文字以上で入力してください': 'Password must be at least 6 characters',
   'パスワードを忘れた場合': 'Forgot password?',
   'ローカルモード: この端末だけのアカウントです（複数端末で同期するには Supabase に接続）':
       'Local mode: this account stays on this device (connect Supabase to sync across devices)',
@@ -31,17 +30,16 @@ const Map<String, String> kEnglishTranslations = <String, String>{
       'Local accounts cannot reset passwords. Please create a new account.',
   'パスワード再設定にはメールアドレスを入力してください。':
       'Enter your email address to reset your password.',
-  'パスワード再設定メールを送信しました。':
-      'Password reset email sent.',
+  'パスワード再設定メールを送信しました。': 'Password reset email sent.',
 
   // Settings
   'アカウント': 'Account',
   '未ログイン': 'Not signed in',
-  'ローカルアカウント（この端末のみ・他の端末とは同期しません）':
-      'Local account (this device only, no sync)',
+  'ローカルアカウント（この端末のみ・他の端末とは同期しません）': 'Local account (this device only, no sync)',
   'すべての端末でレシート・画像・カテゴリが同期されます':
       'Receipts, images and categories sync across all devices',
-  'Firebase アカウント（レシート・明細・予算はすべての端末で同期されます）': 'Firebase account (receipts, items and budgets sync across all devices)',
+  'Firebase アカウント（レシート・明細・予算はすべての端末で同期されます）':
+      'Firebase account (receipts, items and budgets sync across all devices)',
   'ユーザーIDをコピー': 'Copy user ID',
   'ユーザーIDをコピーしました': 'User ID copied',
   'ログアウト': 'Sign out',
@@ -50,7 +48,8 @@ const Map<String, String> kEnglishTranslations = <String, String>{
       'You will sign out of the local account. Data stays on this device.',
   'データはサーバーに保存されています。次回ログインで復元されます。':
       'Your data is stored on the server and will be restored on the next sign-in.',
-  'データは Firebase に保存されています。次回ログインで復元されます。': 'Your data is stored in Firebase and will be restored on the next sign-in.',
+  'データは Firebase に保存されています。次回ログインで復元されます。':
+      'Your data is stored in Firebase and will be restored on the next sign-in.',
   '表示': 'Appearance',
   '自動': 'Auto',
   'ライト': 'Light',
@@ -68,8 +67,7 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   'CSVエクスポート（今月）': 'Export CSV (this month)',
   'Excel / Numbers で開ける UTF-8 CSV': 'UTF-8 CSV for Excel / Numbers',
   'CSVエクスポート（全期間）': 'Export CSV (all time)',
-  'すべてのレシートを1ファイルにまとめます':
-      'Combine all receipts into one file',
+  'すべてのレシートを1ファイルにまとめます': 'Combine all receipts into one file',
   'ローカル保存（この端末のみ）': 'Local storage (this device only)',
   'Supabase と同期中': 'Syncing with Supabase',
   'レシートはブラウザの localStorage に保存されます。\n他の端末とは共有されません。':
@@ -78,10 +76,8 @@ const Map<String, String> kEnglishTranslations = <String, String>{
       'Stored in Postgres / Storage and shared across all devices.',
   'Supabase に接続する': 'Connect to Supabase',
   'ローカルモードに切り替える': 'Switch to local mode',
-  'アカウントを作成して複数端末で同期できます':
-      'Create an account to sync across devices',
-  'サーバーを使わず、この端末だけに保存します':
-      'Keep data on this device without a server',
+  'アカウントを作成して複数端末で同期できます': 'Create an account to sync across devices',
+  'サーバーを使わず、この端末だけに保存します': 'Keep data on this device without a server',
   'ローカルデータを削除': 'Delete local data',
   'この端末のレシート・画像・カテゴリを消去します':
       'Erase receipts, images and categories on this device',
@@ -110,8 +106,7 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   'レシートOCR': 'Receipt OCR',
   '長レシート': 'Long receipt',
   'バーコード検出': 'Barcode detected',
-  'バーコード（チェックディジット不一致）':
-      'Barcode (check digit mismatch)',
+  'バーコード（チェックディジット不一致）': 'Barcode (check digit mismatch)',
   'クリア': 'Clear',
   'レシートを撮影': 'Capture receipt',
   'レシートを撮影して読み取る': 'Capture and read receipt',
@@ -125,10 +120,8 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   '解析中…': 'Analysing…',
   '画像を選択してOCR': 'Choose an image for OCR',
   'カメラを再試行': 'Retry camera',
-  'カメラへのアクセスを許可してください':
-      'Please allow camera access',
-  'このデバイスではライブカメラを利用できません':
-      'Live camera is not available on this device',
+  'カメラへのアクセスを許可してください': 'Please allow camera access',
+  'このデバイスではライブカメラを利用できません': 'Live camera is not available on this device',
   'ブラウザまたは端末の設定でこのサイトのカメラ利用を許可し、\n「カメラを再試行」を押してください。\n許可できない場合も、画像を選択してOCRできます。':
       'Allow camera access for this site in your browser or device settings,\nthen tap “Retry camera”.\nYou can also choose an image for OCR.',
   'レシート画像を選択すると、OCRで店舗名・日付・合計・消費税を\n自動入力します。スマートフォンで撮影した画像も利用できます。':
@@ -140,8 +133,7 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   'カメラを起動できませんでした。': 'Could not start the camera.',
   'ブラウザOCRエンジンを読み込めませんでした。通信環境を確認して再試行してください。':
       'Could not load the browser OCR engine. Check your connection and try again.',
-  'ブラウザOCRでエラーが発生しました: ':
-      'Browser OCR error: ',
+  'ブラウザOCRでエラーが発生しました: ': 'Browser OCR error: ',
   '文字を認識できませんでした。明るい場所で、レシート全体が入るように撮影してください。':
       'No text was recognised. Use good lighting and fit the whole receipt in the frame.',
   'ローカルモードではサーバーOCRを使えません。「手入力で登録」を使うか、設定から Supabase に接続してください。':
@@ -155,6 +147,27 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   '1枚目を撮影': 'Capture first part',
   '読み取り中…': 'Reading…',
   '取り込み済み: ': 'Captured: ',
+
+  'AIがレシートを解析しています…': 'Gemini is reading the receipt…',
+  'AIを利用できないため、端末内OCRで解析しています…': 'AI unavailable. Reading with on-device OCR…',
+  '端末内OCRでレシートを解析しています…': 'Reading the receipt with on-device OCR…',
+  'AIを利用できないため、端末内OCRで読み取りました。':
+      'AI was unavailable, so the receipt was read with on-device OCR.',
+  '撮影した写真はGoogle（Firebase AI）に送信して解析します。写真は保存されません。':
+      'The photo is sent to Google (Firebase AI) for processing and is not stored.',
+  '端末のカメラを使う': 'Use device camera',
+  'プレビューするレシート画像はありません': 'No receipt image to preview',
+  '店舗名を読み取れませんでした': 'Could not read the store name',
+  '購入日を読み取れませんでした': 'Could not read the purchase date',
+  '合計金額を読み取れませんでした': 'Could not read the total amount',
+  '明細の合計がレシートの合計と一致しません。内容を確認してください':
+      'The item total does not match the receipt total. Please review it.',
+  'AIと端末内OCRの両方で読み取れませんでした。通信環境を確認するか、手入力で登録してください。':
+      'Neither AI nor on-device OCR could read the receipt. Check your connection or enter it manually.',
+  'レシートデータはアカウントに紐づけて暗号化保存され、すべての端末で同期されます。写真は保存されません。':
+      'Receipt data is stored encrypted with your account and synced across all devices. Photos are never stored.',
+  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nAI抽出: Gemini Flash（Firebase AI Logic）\nフォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）':
+      '1D barcode: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nAI extraction: Gemini Flash (Firebase AI Logic)\nFallback OCR: ML Kit (iOS/Android) / Tesseract.js (web)',
 
   // Dashboard
   '集計': 'Analytics',
@@ -327,16 +340,13 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   'はじめに Supabase プロジェクトへ接続します。\nレシート・画像・カテゴリはこのプロジェクトに保存され、\nすべての端末で同期されます。':
       'First connect to your Supabase project.\nReceipts, images and categories are stored in this project\nand synced across all devices.',
   'Project URL を入力してください': 'Please enter the Project URL',
-  'https:// から始まる URL を入力してください':
-      'Please enter a URL starting with https://',
+  'https:// から始まる URL を入力してください': 'Please enter a URL starting with https://',
   'eyJhbGciOi... または sb_publishable_...': 'eyJhbGciOi... or sb_publishable_...',
-  'anon / publishable key を入力してください':
-      'Please enter the anon / publishable key',
+  'anon / publishable key を入力してください': 'Please enter the anon / publishable key',
   '表示を切り替え': 'Toggle visibility',
   '接続しています…': 'Connecting…',
   '接続して開始': 'Connect and start',
-  'この端末だけで使う（ローカルアカウント）':
-      'Use on this device only (local account)',
+  'この端末だけで使う（ローカルアカウント）': 'Use on this device only (local account)',
   '値の取得場所': 'Where to find these values',
   'Supabase ダッシュボード → Project Settings → API の ':
       'In the Supabase dashboard → Project Settings → API, copy the ',

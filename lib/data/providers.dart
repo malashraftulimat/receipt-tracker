@@ -6,11 +6,14 @@ import '../domain/models/category.dart';
 import '../domain/models/monthly_budget.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
+import '../domain/parser/receipt_parser.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/budget_repository.dart';
 import 'repositories/category_repository.dart';
 import 'repositories/receipt_repository.dart';
+import 'services/ocr/ai_receipt_ocr_service.dart';
 import 'services/ocr/ocr_service.dart';
+import 'services/ocr/receipt_ocr_pipeline.dart';
 
 // ---------------------------------------------------------------------------
 // Infrastructure
@@ -32,12 +35,27 @@ final budgetRepositoryProvider = Provider<BudgetRepository>(
   (ref) => BudgetRepository(),
 );
 
-/// ML Kit on Android/iOS, Tesseract.js on Web. Desktop has no OCR engine.
+/// Fallback OCR: ML Kit on Android/iOS, Tesseract.js on Web.
+/// Desktop has no fallback OCR engine (Gemini still runs when online).
 final ocrServiceProvider = Provider<OcrService>((ref) {
   final service = createOcrService();
   ref.onDispose(service.dispose);
   return service;
 });
+
+/// Primary extraction engine: Firebase AI Logic (Gemini Developer API).
+final aiReceiptOcrServiceProvider = Provider<AiReceiptOcrService>(
+  (ref) => AiReceiptOcrService(),
+);
+
+/// AI first, then the platform OCR service on error / offline / quota.
+final receiptOcrPipelineProvider = Provider<ReceiptOcrPipeline>(
+  (ref) => ReceiptOcrPipeline(
+    ai: ref.watch(aiReceiptOcrServiceProvider),
+    fallback: ref.watch(ocrServiceProvider),
+    parser: const ReceiptParser(),
+  ),
+);
 
 // ---------------------------------------------------------------------------
 // Auth state (Firebase Auth)
@@ -87,7 +105,8 @@ class ReceiptFilterController extends Notifier<ReceiptFilter> {
         to: null,
       );
 
-  void setRange(DateTime start, DateTime endInclusive) => state = state.copyWith(
+  void setRange(DateTime start, DateTime endInclusive) =>
+      state = state.copyWith(
         month: null,
         from: DateTime(start.year, start.month, start.day),
         to: DateTime(
@@ -97,7 +116,8 @@ class ReceiptFilterController extends Notifier<ReceiptFilter> {
         ),
       );
 
-  void clearRange() => state = state.copyWith(month: null, from: null, to: null);
+  void clearRange() =>
+      state = state.copyWith(month: null, from: null, to: null);
 
   void setView(ReceiptViewMode view) => state = state.copyWith(view: view);
 
@@ -115,7 +135,6 @@ final receiptsProvider = FutureProvider<List<Receipt>>((ref) async {
   final filter = ref.watch(receiptFilterProvider);
   return ref.watch(receiptRepositoryProvider).fetch(filter);
 });
-
 
 // ---------------------------------------------------------------------------
 // Budgets
@@ -183,7 +202,6 @@ final receiptByIdProvider = FutureProvider.family<Receipt, String>(
   (ref, id) => ref.watch(receiptRepositoryProvider).getById(id),
 );
 
-
 /// Receipts with a 支払期限, sorted by the closest deadline.
 final upcomingDueProvider = FutureProvider<List<Receipt>>((ref) async {
   final userId = ref.watch(userIdProvider);
@@ -191,15 +209,13 @@ final upcomingDueProvider = FutureProvider<List<Receipt>>((ref) async {
 
   final now = DateTime.now();
   final receipts = await ref.watch(receiptRepositoryProvider).fetch(
-    ReceiptFilter(
-      from: DateTime(now.year, now.month - 1, 1),
-      to: DateTime(now.year, now.month + 3, 1),
-    ),
-  );
+        ReceiptFilter(
+          from: DateTime(now.year, now.month - 1, 1),
+          to: DateTime(now.year, now.month + 3, 1),
+        ),
+      );
 
   final due = receipts.where((receipt) => receipt.dueDate != null).toList();
   due.sort((a, b) => a.dueDate!.compareTo(b.dueDate!));
   return due;
 });
-
-

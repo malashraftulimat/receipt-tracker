@@ -80,8 +80,10 @@ cd build/web && python -m http.server 8080
 Deploy the folder to Netlify / Vercel / Firebase Hosting / S3 + CloudFront.
 The web build uses the browser's `getUserMedia` stream for live 1D barcode
 scanning and OCR frame capture; `web/zxing.min.js` is bundled automatically.
+Primary extraction uses Firebase AI Logic / Gemini Flash; when AI is unavailable,
 OCR runs client-side with Tesseract.js (`web/tesseract.min.js`, WASM/worker/
-language data from CDN, cached by the browser). Firebase provides Auth + Firestore.
+language data from CDN, cached by the browser). Firebase provides Auth, Firestore
+and AI Logic. Receipt photos are never stored; the JPEG stays in memory.
 Camera permission requires HTTPS (or `localhost`); if access is denied, the
 scanner falls back to photo upload.
 
@@ -147,7 +149,8 @@ GitHub runners and uploads them as artifacts:
 * Actions → **Build apps** → *Run workflow*.
 
 The Firebase configuration is hard-coded in
-`lib/core/config/firebase_config.dart`; CI needs no credentials or secrets.
+`lib/core/config/firebase_config.dart`; CI needs no credentials. An optional
+`RECAPTCHA_V3_SITE_KEY` secret enables App Check for web builds.
 
 ### Publish this repo and run the build
 
@@ -158,7 +161,8 @@ git push -u origin main
 
 Then on GitHub:
 
-1. No repository secrets are required (Firebase config is in the source).
+1. No repository secrets are required. Optionally add `RECAPTCHA_V3_SITE_KEY`
+   to enable App Check on the deployed web app (Firebase config is in the source).
 
 2. **Actions → Build apps → Run workflow** (branch `main`).
 3. Wait ~8–15 min, then download the artifacts from the run page:

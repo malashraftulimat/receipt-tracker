@@ -41,7 +41,8 @@ class SettingsPage extends ConsumerWidget {
           : const ReceiptFilter();
       final receipts = await ref.read(receiptRepositoryProvider).fetch(filter);
       if (receipts.isEmpty) {
-        messenger.showSnackBar(const SnackBar(content: AppText('対象のレシートがありません')));
+        messenger
+            .showSnackBar(const SnackBar(content: AppText('対象のレシートがありません')));
         return;
       }
 
@@ -58,6 +59,7 @@ class SettingsPage extends ConsumerWidget {
       );
     }
   }
+
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -105,7 +107,8 @@ class SettingsPage extends ConsumerWidget {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.14),
+                  backgroundColor:
+                      theme.colorScheme.primary.withValues(alpha: 0.14),
                   child: Icon(
                     Icons.person_outline,
                     color: theme.colorScheme.primary,
@@ -232,8 +235,7 @@ class SettingsPage extends ConsumerWidget {
                 leading: const Icon(Icons.file_download_outlined),
                 title: const AppText('CSVエクスポート（今月）'),
                 subtitle: const AppText('Excel / Numbers で開ける UTF-8 CSV'),
-                onTap: () =>
-                    _exportCsv(context, ref, currentMonthOnly: true),
+                onTap: () => _exportCsv(context, ref, currentMonthOnly: true),
               ),
               const Divider(height: 1),
               ListTile(
@@ -241,8 +243,7 @@ class SettingsPage extends ConsumerWidget {
                 leading: const Icon(Icons.table_view_outlined),
                 title: const AppText('CSVエクスポート（全期間）'),
                 subtitle: const AppText('すべてのレシートを1ファイルにまとめます'),
-                onTap: () =>
-                    _exportCsv(context, ref, currentMonthOnly: false),
+                onTap: () => _exportCsv(context, ref, currentMonthOnly: false),
               ),
             ],
           ),
@@ -256,7 +257,8 @@ class SettingsPage extends ConsumerWidget {
                 title: AppText('スキャンエンジン'),
                 subtitle: AppText(
                   '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\n'
-                  'OCR: ML Kit（iOS・Android オンデバイス）/ Tesseract.js（Web）',
+                  'AI抽出: Gemini Flash（Firebase AI Logic）\n'
+                  'フォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）',
                 ),
               ),
               Divider(height: 1),

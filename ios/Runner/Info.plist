@@ -52,9 +52,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>レシートのバーコードと文字を読み取るためにカメラを使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>保存済みのレシート画像を読み取るために写真へアクセスします。</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>撮影したレシート画像を保存します。</string>
+	<string>選択したレシート画像を読み取るために写真へアクセスします。画像は保存されません。</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

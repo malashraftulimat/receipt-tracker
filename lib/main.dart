@@ -1,9 +1,12 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
+import 'core/config/app_check_config.dart';
 import 'core/config/firebase_config.dart';
 
 Future<void> main() async {
@@ -14,8 +17,51 @@ Future<void> main() async {
   await initializeDateFormatting('en');
   await initializeDateFormatting('ar');
 
-  // Firebase Auth + Cloud Firestore (Web / Android / iOS).
+  // Firebase Auth + Cloud Firestore + Firebase AI Logic.
   await Firebase.initializeApp(options: kFirebaseOptions);
+  await _initializeAppCheck();
 
   runApp(const ProviderScope(child: ReceiptTrackerApp()));
+}
+
+/// Enables App Check for Firebase AI Logic and the other Firebase services.
+///
+/// Web debug builds use the App Check debug provider. Release web builds use
+/// reCAPTCHA v3 when `RECAPTCHA_V3_SITE_KEY` is supplied; when it is absent the
+/// app still starts normally (AI requests simply fall back to local OCR).
+Future<void> _initializeAppCheck() async {
+  try {
+    if (kIsWeb) {
+      if (kDebugMode) {
+        await FirebaseAppCheck.instance.activate(
+          providerWeb: WebDebugProvider(),
+        );
+        return;
+      }
+      final siteKey = kReCaptchaV3SiteKey.trim();
+      if (siteKey.isEmpty) return;
+      await FirebaseAppCheck.instance.activate(
+        providerWeb: ReCaptchaV3Provider(siteKey),
+      );
+      return;
+    }
+
+    final isApple = defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+      );
+    } else if (isApple) {
+      await FirebaseAppCheck.instance.activate(
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleAppAttestWithDeviceCheckFallbackProvider(),
+      );
+    }
+  } catch (_) {
+    // Never block app startup because App Check could not be activated.
+  }
 }

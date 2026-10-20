@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/utils/formatters.dart';
-import '../../core/utils/receipt_image.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/receipt_repository.dart';
@@ -73,8 +72,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   int? _tax8ItemsTotal;
   int? _tax10ItemsTotal;
   DateTime? _dueDate;
+
+  /// In-memory only. Never written to Firestore or local storage.
   Uint8List? _imageBytes;
-  String? _imageBase64;
   String? _rawOcrText;
   ReceiptSource _source = ReceiptSource.manual;
   List<String> _warnings = const <String>[];
@@ -132,7 +132,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     _tax10ItemsTotal = draft?.tax10ItemsTotal;
     _dueDate = draft?.dueDate;
     _imageBytes = widget.args.imageBytes;
-    _imageBase64 = draft?.imageBase64;
     _rawOcrText = draft?.rawOcrText;
     _source = draft?.source ?? ReceiptSource.manual;
     _warnings = widget.args.parsed?.warnings ?? const <String>[];
@@ -157,6 +156,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     for (final item in _items) {
       item.dispose();
     }
+    // Drop the captured photo when the review screen is closed.
+    _imageBytes = null;
     super.dispose();
   }
 
@@ -229,9 +230,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           await ref.read(receiptRepositoryProvider).findIdByBarcode(barcode);
       if (!mounted) return;
       setState(() {
-        _duplicateId = existingId == null || existingId == _existingId
-            ? null
-            : existingId;
+        _duplicateId =
+            existingId == null || existingId == _existingId ? null : existingId;
       });
     } catch (_) {
       // Offline / permission errors are surfaced on save instead.
@@ -254,17 +254,30 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       if (file == null) return;
 
       final bytes = await file.readAsBytes();
-      final barcode = _barcode.text.trim().isEmpty ? null : _barcode.text.trim();
-      final result = await ref.read(ocrServiceProvider).recognize(bytes);
-      final parsed = const ReceiptParser().parse(
-        result.text,
-        scannedBarcode: barcode,
-      );
+      final barcode =
+          _barcode.text.trim().isEmpty ? null : _barcode.text.trim();
+      final result = await ref
+          .read(receiptOcrPipelineProvider)
+          .recognize(bytes, barcodeId: barcode);
+      final parsed = result.parsed;
 
       if (!mounted) return;
+      final oldItems = List<ReceiptItemEditor>.of(_items);
+      final extractedItems = <ReceiptItemEditor>[
+        for (final item in parsed.items)
+          ReceiptItemEditor(
+            item: ReceiptItem(
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              taxRate: item.taxRate,
+            ),
+          ),
+      ];
       setState(() {
         _imageBytes = bytes;
-        _rawOcrText = result.text;
+        _rawOcrText = parsed.rawText;
         _warnings = parsed.warnings;
         _source = barcode == null ? ReceiptSource.ocr : ReceiptSource.barcode;
 
@@ -286,10 +299,25 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         }
         _tax8Base = parsed.tax8Base ?? _tax8Base;
         _tax10Base = parsed.tax10Base ?? _tax10Base;
+        _tax8ItemsTotal = parsed.tax8ItemsTotal;
+        _tax10ItemsTotal = parsed.tax10ItemsTotal;
         if (parsed.barcodeId != null && _barcode.text.trim().isEmpty) {
           _barcode.text = parsed.barcodeId!;
         }
+        _items
+          ..clear()
+          ..addAll(extractedItems);
       });
+      for (final item in oldItems) {
+        item.dispose();
+      }
+      if (result.usedFallback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: AppText('AIを利用できないため、端末内OCRで読み取りました。'),
+          ),
+        );
+      }
       await _checkDuplicate();
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -345,52 +373,23 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       barcodeId: _barcode.text,
       categoryId: _categoryId,
       note: _note.text,
-      imageBase64: _imageBase64,
       rawOcrText: _rawOcrText,
       items: items,
       source: _source,
     );
 
     try {
-      final imageBase64 = _imageBytes == null
-          ? _imageBase64
-          : encodeReceiptImageForFirestore(_imageBytes!);
-
-      final draftWithImage = ReceiptDraft(
-        merchant: draft.merchant,
-        purchasedAt: draft.purchasedAt,
-        totalAmount: draft.totalAmount,
-        subtotalAmount: draft.subtotalAmount,
-        tax8Amount: draft.tax8Amount,
-        tax10Amount: draft.tax10Amount,
-        tax8Base: draft.tax8Base,
-        tax10Base: draft.tax10Base,
-        tax8ItemsTotal: draft.tax8ItemsTotal,
-        tax10ItemsTotal: draft.tax10ItemsTotal,
-        dueDate: draft.dueDate,
-        reminderAt: draft.reminderAt,
-        pointBrand: draft.pointBrand,
-        pointAmount: draft.pointAmount,
-        barcodeId: draft.barcodeId,
-        categoryId: draft.categoryId,
-        note: draft.note,
-        imageBase64: imageBase64,
-        rawOcrText: draft.rawOcrText,
-        items: draft.items,
-        source: draft.source,
-      );
-
       final Receipt saved;
       if (_existingId != null) {
         saved = await repository.update(
           _existingId!,
           <String, dynamic>{
-            ...draftWithImage.toRow(includeItems: true),
+            ...draft.toRow(includeItems: true),
           },
           items: items,
         );
       } else {
-        saved = await repository.create(draftWithImage);
+        saved = await repository.create(draft);
       }
 
       if (!mounted) return;
@@ -403,7 +402,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           DateTime(saved.purchasedAt.year, saved.purchasedAt.month),
         ),
       );
-      setState(() => _saving = false);
+      setState(() {
+        _saving = false;
+        _imageBytes = null;
+      });
       context.pop(saved);
     } on DuplicateReceiptException catch (error) {
       if (!mounted) return;
@@ -440,7 +442,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       appBar: AppBar(
         title: AppText(_existingId == null ? '内容の確認' : 'レシートを編集'),
         actions: <Widget>[
-          if (_imageBytes != null || _imageBase64 != null)
+          if (_imageBytes != null)
             IconButton(
               tooltip: context.tr('画像を撮り直す'),
               onPressed: _recognizing ? null : _recognizeAgain,
@@ -462,7 +464,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                         padding: const EdgeInsets.fromLTRB(24, 8, 12, 24),
                         child: _ImagePanel(
                           bytes: _imageBytes,
-                          base64: _imageBase64,
                           busy: _recognizing,
                           onCapture: _recognizeAgain,
                         ),
@@ -483,7 +484,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     children: <Widget>[
                       _ImagePanel(
                         bytes: _imageBytes,
-                        base64: _imageBase64,
                         busy: _recognizing,
                         onCapture: _recognizeAgain,
                       ),
@@ -551,6 +551,18 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           ),
           const SizedBox(height: 12),
         ],
+        ItemEditorSection(
+          items: _items,
+          categories: categories,
+          totalAmount: parseYenInput(_total.text) ?? 0,
+          taxTotal: (parseYenInput(_tax8.text) ?? 0) +
+              (parseYenInput(_tax10.text) ?? 0),
+          onAdd: _addItem,
+          onRemove: _removeItem,
+          onChanged: () => setState(() {}),
+          onMatchTotal: _matchTotalToItems,
+        ),
+        const SizedBox(height: 14),
         _Section(
           title: '基本情報',
           children: <Widget>[
@@ -705,18 +717,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               ],
             ),
           ],
-        ),
-        const SizedBox(height: 14),
-        ItemEditorSection(
-          items: _items,
-          categories: categories,
-          totalAmount: parseYenInput(_total.text) ?? 0,
-          taxTotal: (parseYenInput(_tax8.text) ?? 0) +
-              (parseYenInput(_tax10.text) ?? 0),
-          onAdd: _addItem,
-          onRemove: _removeItem,
-          onChanged: () => setState(() {}),
-          onMatchTotal: _matchTotalToItems,
         ),
         const SizedBox(height: 14),
         _Section(
@@ -1109,13 +1109,11 @@ class _DuplicateCard extends StatelessWidget {
 class _ImagePanel extends ConsumerWidget {
   const _ImagePanel({
     required this.bytes,
-    required this.base64,
     required this.busy,
     required this.onCapture,
   });
 
   final Uint8List? bytes;
-  final String? base64;
   final bool busy;
   final VoidCallback onCapture;
 
@@ -1126,16 +1124,6 @@ class _ImagePanel extends ConsumerWidget {
     Widget content;
     if (bytes != null) {
       content = Image.memory(bytes!, fit: BoxFit.cover);
-    } else if (base64 != null) {
-      final storedBytes = decodeReceiptImage(base64);
-      content = storedBytes == null
-          ? Center(
-              child: AppText(
-                '画像を読み込めませんでした',
-                style: theme.textTheme.bodySmall,
-              ),
-            )
-          : Image.memory(storedBytes, fit: BoxFit.cover, gaplessPlayback: true);
     } else {
       content = Center(
         child: Column(
@@ -1148,7 +1136,7 @@ class _ImagePanel extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             AppText(
-              'レシート画像は未添付です',
+              'プレビューするレシート画像はありません',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
@@ -1182,11 +1170,7 @@ class _ImagePanel extends ConsumerWidget {
                 )
               : const Icon(Icons.document_scanner_outlined, size: 18),
           label: AppText(
-            busy
-                ? '読み取り中…'
-                : (bytes == null && base64 == null
-                    ? 'レシートを撮影して自動入力'
-                    : '撮り直して再読み取り'),
+            busy ? '読み取り中…' : (bytes == null ? 'レシートを撮影して自動入力' : '撮り直して再読み取り'),
           ),
         ),
       ],

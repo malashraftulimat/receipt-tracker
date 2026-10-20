@@ -23,8 +23,20 @@ class CameraFrame {
   /// Returns `null` when there is no active video element, e.g. the camera is
   /// still starting or permission was denied.
   static Future<Uint8List?> capture({
-    int maxWidth = 2000,
-    double quality = 0.9,
+    int maxWidth = 2400,
+    double quality = 0.92,
   }) =>
       platform.capture(maxWidth: maxWidth, quality: quality);
+
+  /// Raises the live stream resolution and enables continuous autofocus when
+  /// the browser/device exposes those constraints. No-op elsewhere.
+  static Future<void> prepareForCapture() => platform.prepareForCapture();
+
+  /// Re-focuses the live camera at a normalised (0..1) preview coordinate.
+  static Future<void> focusAt(double x, double y) => platform.focusAt(x, y);
+
+  /// iOS Safari / browsers that cannot constrain focus: open the native camera
+  /// through a hidden `<input type="file" capture="environment">`.
+  static Future<Uint8List?> pickFromDeviceCamera() =>
+      platform.pickFromDeviceCamera();
 }

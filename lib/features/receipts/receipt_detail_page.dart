@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/utils/barcode_utils.dart';
 import '../../core/utils/formatters.dart';
-import '../../core/utils/receipt_image.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/receipt.dart';
@@ -156,17 +155,14 @@ class _DetailBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              if (receipt.imageBase64 != null) ...<Widget>[
-                _ReceiptImage(base64: receipt.imageBase64!),
-                const SizedBox(height: 16),
-              ],
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
+                    color:
+                        theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
                   ),
                 ),
                 child: Column(
@@ -259,12 +255,14 @@ class _DetailBody extends StatelessWidget {
                     ),
                   if (receipt.tax8Amount != null)
                     _InfoRow(
-                      label: '消費税 8%${receipt.tax8Base != null ? '（対象 ${formatYen(receipt.tax8Base!)}）' : ''}',
+                      label:
+                          '消費税 8%${receipt.tax8Base != null ? '（対象 ${formatYen(receipt.tax8Base!)}）' : ''}',
                       value: formatYen(receipt.tax8Amount!),
                     ),
                   if (receipt.tax10Amount != null)
                     _InfoRow(
-                      label: '消費税 10%${receipt.tax10Base != null ? '（対象 ${formatYen(receipt.tax10Base!)}）' : ''}',
+                      label:
+                          '消費税 10%${receipt.tax10Base != null ? '（対象 ${formatYen(receipt.tax10Base!)}）' : ''}',
                       value: formatYen(receipt.tax10Amount!),
                     ),
                   if (receipt.hasTaxBreakdown)
@@ -422,51 +420,6 @@ class _DetailBody extends StatelessWidget {
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReceiptImage extends StatelessWidget {
-  const _ReceiptImage({required this.base64});
-
-  final String base64;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bytes = decodeReceiptImage(base64);
-
-    if (bytes == null) {
-      return AppText(
-        '画像を読み込めませんでした',
-        style: theme.textTheme.bodySmall,
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        height: 280,
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        child: InkWell(
-          onTap: () => showDialog<void>(
-            context: context,
-            builder: (context) => Dialog(
-              insetPadding: const EdgeInsets.all(16),
-              child: InteractiveViewer(
-                maxScale: 4,
-                child: Image.memory(bytes, fit: BoxFit.contain),
-              ),
-            ),
-          ),
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            gaplessPlayback: true,
           ),
         ),
       ),

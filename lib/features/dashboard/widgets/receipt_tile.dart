@@ -114,14 +114,6 @@ class ReceiptTile extends StatelessWidget {
                               color: accent,
                             ),
                           ),
-                          if (receipt.imageBase64 != null) ...<Widget>[
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.image_outlined,
-                              size: 13,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ],
                           if (receipt.barcodeId != null) ...<Widget>[
                             const SizedBox(width: 4),
                             Icon(
@@ -193,7 +185,8 @@ class ReceiptGridCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: CategoryPill(label: receipt.displayCategory, color: accent),
+                    child: CategoryPill(
+                        label: receipt.displayCategory, color: accent),
                   ),
                 ],
               ),

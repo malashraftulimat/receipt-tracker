@@ -36,6 +36,10 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   final List<String> _chunkTexts = <String>[];
   final List<Uint8List> _chunkImages = <Uint8List>[];
   String? _error;
+  String _processingLabel = 'AIがレシートを解析しています…';
+  double? _focusX;
+  double? _focusY;
+  int _focusRingId = 0;
 
   /// Android / iOS use the native ML Kit camera pipeline, while the web build
   /// uses `mobile_scanner`'s HTML5/WebRTC implementation (getUserMedia + ZXing).
@@ -61,6 +65,9 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   void dispose() {
     _scanner?.removeListener(_handleScannerState);
     _scanner?.dispose();
+    // Captured chunks live in memory only; drop them when leaving the scanner.
+    _chunkTexts.clear();
+    _chunkImages.clear();
     super.dispose();
   }
 
@@ -119,9 +126,8 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         MobileScannerErrorCode.permissionDenied =>
           'ブラウザまたは端末でカメラへのアクセスが拒否されています。'
               'サイト設定でカメラを許可して再試行してください。',
-        MobileScannerErrorCode.unsupported =>
-          'このブラウザではライブカメラを利用できません。'
-              '画像を選択してOCRするか、手入力で登録してください。',
+        MobileScannerErrorCode.unsupported => 'このブラウザではライブカメラを利用できません。'
+            '画像を選択してOCRするか、手入力で登録してください。',
         _ => error.errorDetails?.message ?? 'カメラを起動できませんでした。',
       };
     });
@@ -145,9 +151,33 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   Future<void> _startScanner() async {
     try {
       await _scanner?.start();
+      await _prepareWebCamera();
     } catch (_) {
       // Permission denied / already running: the state listener handles UI.
     }
+  }
+
+  /// Applies the highest practical resolution and continuous autofocus to the
+  /// MediaStreamTrack behind mobile_scanner's web <video> element.
+  Future<void> _prepareWebCamera() async {
+    if (!kIsWeb) return;
+    try {
+      await CameraFrame.prepareForCapture();
+    } catch (_) {
+      // Focus tuning is best-effort and must never stop scanning.
+    }
+  }
+
+  Future<void> _focusPreview(TapDownDetails details, Size size) async {
+    if (!kIsWeb || size.width <= 0 || size.height <= 0) return;
+    final x = details.localPosition.dx / size.width;
+    final y = details.localPosition.dy / size.height;
+    setState(() {
+      _focusX = x.clamp(0.0, 1.0);
+      _focusY = y.clamp(0.0, 1.0);
+      _focusRingId += 1;
+    });
+    await CameraFrame.focusAt(x, y);
   }
 
   Future<void> _stopScanner() async {
@@ -231,6 +261,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
     setState(() {
       _processing = true;
+      _processingLabel = 'AIがレシートを解析しています…';
       _error = null;
     });
 
@@ -241,29 +272,71 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         await _restartScannerIfNeeded();
         return;
       }
-
-      final barcode = ref.read(scanSessionProvider).barcode;
-      final result = await ref.read(ocrServiceProvider).recognize(bytes);
-      final parsed = const ReceiptParser().parse(
-        result.text,
-        scannedBarcode: barcode,
-      );
-
-      final draft = ReceiptDraft.fromParsed(
-        parsed,
-        barcodeId: barcode,
-        source: barcode == null ? ReceiptSource.ocr : ReceiptSource.barcode,
-      );
-
-      if (!mounted) return;
-      setState(() => _processing = false);
-      await _openReview(draft, bytes, parsed: parsed);
+      await _recognizeAndReview(bytes);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
       await _restartScannerIfNeeded();
     } finally {
       if (mounted && _processing) setState(() => _processing = false);
     }
+  }
+
+  /// iOS Safari path: native camera via <input type=file capture=environment>.
+  Future<void> _captureWithDeviceCamera() async {
+    if (_processing || _navigating) return;
+
+    setState(() {
+      _processing = true;
+      _processingLabel = 'AIがレシートを解析しています…';
+      _error = null;
+    });
+
+    try {
+      final bytes = await CameraFrame.pickFromDeviceCamera();
+      if (bytes == null) {
+        if (mounted) setState(() => _processing = false);
+        return;
+      }
+      await _stopScanner();
+      await _recognizeAndReview(bytes);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+      await _restartScannerIfNeeded();
+    } finally {
+      if (mounted && _processing) setState(() => _processing = false);
+    }
+  }
+
+  Future<void> _recognizeAndReview(Uint8List bytes) async {
+    final barcode = ref.read(scanSessionProvider).barcode;
+    final result = await ref.read(receiptOcrPipelineProvider).recognize(
+      bytes,
+      barcodeId: barcode,
+      onFallback: (_) {
+        if (!mounted) return;
+        setState(() {
+          _processingLabel = 'AIを利用できないため、端末内OCRで解析しています…';
+        });
+      },
+    );
+    final parsed = result.parsed;
+
+    final draft = ReceiptDraft.fromParsed(
+      parsed,
+      barcodeId: barcode,
+      source: barcode == null ? ReceiptSource.ocr : ReceiptSource.barcode,
+    );
+
+    if (!mounted) return;
+    setState(() => _processing = false);
+    if (result.usedFallback) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: AppText('AIを利用できないため、端末内OCRで読み取りました。'),
+        ),
+      );
+    }
+    await _openReview(draft, bytes, parsed: parsed);
   }
 
   // -------------------------------------------------------------------------
@@ -275,6 +348,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
     setState(() {
       _processing = true;
+      _processingLabel = '端末内OCRでレシートを解析しています…';
       _error = null;
     });
 
@@ -332,6 +406,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     _clearChunks();
     await _openReview(draft, cover, parsed: parsed);
   }
+
   Future<void> _openReview(
     ReceiptDraft draft,
     Uint8List? imageBytes, {
@@ -386,6 +461,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         body: _NoCameraView(
           onPickImage: _captureAndRecognize,
           onManual: _openManual,
+          onDeviceCamera: kIsWeb ? _captureWithDeviceCamera : null,
           busy: _processing,
           error: _cameraError ?? _error,
           cameraDenied: _cameraBlocked,
@@ -414,16 +490,36 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       body: Column(
         children: <Widget>[
           Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                MobileScanner(
-                  controller: _scanner!,
-                  onDetect: _onDetect,
-                ),
-                const IgnorePointer(child: _ScanFrame()),
-                if (_processing) const _ProcessingOverlay(),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final size = constraints.biggest;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (details) => _focusPreview(details, size),
+                      child: MobileScanner(
+                        controller: _scanner!,
+                        onDetect: _onDetect,
+                      ),
+                    ),
+                    const IgnorePointer(child: _ScanFrame()),
+                    if (_focusX != null && _focusY != null)
+                      Positioned(
+                        left: _focusX! * size.width - 36,
+                        top: _focusY! * size.height - 36,
+                        child: IgnorePointer(
+                          child: _TapFocusRing(
+                            key: ValueKey<int>(_focusRingId),
+                          ),
+                        ),
+                      ),
+                    if (_processing)
+                      _ProcessingOverlay(label: _processingLabel),
+                  ],
+                );
+              },
             ),
           ),
           Theme(
@@ -462,6 +558,16 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                       height: 1.4,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  const AppText(
+                    '撮影した写真はGoogle（Firebase AI）に送信して解析します。写真は保存されません。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 10.5,
+                      height: 1.4,
+                    ),
+                  ),
                   if (session.barcode != null) ...<Widget>[
                     const SizedBox(height: 12),
                     _BarcodeBanner(
@@ -484,23 +590,31 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                     )
                   else
                     _ActionButtons(
-                    mode: session.mode,
-                    hasBarcode: session.barcode != null,
-                    busy: _processing,
-                    onCapture: _captureAndRecognize,
-                    onManual: _openManual,
-                    onUseBarcodeOnly: () {
-                      final barcode = session.barcode;
-                      if (barcode == null) return;
-                      _openReview(
-                        ReceiptDraft(
-                          barcodeId: barcode,
-                          source: ReceiptSource.barcode,
-                        ),
-                        null,
-                      );
-                    },
-                  ),
+                      mode: session.mode,
+                      hasBarcode: session.barcode != null,
+                      busy: _processing,
+                      onCapture: _captureAndRecognize,
+                      onManual: _openManual,
+                      onUseBarcodeOnly: () {
+                        final barcode = session.barcode;
+                        if (barcode == null) return;
+                        _openReview(
+                          ReceiptDraft(
+                            barcodeId: barcode,
+                            source: ReceiptSource.barcode,
+                          ),
+                          null,
+                        );
+                      },
+                    ),
+                  if (kIsWeb) ...<Widget>[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _processing ? null : _captureWithDeviceCamera,
+                      icon: const Icon(Icons.phone_iphone),
+                      label: const AppText('端末のカメラを使う'),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -695,7 +809,8 @@ class _ScanFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = (constraints.maxWidth * 0.8).clamp(220.0, 420.0).toDouble();
+        final width =
+            (constraints.maxWidth * 0.8).clamp(220.0, 420.0).toDouble();
         final height =
             (constraints.maxHeight * 0.55).clamp(160.0, 320.0).toDouble();
         return Center(
@@ -751,22 +866,83 @@ class _CornerPainter extends CustomPainter {
       oldDelegate.color != color;
 }
 
+class _TapFocusRing extends StatefulWidget {
+  const _TapFocusRing({super.key});
+
+  @override
+  State<_TapFocusRing> createState() => _TapFocusRingState();
+}
+
+class _TapFocusRingState extends State<_TapFocusRing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 850),
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final progress = _controller.value;
+        return Opacity(
+          opacity: (1 - progress).clamp(0.0, 1.0),
+          child: Transform.scale(scale: 1 + progress * 0.45, child: child),
+        );
+      },
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(color: Colors.black26, blurRadius: 8),
+          ],
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 8,
+            height: 8,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProcessingOverlay extends StatelessWidget {
-  const _ProcessingOverlay();
+  const _ProcessingOverlay({required this.label});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: Colors.black54,
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 14),
+            const CircularProgressIndicator(color: Colors.white),
+            const SizedBox(height: 14),
             AppText(
-              'レシートを解析しています…',
-              style: TextStyle(color: Colors.white, fontSize: 13),
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
           ],
         ),
@@ -780,6 +956,7 @@ class _NoCameraView extends StatelessWidget {
     required this.onPickImage,
     required this.onManual,
     required this.busy,
+    this.onDeviceCamera,
     this.error,
     this.cameraDenied = false,
     this.canRetryCamera = false,
@@ -788,6 +965,7 @@ class _NoCameraView extends StatelessWidget {
 
   final VoidCallback onPickImage;
   final VoidCallback onManual;
+  final VoidCallback? onDeviceCamera;
   final bool busy;
   final String? error;
   final bool cameraDenied;
@@ -797,9 +975,8 @@ class _NoCameraView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final title = cameraDenied
-        ? 'カメラへのアクセスを許可してください'
-        : 'このデバイスではライブカメラを利用できません';
+    final title =
+        cameraDenied ? 'カメラへのアクセスを許可してください' : 'このデバイスではライブカメラを利用できません';
     final description = cameraDenied
         ? 'ブラウザまたは端末の設定でこのサイトのカメラ利用を許可し、'
             '「カメラを再試行」を押してください。'
@@ -835,6 +1012,12 @@ class _NoCameraView extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 8),
+              const AppText(
+                '撮影した写真はGoogle（Firebase AI）に送信して解析します。写真は保存されません。',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, height: 1.4),
               ),
               if (error != null) ...<Widget>[
                 const SizedBox(height: 14),
@@ -874,6 +1057,14 @@ class _NoCameraView extends StatelessWidget {
                     : const Icon(Icons.photo_library_outlined),
                 label: AppText(busy ? '解析中…' : '画像を選択してOCR'),
               ),
+              if (onDeviceCamera != null) ...<Widget>[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : onDeviceCamera,
+                  icon: const Icon(Icons.phone_iphone),
+                  label: const AppText('端末のカメラを使う'),
+                ),
+              ],
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: busy ? null : onManual,
@@ -931,9 +1122,7 @@ class _LongReceiptControls extends StatelessWidget {
                 onPressed: busy ? null : onAdd,
                 icon: const Icon(Icons.add_a_photo_outlined),
                 label: AppText(
-                  busy
-                      ? '読み取り中…'
-                      : (chunkCount == 0 ? '1枚目を撮影' : '次のチャンクを撮影'),
+                  busy ? '読み取り中…' : (chunkCount == 0 ? '1枚目を撮影' : '次のチャンクを撮影'),
                 ),
               ),
             ),

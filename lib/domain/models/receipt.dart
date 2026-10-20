@@ -47,7 +47,6 @@ class Receipt {
     this.barcodeId,
     this.categoryId,
     this.note,
-    this.imageBase64,
     this.source = ReceiptSource.manual,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
@@ -85,7 +84,6 @@ class Receipt {
   final String? barcodeId;
   final String? categoryId;
   final String? note;
-  final String? imageBase64;
   final ReceiptSource source;
   final String? rawOcrText;
 
@@ -113,8 +111,9 @@ class Receipt {
 
   bool get hasTaxBreakdown => tax8Amount != null || tax10Amount != null;
 
-  String get displayMerchant =>
-      (merchant == null || merchant!.trim().isEmpty) ? '店舗名なし' : merchant!.trim();
+  String get displayMerchant => (merchant == null || merchant!.trim().isEmpty)
+      ? '店舗名なし'
+      : merchant!.trim();
 
   String get displayCategory => category?.name ?? '未分類';
 
@@ -124,7 +123,8 @@ class Receipt {
     ExpenseCategory? category;
     final rawCategory = json['category'];
     if (rawCategory is Map) {
-      category = ExpenseCategory.fromJson(Map<String, dynamic>.from(rawCategory));
+      category =
+          ExpenseCategory.fromJson(Map<String, dynamic>.from(rawCategory));
     }
     return Receipt(
       id: json['id'] as String,
@@ -146,7 +146,7 @@ class Receipt {
       barcodeId: json['barcode_id'] as String?,
       categoryId: json['category_id'] as String?,
       note: json['note'] as String?,
-      imageBase64: json['image_base64'] as String?,
+      // Legacy image_base64 documents are tolerated but the photo is ignored.
       source: receiptSourceFromString(json['source'] as String?),
       rawOcrText: json['raw_ocr_text'] as String?,
       createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
@@ -181,7 +181,6 @@ class Receipt {
     String? barcodeId,
     String? categoryId,
     String? note,
-    String? imageBase64,
     ReceiptSource? source,
     String? rawOcrText,
     List<ReceiptItem>? items,
@@ -207,7 +206,6 @@ class Receipt {
       barcodeId: barcodeId ?? this.barcodeId,
       categoryId: categoryId ?? this.categoryId,
       note: note ?? this.note,
-      imageBase64: imageBase64 ?? this.imageBase64,
       source: source ?? this.source,
       rawOcrText: rawOcrText ?? this.rawOcrText,
       items: items ?? this.items,

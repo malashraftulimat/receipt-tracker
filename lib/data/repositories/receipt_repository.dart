@@ -58,10 +58,8 @@ class ReceiptRepository {
       );
     }
 
-    final snapshot = await query
-        .orderBy('purchased_at', descending: true)
-        .limit(1000)
-        .get();
+    final snapshot =
+        await query.orderBy('purchased_at', descending: true).limit(1000).get();
 
     final categories = await _categoryMap();
     var receipts = snapshot.docs
@@ -93,15 +91,13 @@ class ReceiptRepository {
   }
 
   Future<String?> findIdByBarcode(String barcode) async {
-    final snapshot = await _receipts
-        .where('barcode_id', isEqualTo: barcode)
-        .limit(1)
-        .get();
+    final snapshot =
+        await _receipts.where('barcode_id', isEqualTo: barcode).limit(1).get();
     if (snapshot.docs.isEmpty) return null;
     return snapshot.docs.first.id;
   }
 
-  Future<Receipt> create(ReceiptDraft draft, {String? imageBase64}) async {
+  Future<Receipt> create(ReceiptDraft draft) async {
     final barcode = draft.barcodeId?.trim();
     if (barcode != null && barcode.isNotEmpty) {
       final existingId = await findIdByBarcode(barcode);
@@ -115,7 +111,6 @@ class ReceiptRepository {
     await doc.set(<String, dynamic>{
       ...draft.toRow(includeItems: true),
       'user_id': _userId,
-      'image_base64': imageBase64 ?? draft.imageBase64,
       'created_at': now,
       'updated_at': now,
     });
