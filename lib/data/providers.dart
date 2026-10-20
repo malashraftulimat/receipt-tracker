@@ -1,9 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/config/app_config.dart';
 import '../domain/models/app_user.dart';
 import '../domain/models/category.dart';
 import '../domain/models/monthly_budget.dart';
@@ -13,20 +10,12 @@ import 'repositories/auth_repository.dart';
 import 'repositories/budget_repository.dart';
 import 'repositories/category_repository.dart';
 import 'repositories/receipt_repository.dart';
-import 'repositories/storage_repository.dart';
-import 'services/local_store.dart';
 import 'services/ocr/ocr_service.dart';
 
 // ---------------------------------------------------------------------------
 // Infrastructure
 // ---------------------------------------------------------------------------
 
-final supabaseClientProvider = Provider<SupabaseClient>(
-  (ref) => Supabase.instance.client,
-);
-
-// Repositories resolve the Supabase client lazily so that local mode works
-// without ever initialising Supabase.
 final authRepositoryProvider = Provider<AuthRepository>(
   (ref) => AuthRepository(),
 );
@@ -39,95 +28,30 @@ final categoryRepositoryProvider = Provider<CategoryRepository>(
   (ref) => CategoryRepository(),
 );
 
-final storageRepositoryProvider = Provider<StorageRepository>(
-  (ref) => StorageRepository(),
-);
-
 final budgetRepositoryProvider = Provider<BudgetRepository>(
   (ref) => BudgetRepository(),
 );
 
-bool get _hasOnDeviceOcr =>
-    !kIsWeb &&
-    (defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS);
-
-/// ML Kit on mobile, Tesseract.js on local web, Supabase Edge Function in
-/// Supabase mode (web / desktop). Desktop local mode has no OCR engine.
+/// ML Kit on Android/iOS, Tesseract.js on Web. Desktop has no OCR engine.
 final ocrServiceProvider = Provider<OcrService>((ref) {
-  ref.watch(appModeProvider);
-
-  if (AppConfig.isLocal && !_hasOnDeviceOcr && !kIsWeb) {
-    return const UnavailableOcrService(
-      'ローカルモードではサーバーOCRを使えません。'
-      '「手入力で登録」を使うか、設定から Supabase に接続してください。',
-    );
-  }
   final service = createOcrService();
   ref.onDispose(service.dispose);
   return service;
 });
 
 // ---------------------------------------------------------------------------
-// Backend mode (Supabase sync vs on-device local mode)
+// Auth state (Firebase Auth)
 // ---------------------------------------------------------------------------
 
-class AppModeController extends Notifier<AppMode> {
-  @override
-  AppMode build() => AppConfig.mode;
-
-  Future<void> switchToLocal() async {
-    final prefs = await SharedPreferences.getInstance();
-    await AppConfig.useLocalMode(prefs);
-    state = AppMode.local;
-  }
-
-  Future<void> switchToSupabase() async {
-    final prefs = await SharedPreferences.getInstance();
-    await AppConfig.useSupabaseMode(prefs);
-    state = AppMode.supabase;
-  }
-
-  /// Re-reads the mode after [AppConfig.connect] changed it.
-  void refresh() => state = AppConfig.mode;
-}
-
-final appModeProvider =
-    NotifierProvider<AppModeController, AppMode>(AppModeController.new);
-
-// ---------------------------------------------------------------------------
-// Auth state
-// ---------------------------------------------------------------------------
-
-final authStateProvider = StreamProvider<AuthState>(
-  (ref) => ref.watch(supabaseClientProvider).auth.onAuthStateChange,
-);
-
-/// Holds the signed-in account for on-device (local) mode.
-class LocalSessionController extends Notifier<AppUser?> {
-  @override
-  AppUser? build() => AppConfig.localUser;
-
-  void setUser(AppUser? user) {
-    AppConfig.localUser = user;
-    if (user != null) LocalStore.instance.useUser(user.id);
-    state = user;
-  }
-}
-
-final localSessionProvider =
-    NotifierProvider<LocalSessionController, AppUser?>(
-  LocalSessionController.new,
+final authStateProvider = StreamProvider<User?>(
+  (ref) => FirebaseAuth.instance.authStateChanges(),
 );
 
 final currentUserProvider = Provider<AppUser?>((ref) {
-  final mode = ref.watch(appModeProvider);
-  if (mode == AppMode.local) return ref.watch(localSessionProvider);
-
   ref.watch(authStateProvider); // rebuild on sign-in / sign-out / refresh
-  final user = ref.watch(supabaseClientProvider).auth.currentUser;
+  final user = FirebaseAuth.instance.currentUser;
   if (user == null) return null;
-  return AppUser(id: user.id, email: user.email ?? '');
+  return AppUser(id: user.uid, email: user.email ?? '');
 });
 
 final userIdProvider = Provider<String?>(
@@ -278,7 +202,4 @@ final upcomingDueProvider = FutureProvider<List<Receipt>>((ref) async {
   return due;
 });
 
-/// Signed URL for a stored receipt image path.
-final signedImageUrlProvider = FutureProvider.family<String, String>(
-  (ref, path) => ref.watch(storageRepositoryProvider).signedUrl(path),
-);
+

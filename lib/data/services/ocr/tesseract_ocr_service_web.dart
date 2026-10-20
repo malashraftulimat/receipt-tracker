@@ -6,15 +6,13 @@ import 'dart:typed_data';
 import 'package:web/web.dart' as web;
 
 import 'ocr_service.dart';
-import 'remote_ocr_service.dart';
 
-/// Client-side OCR for Flutter Web in local mode.
+/// Client-side OCR for Flutter Web.
 ///
 /// Tesseract.js runs entirely inside the browser (WASM + Web Worker), so no
-/// Supabase Edge Function, API key or server-side network request is required
-/// for the recognition itself. The JS bundle is served from the app
-/// (`web/tesseract.min.js`); the worker/WASM/language data are cached by the
-/// browser from the Tesseract.js CDN.
+/// server API, key or Edge Function is required for recognition. The JS bundle
+/// is served from the app (`web/tesseract.min.js`); worker/WASM/language data
+/// are loaded from the Tesseract.js CDN and cached by the browser.
 class TesseractOcrService implements OcrService {
   static Future<void>? _loading;
 

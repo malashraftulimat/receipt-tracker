@@ -47,7 +47,7 @@ class Receipt {
     this.barcodeId,
     this.categoryId,
     this.note,
-    this.imagePath,
+    this.imageBase64,
     this.source = ReceiptSource.manual,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
@@ -85,12 +85,11 @@ class Receipt {
   final String? barcodeId;
   final String? categoryId;
   final String? note;
-  final String? imagePath;
+  final String? imageBase64;
   final ReceiptSource source;
   final String? rawOcrText;
 
-  /// Item rows (商品明細). Persisted in `receipt_items` on Supabase and inline
-  /// in the receipt JSON for local mode.
+  /// Item rows (商品明細), embedded in the Firestore receipt document.
   final List<ReceiptItem> items;
 
   final DateTime createdAt;
@@ -147,7 +146,7 @@ class Receipt {
       barcodeId: json['barcode_id'] as String?,
       categoryId: json['category_id'] as String?,
       note: json['note'] as String?,
-      imagePath: json['image_path'] as String?,
+      imageBase64: json['image_base64'] as String?,
       source: receiptSourceFromString(json['source'] as String?),
       rawOcrText: json['raw_ocr_text'] as String?,
       createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
@@ -182,7 +181,7 @@ class Receipt {
     String? barcodeId,
     String? categoryId,
     String? note,
-    String? imagePath,
+    String? imageBase64,
     ReceiptSource? source,
     String? rawOcrText,
     List<ReceiptItem>? items,
@@ -208,7 +207,7 @@ class Receipt {
       barcodeId: barcodeId ?? this.barcodeId,
       categoryId: categoryId ?? this.categoryId,
       note: note ?? this.note,
-      imagePath: imagePath ?? this.imagePath,
+      imageBase64: imageBase64 ?? this.imageBase64,
       source: source ?? this.source,
       rawOcrText: rawOcrText ?? this.rawOcrText,
       items: items ?? this.items,

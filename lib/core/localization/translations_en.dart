@@ -41,6 +41,7 @@ const Map<String, String> kEnglishTranslations = <String, String>{
       'Local account (this device only, no sync)',
   'すべての端末でレシート・画像・カテゴリが同期されます':
       'Receipts, images and categories sync across all devices',
+  'Firebase アカウント（レシート・明細・予算はすべての端末で同期されます）': 'Firebase account (receipts, items and budgets sync across all devices)',
   'ユーザーIDをコピー': 'Copy user ID',
   'ユーザーIDをコピーしました': 'User ID copied',
   'ログアウト': 'Sign out',
@@ -49,6 +50,7 @@ const Map<String, String> kEnglishTranslations = <String, String>{
       'You will sign out of the local account. Data stays on this device.',
   'データはサーバーに保存されています。次回ログインで復元されます。':
       'Your data is stored on the server and will be restored on the next sign-in.',
+  'データは Firebase に保存されています。次回ログインで復元されます。': 'Your data is stored in Firebase and will be restored on the next sign-in.',
   '表示': 'Appearance',
   '自動': 'Auto',
   'ライト': 'Light',
@@ -95,8 +97,8 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   '標準カテゴリを確認しました': 'Default categories checked',
   'このアプリについて': 'About this app',
   'スキャンエンジン': 'Scanning engine',
-  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nOCR: ML Kit（iOS・Android オンデバイス）/ Cloud Vision（同期Web・デスクトップ）/ Tesseract.js（ローカルWeb）':
-      '1D barcode: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nOCR: ML Kit (on-device iOS/Android) / Cloud Vision (synced web/desktop) / Tesseract.js (local web)',
+  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nOCR: ML Kit（iOS・Android オンデバイス）/ Tesseract.js（Web）':
+      '1D barcode: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nOCR: ML Kit (on-device iOS/Android) / Tesseract.js (web)',
   'バージョン': 'Version',
   '対象のレシートがありません': 'No matching receipts',
   'CSVを書き出しました: ': 'CSV exported: ',

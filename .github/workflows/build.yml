@@ -33,16 +33,7 @@ jobs:
       - run: flutter test
 
       - name: Build release APK
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          ARGS=(--release)
-          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            ARGS+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
-            ARGS+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
-          fi
-          flutter build apk "${ARGS[@]}"
+        run: flutter build apk --release
 
       - uses: actions/upload-artifact@v4
         with:
@@ -66,16 +57,7 @@ jobs:
 
       - run: flutter pub get
       - name: Build Windows app
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          $buildArgs = @("--release")
-          if ($env:SUPABASE_URL -and $env:SUPABASE_ANON_KEY) {
-            $buildArgs += "--dart-define=SUPABASE_URL=$env:SUPABASE_URL"
-            $buildArgs += "--dart-define=SUPABASE_ANON_KEY=$env:SUPABASE_ANON_KEY"
-          }
-          flutter build windows @buildArgs
+        run: flutter build windows --release
       - name: Package
         run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath receipt_tracker-windows.zip
       - uses: actions/upload-artifact@v4
@@ -102,16 +84,7 @@ jobs:
 
       - run: flutter pub get
       - name: Build without codesign
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          ARGS=(--release --no-codesign)
-          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            ARGS+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
-            ARGS+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
-          fi
-          flutter build ios "${ARGS[@]}"
+        run: flutter build ios --release --no-codesign
 
       - name: Package as unsigned IPA
         run: |
@@ -144,16 +117,7 @@ jobs:
 
       - run: flutter pub get
       - name: Build web
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          ARGS=(--release)
-          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            ARGS+=("--dart-define=SUPABASE_URL=$SUPABASE_URL")
-            ARGS+=("--dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
-          fi
-          flutter build web "${ARGS[@]}"
+        run: flutter build web --release
       - uses: actions/upload-artifact@v4
         with:
           name: web

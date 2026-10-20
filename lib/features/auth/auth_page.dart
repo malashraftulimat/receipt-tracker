@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../core/config/app_config.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/auth_repository.dart';
-import '../../data/services/local_auth.dart';
-import '../../data/services/local_store.dart';
 import '../../core/localization/localization.dart';
 
 enum _AuthMode { signIn, signUp }
@@ -49,38 +45,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final password = _passwordController.text;
     final isSignUp = _mode == _AuthMode.signUp;
 
-    // On-device accounts (local mode) never touch the network.
-    if (AppConfig.isLocal) {
-      try {
-        final user = isSignUp
-            ? await LocalAuth.instance.signUp(email: email, password: password)
-            : await LocalAuth.instance.signIn(email: email, password: password);
-        ref.read(localSessionProvider.notifier).setUser(user);
-        LocalStore.instance.useUser(user.id);
-        await LocalStore.instance.seedDefaults();
-        if (!mounted) return;
-        context.go('/dashboard');
-      } on LocalAuthException catch (error) {
-        if (mounted) setState(() => _error = error.message);
-      } catch (error) {
-        if (mounted) setState(() => _error = error.toString());
-      } finally {
-        if (mounted) setState(() => _loading = false);
-      }
-      return;
-    }
-
     try {
       if (!isSignUp) {
         await repository.signIn(email: email, password: password);
       } else {
-        final response = await repository.signUp(
+        await repository.signUp(
           email: email,
           password: password,
         );
-        if (response.session == null && mounted) {
-          _showMessage('確認メールを送信しました。メール内のリンクから認証してください。');
-        }
       }
     } catch (error) {
       if (mounted) {
@@ -93,10 +65,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   Future<void> _resetPassword() async {
     final email = _emailController.text.trim();
-    if (AppConfig.isLocal) {
-      _showMessage('ローカルアカウントのパスワード再設定はできません。新しいアカウントを作成してください。');
-      return;
-    }
     if (!email.contains('@')) {
       setState(() => _error = 'パスワード再設定にはメールアドレスを入力してください。');
       return;
@@ -151,26 +119,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
-                if (AppConfig.isLocal) ...<Widget>[
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: AppText(
-                      'ローカルモード: この端末だけのアカウントです（複数端末で同期するには Supabase に接続）',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 28),
                 SegmentedButton<_AuthMode>(
                   segments: const <ButtonSegment<_AuthMode>>[

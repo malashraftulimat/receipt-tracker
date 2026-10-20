@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/utils/barcode_utils.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/receipt_image.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/receipt.dart';
@@ -12,7 +13,6 @@ import '../dashboard/analytics_provider.dart';
 import '../dashboard/widgets/receipt_tile.dart';
 import '../review/review_page.dart';
 import 'widgets/receipt_item_row.dart';
-import '../shared/stored_image.dart';
 import '../../core/localization/localization.dart';
 
 class ReceiptDetailPage extends ConsumerWidget {
@@ -49,14 +49,6 @@ class ReceiptDetailPage extends ConsumerWidget {
 
     try {
       await ref.read(receiptRepositoryProvider).delete(receipt.id);
-      // Best-effort image cleanup; a leftover object must not block deletion.
-      if (receipt.imagePath != null) {
-        try {
-          await ref
-              .read(storageRepositoryProvider)
-              .deleteImage(receipt.imagePath!);
-        } catch (_) {}
-      }
       if (!context.mounted) return;
       ref.invalidate(receiptsProvider);
       ref.invalidate(analyticsProvider);
@@ -164,8 +156,8 @@ class _DetailBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              if (receipt.imagePath != null) ...<Widget>[
-                _ReceiptImage(path: receipt.imagePath!),
+              if (receipt.imageBase64 != null) ...<Widget>[
+                _ReceiptImage(base64: receipt.imageBase64!),
                 const SizedBox(height: 16),
               ],
               Container(
@@ -437,42 +429,44 @@ class _DetailBody extends StatelessWidget {
   }
 }
 
-class _ReceiptImage extends ConsumerWidget {
-  const _ReceiptImage({required this.path});
+class _ReceiptImage extends StatelessWidget {
+  const _ReceiptImage({required this.base64});
 
-  final String path;
+  final String base64;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final url = ref.watch(signedImageUrlProvider(path));
+    final bytes = decodeReceiptImage(base64);
+
+    if (bytes == null) {
+      return AppText(
+        '画像を読み込めませんでした',
+        style: theme.textTheme.bodySmall,
+      );
+    }
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: Container(
         height: 280,
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        child: url.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: AppText('画像を読み込めませんでした', style: theme.textTheme.bodySmall),
-          ),
-          data: (value) => InkWell(
-            onTap: () => showDialog<void>(
-              context: context,
-              builder: (context) => Dialog(
-                insetPadding: const EdgeInsets.all(16),
-                child: InteractiveViewer(
-                  maxScale: 4,
-                  child: StoredImage(url: value, fit: BoxFit.contain),
-                ),
+        child: InkWell(
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (context) => Dialog(
+              insetPadding: const EdgeInsets.all(16),
+              child: InteractiveViewer(
+                maxScale: 4,
+                child: Image.memory(bytes, fit: BoxFit.contain),
               ),
             ),
-            child: StoredImage(
-              url: value,
-              fit: BoxFit.cover,
-              width: double.infinity,
-            ),
+          ),
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            gaplessPlayback: true,
           ),
         ),
       ),

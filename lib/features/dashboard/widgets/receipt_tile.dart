@@ -114,7 +114,7 @@ class ReceiptTile extends StatelessWidget {
                               color: accent,
                             ),
                           ),
-                          if (receipt.imagePath != null) ...<Widget>[
+                          if (receipt.imageBase64 != null) ...<Widget>[
                             const SizedBox(width: 6),
                             Icon(
                               Icons.image_outlined,

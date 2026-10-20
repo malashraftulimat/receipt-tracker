@@ -1,8 +1,37 @@
 # Platform setup
 
-The platform runners are already generated in this repository **and the settings
-below are already applied** (Android manifest/ML Kit, iOS Info.plist). Keep this
-file as a reference when regenerating the projects, then re-apply the changes.
+The platform runners are already generated in this repository and the Firebase /
+camera / ML Kit settings are already applied. Keep this file as a reference when
+regenerating the projects.
+
+---
+
+## Firebase (Web / Android / iOS)
+
+The config is hard-coded in `lib/core/config/firebase_config.dart` (project
+`receipt-tracker-78d9f`). No `--dart-define`, setup screen or local mode is used.
+
+In the Firebase console:
+
+1. **Authentication → Sign-in method → Email/Password** → enable.
+2. **Firestore Database** → create the database.
+3. Deploy [`firestore.rules`](../firestore.rules) (`firebase deploy --only firestore:rules`).
+4. **Authentication → Settings → Authorized domains** → add the GitHub Pages
+   hostname (for example `malashraftulimat.github.io`). `localhost` is already
+   authorized.
+5. For native builds, register Android / iOS apps in the Firebase project if you
+   want platform-specific OAuth or messaging. Email/password + Firestore work
+   with the hard-coded `FirebaseOptions`.
+
+Firestore layout:
+
+```
+users/{userId}/receipts/{receiptId}   # header + embedded items + image_base64 + OCR text
+users/{userId}/categories/{categoryId}
+users/{userId}/budgets/{yyyy-MM}
+```
+
+No Cloud Functions, Firebase Storage, Blaze plan or credit card is required.
 
 ---
 
@@ -12,6 +41,7 @@ file as a reference when regenerating the projects, then re-apply the changes.
 
 ```xml
 <manifest ...>
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -24,20 +54,20 @@ file as a reference when regenerating the projects, then re-apply the changes.
 </manifest>
 ```
 
-`android/app/build.gradle`
+`android/app/build.gradle.kts`
 
-```gradle
+```kotlin
 android {
-    compileSdk 34
     defaultConfig {
-        minSdk 21          // required by mobile_scanner & ML Kit
-        targetSdk 34
-        multiDexEnabled true
+        minSdk = 24          // required by Firebase Auth / Firestore
+        targetSdk = flutter.targetSdkVersion
     }
 }
 ```
 
-If you build with `minSdk < 21` the build fails in `mobile_scanner` / ML Kit.
+`minSdk < 24` fails with the current Firebase plugins. No `google-services.json`
+is needed because `Firebase.initializeApp(options: ...)` is called with the
+hard-coded config.
 
 ---
 
@@ -64,65 +94,41 @@ platform :ios, '15.5'   # google_mlkit_text_recognition requires iOS 15.5+
 
 ## Web (`web/index.html`)
 
-Camera access needs a **secure context**: serve the app over HTTPS (GitHub Pages,
-Netlify, etc.) or `localhost`, otherwise `getUserMedia` is unavailable. The scanner
-uses `mobile_scanner`'s HTML5/WebRTC backend for live barcode detection and grabs
-OCR stills from the same `<video>` stream. ZXing is bundled at `web/zxing.min.js`,
-so no CDN script is required.
+Camera access needs a **secure context**: serve over HTTPS (GitHub Pages,
+Netlify, etc.) or `localhost`, otherwise `getUserMedia` is unavailable.
 
-Browser/OS camera permission must be granted. If it is explicitly denied or the
-browser cannot expose a camera, the scanner automatically shows the photo-upload
-fallback instead of the live preview.
+- Live barcode detection uses `mobile_scanner`'s HTML5/WebRTC backend.
+- `web/zxing.min.js` is bundled locally (no CDN required).
+- OCR uses **Tesseract.js** (`web/tesseract.min.js` + WASM). The first scan
+  downloads worker/WASM/Japanese+English language data from the Tesseract.js CDN;
+  the browser caches it afterwards.
+- Receipt photos are compressed client-side and stored as base64 in Firestore.
 
-Supabase Storage must allow your origin — the default `*` CORS policy works, but you
-can restrict it in *Project Settings → API → CORS*.
-
-> **Synced web mode** uses the `ocr` **Edge Function**. Without
-> `GOOGLE_VISION_API_KEY` the review screen opens with empty fields and a warning —
-> manual entry still works.
->
-> **Local web mode** uses **Tesseract.js** entirely in the browser
-> (`web/tesseract.min.js` + WASM). No Supabase Edge Function or API key is needed.
-> The first run downloads worker/WASM/Japanese+English language data from the
-> Tesseract.js CDN and the browser caches it afterwards.
+If camera permission is explicitly denied or unsupported, the scanner shows the
+photo-upload fallback.
 
 ---
 
 ## Windows / macOS / Linux
 
-- `image_picker` opens a native file dialog (`ImageSource.gallery`).
-- ML Kit is unavailable, so OCR goes through the `ocr` Edge Function.
-- macOS: add camera/photo entitlements if you enable camera capture later
-  (`macos/Runner/*.entitlements`).
+- `image_picker` opens a native file dialog.
+- ML Kit/Tesseract are not wired for desktop; OCR is unavailable there.
+  Manual entry and CSV export still work.
+- macOS: add camera/photo entitlements if you enable camera capture later.
 
 ```bash
-flutter run -d windows --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
+flutter run -d windows
 ```
-
----
-
-## Supabase edge function
-
-```bash
-supabase login
-supabase link --project-ref <project-ref>
-supabase functions deploy ocr
-supabase secrets set GOOGLE_VISION_API_KEY=<your-key>
-```
-
-`supabase/functions/ocr/index.ts` verifies the caller's JWT with the anon key and the
-user's `Authorization` header, then calls Vision `TEXT_DETECTION` with
-`languageHints: ['ja', 'en']`.
 
 ---
 
 ## Verify the setup
 
-1. `flutter test` — parser & formatter unit tests pass.
-2. Sign up with an email/password on the auth screen.
-3. Home → スキャン → scan any JAN-13 barcode: review opens with the barcode filled in.
-4. Photograph a receipt (`レシートを撮影して読み取る`): merchant / date / total / tax are
-   prefilled.
-5. Save, then edit the category, add a note, and confirm the dashboard grouping,
-   search, filters and charts update.
-6. Sign in on a second device — the same receipts and images appear.
+1. `flutter analyze --no-fatal-infos` and `flutter test`.
+2. Open the app: it should show the Firebase login screen (no setup screen).
+3. Sign up with an email/password.
+4. Home → スキャン → scan a JAN-13 barcode: review opens with the barcode filled.
+5. Photograph a receipt (`レシートを撮影して読み取る`): merchant/date/total/tax/items
+   are prefilled by ML Kit (mobile) or Tesseract.js (web).
+6. Save, edit the category, add a note, and confirm dashboard/search/analytics.
+7. Sign in on a second device: the same receipts, items, budgets and images sync.

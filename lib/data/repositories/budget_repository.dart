@@ -1,51 +1,49 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../core/config/app_config.dart';
 import '../../domain/models/monthly_budget.dart';
-import '../services/local_store.dart';
 
+/// Firestore budgets at `users/{userId}/budgets/{yyyy-MM}`.
 class BudgetRepository {
-  BudgetRepository([this._client]);
+  BudgetRepository([FirebaseFirestore? firestore])
+      : _db = firestore ?? FirebaseFirestore.instance;
 
-  final SupabaseClient? _client;
-
-  SupabaseClient get _supabase => _client ?? Supabase.instance.client;
+  final FirebaseFirestore _db;
 
   String get _userId {
-    final user = _supabase.auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw StateError('Not signed in');
-    return user.id;
+    return user.uid;
   }
 
-  Future<MonthlyBudget?> fetchMonth(DateTime month) async {
-    if (AppConfig.isLocal) return LocalStore.instance.fetchBudget(month);
+  CollectionReference<Map<String, dynamic>> get _budgets =>
+      _db.collection('users').doc(_userId).collection('budgets');
 
-    final first = DateTime(month.year, month.month, 1);
-    final rows = await _supabase
-        .from('budgets')
-        .select()
-        .eq('month', first.toUtc().toIso8601String())
-        .limit(1);
-    if (rows.isEmpty) return null;
-    return MonthlyBudget.fromJson(rows.first);
+  String _key(DateTime month) =>
+      '${month.year.toString().padLeft(4, '0')}-'
+      '${month.month.toString().padLeft(2, '0')}';
+
+  Future<MonthlyBudget?> fetchMonth(DateTime month) async {
+    final doc = await _budgets.doc(_key(month)).get();
+    if (!doc.exists) return null;
+    return MonthlyBudget.fromJson(<String, dynamic>{
+      ...?doc.data(),
+      'id': doc.id,
+    });
   }
 
   Future<MonthlyBudget> save(MonthlyBudget budget) async {
-    if (AppConfig.isLocal) return LocalStore.instance.saveBudget(budget);
-
     final first = DateTime(budget.month.year, budget.month.month, 1);
-    final row = await _supabase
-        .from('budgets')
-        .upsert(
-          <String, dynamic>{
-            ...budget.toRow(),
-            'user_id': _userId,
-            'month': first.toUtc().toIso8601String(),
-          },
-          onConflict: 'user_id,month',
-        )
-        .select()
-        .single();
-    return MonthlyBudget.fromJson(row);
+    final doc = _budgets.doc(_key(first));
+    await doc.set(<String, dynamic>{
+      ...budget.toRow(),
+      'user_id': _userId,
+      'month': first.toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, SetOptions(merge: true));
+    return MonthlyBudget.fromJson(<String, dynamic>{
+      ...budget.toRow(),
+      'id': doc.id,
+    });
   }
 }

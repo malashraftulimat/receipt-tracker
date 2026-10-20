@@ -114,8 +114,7 @@ class ExpenseCategory {
     );
   }
 
-  /// Mirrors `supabase/schema.sql#seed_default_categories`
-  /// (used as an offline / first-run fallback).
+  /// Seeded into `users/{userId}/categories` on first sign-in.
   static const List<ExpenseCategory> templates = <ExpenseCategory>[
     ExpenseCategory(
         id: '', name: '食費', color: '#4CAF50', icon: 'grocery', isDefault: true, sortOrder: 0),

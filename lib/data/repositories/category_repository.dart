@@ -1,55 +1,58 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../core/config/app_config.dart';
 import '../../domain/models/category.dart';
-import '../services/local_store.dart';
 
+/// Firestore categories at `users/{userId}/categories/{categoryId}`.
 class CategoryRepository {
-  CategoryRepository([this._client]);
+  CategoryRepository([FirebaseFirestore? firestore])
+      : _db = firestore ?? FirebaseFirestore.instance;
 
-  final SupabaseClient? _client;
-
-  SupabaseClient get _supabase => _client ?? Supabase.instance.client;
+  final FirebaseFirestore _db;
 
   String get _userId {
-    final user = _supabase.auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw StateError('Not signed in');
-    return user.id;
+    return user.uid;
   }
+
+  CollectionReference<Map<String, dynamic>> get _categories =>
+      _db.collection('users').doc(_userId).collection('categories');
+
+  CollectionReference<Map<String, dynamic>> get _receipts =>
+      _db.collection('users').doc(_userId).collection('receipts');
 
   Future<List<ExpenseCategory>> fetchAll() async {
-    if (AppConfig.isLocal) return LocalStore.instance.fetchCategories();
-
-    final rows = await _supabase
-        .from('categories')
-        .select()
-        .order('sort_order', ascending: true)
-        .order('created_at', ascending: true);
-    return rows.map(ExpenseCategory.fromJson).toList(growable: false);
+    final snapshot = await _categories
+        .orderBy('sort_order')
+        .limit(200)
+        .get();
+    final categories = snapshot.docs
+        .map((doc) => ExpenseCategory.fromJson(<String, dynamic>{
+              ...doc.data(),
+              'id': doc.id,
+            }))
+        .toList(growable: false);
+    categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return categories;
   }
 
-  /// Seeds the predefined categories for accounts created before the DB trigger
-  /// existed (idempotent thanks to the `(user_id, name)` unique constraint).
+  /// Seeds the predefined categories once per account.
   Future<void> ensureDefaults() async {
-    if (AppConfig.isLocal) {
-      await LocalStore.instance.seedDefaults();
-      return;
-    }
+    final existing = await _categories.limit(1).get();
+    if (existing.docs.isNotEmpty) return;
 
-    final rows = await _supabase.from('categories').select('id').limit(1);
-    if (rows.isNotEmpty) return;
-    try {
-      await _supabase.from('categories').insert(<Map<String, dynamic>>[
-        for (final template in ExpenseCategory.templates)
-          <String, dynamic>{
-            'user_id': _userId,
-            ...template.toRow(),
-          },
-      ]);
-    } on PostgrestException catch (error) {
-      // Another device seeded the rows first — that is fine.
-      if (error.code != '23505') rethrow;
+    final batch = _db.batch();
+    for (final template in ExpenseCategory.templates) {
+      // Deterministic IDs make seeding idempotent across multiple devices.
+      final doc = _categories.doc('default_${template.sortOrder}');
+      batch.set(doc, <String, dynamic>{
+        ...template.toRow(),
+        'user_id': _userId,
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
     }
+    await batch.commit();
   }
 
   Future<ExpenseCategory> create({
@@ -57,48 +60,40 @@ class CategoryRepository {
     required String color,
     required String icon,
   }) async {
-    if (AppConfig.isLocal) {
-      return LocalStore.instance.createCategory(
-        name: name,
-        color: color,
-        icon: icon,
-      );
-    }
-
-    final row = await _supabase
-        .from('categories')
-        .insert(<String, dynamic>{
-          'user_id': _userId,
-          'name': name.trim(),
-          'color': color,
-          'icon': icon,
-          'is_default': false,
-          'sort_order': 100,
-        })
-        .select()
-        .single();
-    return ExpenseCategory.fromJson(row);
+    final doc = _categories.doc();
+    final data = <String, dynamic>{
+      'user_id': _userId,
+      'name': name.trim(),
+      'color': color,
+      'icon': icon,
+      'is_default': false,
+      'sort_order': 100,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    await doc.set(data);
+    return ExpenseCategory.fromJson(<String, dynamic>{
+      ...data,
+      'id': doc.id,
+    });
   }
 
   Future<ExpenseCategory> update(ExpenseCategory category) async {
-    if (AppConfig.isLocal) {
-      return LocalStore.instance.updateCategory(category);
-    }
-
-    final row = await _supabase
-        .from('categories')
-        .update(category.toRow())
-        .eq('id', category.id)
-        .select()
-        .single();
-    return ExpenseCategory.fromJson(row);
+    await _categories.doc(category.id).update(category.toRow());
+    return category;
   }
 
   Future<void> delete(String id) async {
-    if (AppConfig.isLocal) {
-      await LocalStore.instance.deleteCategory(id);
-      return;
+    final batch = _db.batch();
+    batch.delete(_categories.doc(id));
+
+    // Keep receipts valid: they simply become uncategorised.
+    final linked = await _receipts.where('category_id', isEqualTo: id).get();
+    for (final doc in linked.docs) {
+      batch.update(doc.reference, <String, dynamic>{
+        'category_id': null,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
     }
-    await _supabase.from('categories').delete().eq('id', id);
+    await batch.commit();
   }
 }

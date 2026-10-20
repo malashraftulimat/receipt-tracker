@@ -1,12 +1,8 @@
-import 'dart:async';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../data/providers.dart';
-import '../config/app_config.dart';
 import '../../features/auth/auth_page.dart';
 import '../../features/budget/budget_page.dart';
 import '../../features/categories/categories_page.dart';
@@ -18,27 +14,17 @@ import '../../features/settings/settings_page.dart';
 import 'app_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  // Rebuild the router when the storage mode changes.
-  ref.watch(appModeProvider);
-
-  // Re-run redirects whenever the session changes.
+  // Re-run redirects whenever the Firebase session changes.
   final refresh = ValueNotifier<int>(0);
-  StreamSubscription<AuthState>? subscription;
-
-  if (!AppConfig.isLocal) {
-    final client = ref.watch(supabaseClientProvider);
-    subscription =
-        client.auth.onAuthStateChange.listen((_) => refresh.value++);
-  }
+  final subscription = FirebaseAuth.instance.authStateChanges().listen(
+        (_) => refresh.value++,
+      );
   ref.onDispose(() {
-    subscription?.cancel();
+    subscription.cancel();
     refresh.dispose();
   });
 
-  // Local mode uses an on-device account and never touches Supabase.
-  bool signedIn() => AppConfig.isLocal
-      ? AppConfig.localUser != null
-      : Supabase.instance.client.auth.currentUser != null;
+  bool signedIn() => FirebaseAuth.instance.currentUser != null;
 
   return GoRouter(
     initialLocation: '/dashboard',

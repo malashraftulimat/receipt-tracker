@@ -24,7 +24,7 @@ class ReceiptDraft {
     this.barcodeId,
     this.categoryId,
     this.note,
-    this.imagePath,
+    this.imageBase64,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
     this.source = ReceiptSource.manual,
@@ -48,7 +48,7 @@ class ReceiptDraft {
   final String? barcodeId;
   final String? categoryId;
   final String? note;
-  final String? imagePath;
+  final String? imageBase64;
   final String? rawOcrText;
   final List<ReceiptItem> items;
   final ReceiptSource source;
@@ -114,7 +114,7 @@ class ReceiptDraft {
       barcodeId: receipt.barcodeId,
       categoryId: receipt.categoryId,
       note: receipt.note,
-      imagePath: receipt.imagePath,
+      imageBase64: receipt.imageBase64,
       rawOcrText: receipt.rawOcrText,
       items: receipt.items,
       source: receipt.source,
@@ -126,8 +126,7 @@ class ReceiptDraft {
   int get itemsTotal =>
       items.fold<int>(0, (sum, item) => sum + item.totalPrice);
 
-  /// Receipt columns. Local mode passes [includeItems] so items are stored
-  /// inline; Supabase persists them in the `receipt_items` table instead.
+  /// Receipt fields for Firestore. Items are embedded in the same document.
   Map<String, dynamic> toRow({bool includeItems = false}) =>
       <String, dynamic>{
         'merchant': (merchant ?? '').trim().isEmpty ? null : merchant!.trim(),
@@ -149,6 +148,7 @@ class ReceiptDraft {
         'note': (note ?? '').trim().isEmpty ? null : note!.trim(),
         'source': source.name,
         'raw_ocr_text': rawOcrText,
+        'image_base64': imageBase64,
         if (includeItems)
           'items': <Map<String, dynamic>>[
             for (var i = 0; i < items.length; i++)

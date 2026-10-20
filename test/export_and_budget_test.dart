@@ -1,9 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:receipt_tracker/data/services/export_service.dart';
-import 'package:receipt_tracker/data/services/local_store.dart';
 import 'package:receipt_tracker/domain/models/monthly_budget.dart';
 import 'package:receipt_tracker/domain/models/receipt.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Receipt sampleReceipt() {
   final created = DateTime(2026, 10, 19, 12, 30);
@@ -120,44 +118,6 @@ void main() {
     });
   });
 
-  group('local budget storage', () {
-    setUp(() async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      LocalStore.instance.resetCacheForTests();
-      LocalStore.instance.useUser('u1');
-      await LocalStore.instance.clearAll();
-    });
-
-    test('saves and updates a month plan', () async {
-      final month = DateTime(2026, 10);
-      expect(await LocalStore.instance.fetchBudget(month), isNull);
-
-      await LocalStore.instance.saveBudget(
-        MonthlyBudget(
-          month: _october,
-          salary: 250000,
-          savingsGoal: 20000,
-          fixedExpenses: 90000,
-        ),
-      );
-      var stored = await LocalStore.instance.fetchBudget(month);
-      expect(stored?.salary, 250000);
-      expect(stored?.disposableIncome, 140000);
-
-      await LocalStore.instance.saveBudget(
-        MonthlyBudget(
-          month: _october,
-          salary: 260000,
-          savingsGoal: 30000,
-          fixedExpenses: 90000,
-        ),
-      );
-      stored = await LocalStore.instance.fetchBudget(month);
-      expect(stored?.salary, 260000);
-      expect(stored?.savingsGoal, 30000);
-      expect(stored?.disposableIncome, 140000);
-    });
-  });
 }
 
 final DateTime _october = DateTime(2026, 10);

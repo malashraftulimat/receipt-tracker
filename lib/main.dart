@@ -1,10 +1,10 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
-import 'core/config/app_config.dart';
+import 'core/config/firebase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,10 +14,8 @@ Future<void> main() async {
   await initializeDateFormatting('en');
   await initializeDateFormatting('ar');
 
-  // Connect to Supabase with dart-defines or previously saved credentials.
-  // When neither exists, the app opens the "接続設定" screen.
-  final prefs = await SharedPreferences.getInstance();
-  await AppConfig.bootstrap(prefs);
+  // Firebase Auth + Cloud Firestore (Web / Android / iOS).
+  await Firebase.initializeApp(options: kFirebaseOptions);
 
   runApp(const ProviderScope(child: ReceiptTrackerApp()));
 }

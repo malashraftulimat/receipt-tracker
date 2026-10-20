@@ -1,18 +1,19 @@
 # レシート帳 — Receipt & Invoice Tracker (Flutter)
 
-Cross-platform app (iOS / Android / Web / Windows / macOS / Linux) for tracking Japanese
-paper receipts and invoices with a **dual scanner**:
+Cross-platform app (iOS / Android / Web / Windows / macOS / Linux) for tracking
+Japanese paper receipts and invoices with a **dual scanner**:
 
-- **1D barcode engine** — JAN-13 / EAN-8 / UPC-A / Code 128 / Code 39 / ITF via `mobile_scanner`,
-  used to capture invoice / payment reference numbers and to block duplicate entries.
-- **OCR engine** — Japanese + English text recognition via **ML Kit** on mobile,
-  **Supabase Edge Function (Google Cloud Vision)** in synced web/desktop mode, and
-  **Tesseract.js (WASM)** inside the browser in local web mode.
+- **1D barcode engine** — JAN-13 / EAN-8 / UPC-A / Code 128 / Code 39 / ITF via
+  `mobile_scanner` (ML Kit on mobile, HTML5/WebRTC + ZXing on Web).
+- **OCR engine** — Japanese + English text recognition via **ML Kit** on
+  Android/iOS and **Tesseract.js (WASM)** directly in the browser on Web.
+  No Cloud Functions, Firebase Storage, Blaze plan or credit card are required.
 
-Both engines feed a deterministic parser that detects **store name, date/time
-(`2026年10月19日`, `令和8年10月19日`, `R8.10.19`, `2026/10/19`), total (`合計`, `税込合計`,
-`¥`), subtotal (`小計`) and consumption tax (`消費税 8% / 10%`, `8%対象`, `内消費税`)**.
-Everything is reviewed and editable before saving.
+Both engines feed a deterministic parser that detects **store name, date/time**
+(`2026年10月19日`, `令和8年10月19日`, `R8.10.19`, `2026/10/19`), **total**
+(`合計`, `税込合計`, `¥`), **subtotal** (`小計`) and **consumption tax**
+(`消費税 8% / 10%`, `8%対象`, `内消費税`). Everything is reviewed and editable
+before saving.
 
 ---
 
@@ -20,208 +21,158 @@ Everything is reviewed and editable before saving.
 
 **https://malashraftulimat.github.io/receipt-tracker/**
 
-Opens in any phone or desktop browser. On first launch choose:
+The app opens directly on the **Firebase login / sign-up** screen. There is no
+local-only mode and no connection-setup screen. One account syncs receipts,
+line items, categories, budgets and receipt images across phones and desktop
+browsers.
 
-* **この端末だけで使う（ローカルアカウント）** — email + password sign-up stored
-  on-device (salted SHA-256), no server. Receipts, categories and photos live in
-  the browser (`localStorage`) and are scoped per account.
-* **Supabase に接続** — paste your Project URL + anon key for multi-device sync.
-
-On the web, the scanner uses the browser's **HTML5/WebRTC camera
-(`getUserMedia`)** for live 1D barcode detection (JAN-13 / Code 128 via the
-bundled ZXing engine) and for OCR frame capture. OCR itself runs through the
-`ocr` edge function. If the browser explicitly denies camera access, the scanner
-falls back to photo upload and manual entry.
+On the web, the scanner uses the browser's **HTML5/WebRTC camera**
+(`getUserMedia`) for live barcode detection and OCR frame capture. If camera
+access is explicitly denied, the scanner falls back to photo upload and manual
+entry.
 
 ---
 
-## 0. Built applications (where the platform copies are)
+## Firebase project
 
-| What | Where |
+The Web + mobile configuration is hard-coded in
+`lib/core/config/firebase_config.dart`:
+
+| Setting | Value |
 | --- | --- |
-| Android APKs (built, installable) | `dist/android/*.apk` |
-| Web / PWA build (built) | `dist/receipt_tracker-1.0.0-web.zip` and `build/web/` |
-| Android project (Gradle) | `android/` |
-| iOS project (Xcode) | `ios/Runner.xcworkspace` |
-| Windows project (C++ runner) | `windows/runner/` |
-| Web project | `web/` |
-| macOS / Linux projects | `macos/`, `linux/` |
-| CI that builds all four | `.github/workflows/build.yml` |
+| Project ID | `receipt-tracker-78d9f` |
+| Auth domain | `receipt-tracker-78d9f.firebaseapp.com` |
+| Storage bucket | `receipt-tracker-78d9f.firebasestorage.app` |
+| App ID | `1:298768350843:web:2a2f828d62ba18d8992cde` |
 
-Android and Web are compiled on this machine. **iOS requires macOS + Xcode**
-and **Windows requires Visual Studio 2022 + Developer Mode**, so those two are
-built by the GitHub Actions workflow (or locally following
-[`docs/BUILDING.md`](docs/BUILDING.md)). Install notes are in
-[`dist/README.txt`](dist/README.txt).
+Required one-time setup in the Firebase console:
 
-First launch of any build shows a **接続設定** screen where you paste your
-Supabase Project URL + anon/publishable key; it is stored locally and used from
-then on. Credentials can also be baked in at build time with `--dart-define`.
+1. **Authentication → Sign-in method → Email/Password** → enable.
+2. **Firestore Database** → create the database.
+3. Deploy the rules in [`firestore.rules`](firestore.rules):
+
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+
+4. **Authentication → Settings → Authorized domains** → add
+   `malashraftulimat.github.io`. `localhost` is already authorized.
+
+### Firestore layout
+
+```
+users/{userId}/receipts/{receiptId}
+  merchant, purchased_at, total_amount, tax_8_amount, tax_10_amount,
+  barcode_id (invoice / reference no.), items[], raw_ocr_text,
+  image_base64, created_at, updated_at, ...
+
+users/{userId}/categories/{categoryId}
+users/{userId}/budgets/{yyyy-MM}
+```
+
+Receipt images are resized/compressed by the `image` package and stored as
+base64 in the receipt document (Firestore's 1 MiB document limit). Line items
+are embedded in the same document, so a receipt + items are written atomically.
+
+`firestore.rules` allows each authenticated user to read/write only their own
+`users/{uid}/**` data.
 
 ---
 
-## 1. Feature summary
+## Feature summary
 
 | Area | Implemented |
 | --- | --- |
-| Auth | Email + password (Supabase Auth), password reset, session refresh |
-| Sync | Postgres rows + Storage images + categories, per-user RLS, realtime-ready |
-| Scan | Live 1D barcode scanning (auto duplicate guard), OCR capture, "auto" mode that merges barcode + OCR |
-| Parse | JP date (era/full/2-digit), merchant scoring, total/subtotal keywords, 8%/10% tax incl. tax-inclusive bases, invoice `T+13` numbers |
-| Review | Editable merchant / date / time / total / subtotal / tax 8% / tax 10% / barcode / category / note, OCR warnings, tax cross-check, duplicate banner |
+| Auth | Firebase Email/Password, password reset, persistent sessions |
+| Sync | Firestore per-user receipts/items, categories, budgets and images |
+| Scan | Live 1D barcode (duplicate guard), OCR capture, auto-detect and long-receipt modes |
+| Parse | JP dates, merchant scoring, totals/subtotals, 8%/10% tax, invoice numbers and line items |
+| Review | Editable header, items, tax, category, due date, notes, OCR warnings and duplicate banner |
 | Categorize | 8 seeded categories + custom categories with colour & icon |
-| Dashboard | Year → month → day grouping, list **and** grid views, monthly subtotals |
-| Search/Filter | Full-text-ish search (merchant / note / barcode), category chips, 今月/先月, custom date range |
-| Analytics | 6-month bar chart, current-month category donut, top merchants, monthly metrics (`fl_chart`) |
-| Responsive | `NavigationBar` on phones, `NavigationRail` + analytics side panel on desktop |
-| State | Riverpod (`Notifier` / `FutureProvider` / `StreamProvider`), go_router, repository layer |
+| Dashboard | Month/day grouping, list/grid views, monthly subtotals |
+| Search/Filter | Merchant/note/barcode search, category chips, 今月/先月, custom ranges |
+| Analytics | 6-month bars, category donut, top merchants, monthly metrics (`fl_chart`) |
+| Languages | Japanese / English / Arabic (RTL) selector in Settings |
+| Export | UTF-8 CSV for Excel / Numbers |
 
 ---
 
-## 2. Project structure
+## Project structure
 
 ```
-receipt_tracker/
-├── pubspec.yaml
-├── analysis_options.yaml
-├── android/                        # Gradle project  (APK built here)
-├── ios/                            # Xcode project  (requires macOS to build)
-├── windows/                        # Win32 C++ runner (requires VS 2022)
-├── macos/  linux/                  # desktop runners
-├── web/                            # PWA shell + bundled zxing.min.js
-├── dist/                           # compiled APKs + web zip + install notes
-├── .github/workflows/build.yml     # CI: Android / Windows / iOS / Web artifacts
-├── supabase/
-│   ├── schema.sql                  # tables, RLS, storage policies, seed trigger
-│   └── functions/ocr/index.ts      # web/desktop OCR fallback (Cloud Vision)
-├── docs/
-│   ├── PLATFORM_SETUP.md           # Android / iOS / Web / Desktop config
-│   └── BUILDING.md                 # per-platform build & signing
-├── lib/
-│   ├── main.dart                   # bootstrap: intl(ja) + Supabase.initialize
-│   ├── app.dart                    # MaterialApp.router, theme, locale, config guard
-│   ├── core/
-│   │   ├── config/app_config.dart  # --dart-define values, bucket/function names
-│   │   ├── router/app_router.dart  # auth redirect + shell routes
-│   │   ├── router/app_shell.dart   # responsive NavigationRail / NavigationBar
-│   │   ├── theme/app_theme.dart    # Material 3 light/dark
-│   │   ├── theme/theme_mode_provider.dart
-│   │   └── utils/                  # money & date formatting, responsive, barcode checks
-│   ├── domain/
-│   │   ├── models/receipt.dart
-│   │   ├── models/receipt_draft.dart
-│   │   ├── models/receipt_filter.dart
-│   │   ├── models/category.dart
-│   │   └── parser/receipt_parser.dart   # ★ OCR post-processing heuristics
-│   ├── data/
-│   │   ├── providers.dart          # Riverpod graph (client, repos, auth, queries)
-│   │   ├── repositories/           # auth / receipt / category / storage
-│   │   └── services/
-│   │       ├── image_input.dart    # native camera (mobile) / photo fallback
-│   │       ├── camera/             # web <video> frame capture for OCR
-│   │       └── ocr/                # interface + conditional platform impls
-│   │           ├── ocr_service.dart        # OcrService + OcrResult + factory
-│   │           ├── ocr_service_io.dart     # Android/iOS -> ML Kit, desktop -> remote
-│   │           ├── ocr_service_web.dart    # Web: Tesseract (local) / Edge Function (sync)
-│   │           ├── mlkit_ocr_service.dart
-│   │           └── remote_ocr_service.dart
-│   └── features/
-│       ├── auth/auth_page.dart
-│       ├── scan/scan_page.dart          # dual scanner UI
-│       ├── scan/scan_session.dart       # mode + barcode session state
-│       ├── review/review_page.dart      # confirm & edit before saving
-│       ├── dashboard/dashboard_page.dart
-│       ├── dashboard/analytics_provider.dart
-│       ├── dashboard/widgets/           # filter bar, list/grid, charts, tiles
-│       ├── receipts/receipt_detail_page.dart
-│       ├── categories/categories_page.dart
-│       └── settings/settings_page.dart
-└── test/
-    ├── receipt_parser_test.dart    # JP date/tax/total/merchant cases
-    └── formatters_test.dart
+lib/
+├── main.dart                       # intl + Firebase.initializeApp
+├── app.dart                        # MaterialApp.router, theme, locale
+├── core/
+│   ├── config/firebase_config.dart # hard-coded FirebaseOptions
+│   ├── localization/               # AppLanguage, AppLocalizations, AppText
+│   ├── router/                     # auth redirect + responsive shell
+│   ├── theme/                      # Material 3 light/dark
+│   └── utils/                      # money/date formatting, image compression, barcode checks
+├── domain/
+│   ├── models/                     # receipt, item, category, budget, filter
+│   └── parser/                     # OCR post-processing heuristics
+├── data/
+│   ├── providers.dart              # Riverpod graph (Firebase auth, repos, queries)
+│   ├── repositories/               # auth_repository, receipt_repository,
+│   │                               # category_repository, budget_repository
+│   └── services/
+│       ├── image_input.dart        # native camera / photo fallback
+│       ├── camera/                 # web <video> frame capture for OCR
+│       └── ocr/                    # ML Kit (mobile) + Tesseract.js (web)
+└── features/
+    ├── auth/ scan/ review/
+    ├── dashboard/ receipts/ categories/ budget/
+    └── settings/
 ```
 
 ### Data flow
 
 ```
-                 ┌──────────────┐        ┌────────────────────────┐
- camera / image ─►│ OCR service  │───────►│ ReceiptParser          │
-                 │ ML Kit /     │  text  │ merchant / date / ¥ /  │
-                 │ Cloud Vision │        │ subtotal / tax 8,10    │
-                 └──────────────┘        └───────────┬────────────┘
-                                                     │ ParsedReceipt
- 1D barcode ──► JAN-13 / Code128 value ─────────────►│
-                                                     ▼
-                                          ┌─────────────────────┐
-                                          │ ReviewPage (edit)   │
-                                          └─────────┬───────────┘
-                                                    ▼
-                              Supabase Postgres (receipts) + Storage (images)
-                                                    ▼
-                              Dashboard / filters / analytics (all devices)
+ camera / image ─► OCR service ─► ReceiptParser ─┐
+                   ML Kit /      merchant/date/  │
+                   Tesseract.js  total/tax/items │
+                                                 ▼
+ 1D barcode ──► JAN-13 / Code128 ──────────► ReviewPage (edit)
+                                                 ▼
+                          Firebase Auth + Firestore users/{uid}/receipts
+                                                 ▼
+                          Dashboard / filters / analytics (all devices)
 ```
 
 ---
 
-## 3. Packages (and why)
+## Packages (and why)
 
 | Package | Purpose |
 | --- | --- |
-| `flutter_riverpod` | State management & DI (repositories, filters, queries, auth stream) |
-| `go_router` | Declarative navigation, auth redirect, deep links to `/receipt/:id` |
-| `supabase_flutter` | Email/password auth, Postgres client, Storage, Edge Functions |
-| `mobile_scanner` | 1D/2D barcode scanning (`ean13`, `ean8`, `code128`, `code39`, `itf`, `upcA`); ML Kit on Android/iOS and HTML5/WebRTC + ZXing on web |
-| `google_mlkit_text_recognition` | On-device OCR (Android/iOS) with the Japanese script model |
-| `image_picker` | Native camera capture on mobile, photo/file picker fallback on web & desktop |
-| `web/tesseract.min.js` | Client-side Tesseract.js OCR for local web mode (worker/WASM/language data loaded from CDN and cached) |
-| `web` | Browser interop used to capture an OCR still from the live `<video>` stream |
-| `web/zxing.min.js` | Bundled ZXing browser build (Apache-2.0), so web barcode scanning does not depend on a CDN |
-| `path_provider` | Temp file needed by ML Kit `InputImage` |
-| `fl_chart` | Monthly bar chart + category donut |
-| `intl` | Japanese date formatting (`yyyy年M月d日(E)`) |
-| `shared_preferences` | Persisted light/dark/system preference |
-| `flutter_localizations` | Japanese Material/Dialog/Date picker strings |
+| `flutter_riverpod` | State management & DI |
+| `go_router` | Declarative navigation + auth redirect |
+| `firebase_core` | Firebase app initialization |
+| `firebase_auth` | Email/password auth and persistent sessions |
+| `cloud_firestore` | Per-user receipts, items, categories and budgets |
+| `mobile_scanner` | 1D barcode scanning: ML Kit mobile, WebRTC + ZXing web |
+| `google_mlkit_text_recognition` | On-device OCR (Android/iOS, ja + en) |
+| `image_picker` | Native camera capture / photo fallback |
+| `image` | Resize + JPEG compression before storing base64 in Firestore |
+| `web` | Web camera frame capture + Tesseract.js interop |
+| `web/tesseract.min.js` | Client-side OCR engine for Web (worker/WASM/lang data from CDN, cached) |
+| `web/zxing.min.js` | Bundled ZXing browser build (Apache-2.0) |
+| `path_provider` | Temp file for ML Kit `InputImage` |
+| `fl_chart` | Monthly bars + category donut |
+| `intl` | Locale-aware date formatting (ja/en/ar) |
+| `shared_preferences` | Theme + language preferences |
 
 ---
 
-## 4. Setup
-
-### 4.1 Platform folders are already generated
-
-`android/`, `ios/`, `windows/`, `web/`, `macos/` and `linux/` are checked in,
-with the camera/ML Kit settings already applied. If you ever need to regenerate
-them: `flutter create --platforms=android,ios,web,windows,macos,linux .`
-(existing Dart code is kept). See [`docs/BUILDING.md`](docs/BUILDING.md) for
-per-platform prerequisites and signing.
-
-### 4.2 Supabase
-
-1. Create a project at <https://supabase.com>.
-2. Open **SQL Editor** and run [`supabase/schema.sql`](supabase/schema.sql).
-   This creates `receipts`, `categories`, RLS policies, the private `receipts`
-   storage bucket and a trigger that seeds default categories for new users.
-3. (Optional, required for Web/desktop OCR) deploy the edge function:
-
-   ```bash
-   supabase functions deploy ocr
-   supabase secrets set GOOGLE_VISION_API_KEY=xxxxx
-   ```
-
-4. Auth providers → **Email** is enabled by default. For quick local testing you may
-   disable *Confirm email* (Authentication → Providers → Email).
-
-### 4.3 Run
+## Build & run
 
 ```bash
 flutter pub get
-flutter run                     # pick a device, then choose local mode or paste keys
-
-# or bake the credentials in (no setup screen):
-flutter run --dart-define=SUPABASE_URL=https://xxx.supabase.co \
-            --dart-define=SUPABASE_ANON_KEY=eyJ...
+flutter run
 ```
 
-Builds:
+Release builds:
 
 ```bash
 flutter build apk --release --split-per-abi
@@ -230,113 +181,51 @@ flutter build windows --release   # Windows host + VS C++ + Developer Mode
 flutter build ipa --release       # macOS host + Xcode + signing
 ```
 
-### 4.4 Tests
+Android requires `minSdk 24` (Firebase) and the `INTERNET` permission, both
+already configured in the project.
+
+### GitHub Pages
+
+Pushing to `main` runs [`.github/workflows/pages.yml`](.github/workflows/pages.yml),
+which runs `flutter analyze`, `flutter test`, builds the web app with the
+repository base path and deploys `build/web`. The hard-coded Firebase config is
+included in the build; no repository secrets or `--dart-define` values are
+needed.
+
+Remember to add the Pages hostname to Firebase Auth **Authorized domains**.
+
+### Tests
 
 ```bash
+flutter analyze --no-fatal-infos
 flutter test
 ```
 
-The parser tests cover Japanese dates (era / full / 2-digit), total vs subtotal vs
-change amounts, 8%/10% tax lines, tax-inclusive bases and reference numbers.
+The parser tests cover Japanese dates (era/full/2-digit), total vs subtotal vs
+change amounts, 8%/10% tax lines, tax-inclusive bases, reference numbers and
+line-item extraction.
 
 ---
 
-## 5. How the scanning pipeline works
+## How the scanning pipeline works
 
-1. **Barcode mode** – `mobile_scanner` streams `BarcodeCapture`s (ML Kit on
-   Android/iOS, ZXing over `getUserMedia` on web). The first non-empty `rawValue` is
-   stored in `scanSessionProvider` (JAN-13 check digit validated for display) and the
-   review screen is opened immediately with `barcodeId` filled. A Postgres partial
-   unique index `(user_id, barcode_id)` also prevents duplicates at the database
-   level; the UI shows the existing receipt instead of saving a copy.
-2. **OCR mode** – a still image is captured from the live camera frame on web, or
-   via native `image_picker` on mobile. It is recognised by `MlKitOcrService` on
-   Android/iOS, `TesseractOcrService` (client-side WASM) in local web mode, or
-   `RemoteOcrService` → edge function in synced web/desktop mode. Then
-   `ReceiptParser` extracts structured fields.
-3. **Auto mode** – barcode is detected first; a banner then offers
-   “撮影して自動入力” which runs OCR and merges the barcode into the same draft.
-4. **Review** – every field is editable; warnings from the parser (e.g. missing total,
-   subtotal > total, tax > total) are shown, duplicate barcodes block the save button.
-5. **Save** – image is uploaded to `receipts/<user-id>/<timestamp>.jpg`, the row is
-   inserted/updated, and all relevant providers are invalidated.
-
-### Parser heuristics (short version)
-
-- Text is normalised (full-width → half-width, `￥` → `¥`, ideographic space → space).
-- Dates / times / phone numbers / percentages / invoice numbers are **masked** before
-  money extraction, so `2026年10月19日 14:32` never becomes an amount.
-- Totals are looked up by keyword priority
-  (`税込合計` → `合計金額` → `お会計` → … → `合計` → `計`), ignoring
-  `税抜`, `お預り`, `お釣`, `カード`, `ポイント` lines; a max-value fallback is used
-  when no keyword exists.
-- Tax: lines containing `消費税`/`内税`/`税額` and `8%`/`10%` are parsed, `対象`/`課税`
-  lines are treated as tax-inclusive bases, and missing amounts are derived
-  (`base × rate / (100 + rate)`), with sanity checks that drop impossible values.
-- Merchant: first ~12 lines are scored (index, store keywords like `店`/`マート`/
-  `株式会社`, Japanese characters, length); boilerplate (`領収書`, `TEL`,
-  `登録番号`, …) and date lines are rejected.
+1. **Barcode mode** — `mobile_scanner` streams barcode captures (ML Kit on
+   Android/iOS, ZXing over `getUserMedia` on web). The first non-empty value is
+   stored and the review screen opens with the barcode / invoice number filled.
+2. **OCR mode** — a still image is captured from the live web frame or via
+   `image_picker` on mobile. It is recognised by ML Kit (mobile) or Tesseract.js
+   (web), then `ReceiptParser` extracts store, date, totals, tax and items.
+3. **Auto mode** — barcode first, then OCR, merging both into the same draft.
+4. **Long receipt** — multiple overlapping captures are merged by
+   `ReceiptTextMerger` before parsing.
+5. **Review** — all fields are editable; duplicate barcodes block saving.
+6. **Save** — the compressed image + receipt JSON + items are written to
+   `users/{uid}/receipts/{receiptId}` in Firestore.
 
 ---
 
-## 6. Known limitations / next steps
+## Languages
 
-- **Web live camera** requires a secure context (HTTPS or `localhost`) and browser
-  permission for `getUserMedia`. Only an explicit denial/unsupported browser falls
-  back to photo upload. Desktop platforms still use the file picker + server OCR.
-- **Web OCR** uses Tesseract.js in local mode (no server required) and the `ocr`
-  edge function (Cloud Vision) in Supabase mode. Barcode scanning is always
-  client-side. The first Tesseract run downloads worker/WASM/language data, which
-  the browser caches for subsequent scans.
-- **Server OCR cost**: Cloud Vision is billed per request; ML Kit on mobile is free and
-  offline.
-- Receipt images are stored privately and served with 7-day signed URLs; add a
-  cleanup job if you need retention limits.
-- Realtime subscriptions are not enabled by default (the dashboard refetches on
-  pull-to-refresh / provider invalidation). Add
-  `client.from('receipts').stream(primaryKey: ['id'])` for live multi-device updates.
-
----
-
-## Itemized receipts & budgets (v1.1)
-
-* **Line-item extraction** — `ReceiptParser` pulls item rows above the total:
-  names, quantities (`2個`, `2×198`), unit/total prices and per-item tax
-  (`※`/`軽減` → 8%, `(10%)` → 10%). Stored in `receipt_items`.
-* **Dynamic editor** — the review screen lists items as editable rows with
-  add/delete, tax selector and per-item category; totals are cross-checked
-  against 合計 with a green check or a discrepancy warning + “合計に合わせる”.
-* **Auto-categorisation** — `CategoryGuesser` maps merchant/item keywords to the
-  default categories (食費 / 外食 / 日用品 / 光熱費 / 交通費 / 娯楽 / 医療).
-* **Budgets** — monthly salary, savings goal and fixed costs; disposable income
-  = salary − savings − fixed; live remaining / daily allowance / pacing status
-  on the dashboard (auto-deducted from saved receipts).
-* **Long receipts** — multi-shot capture mode with overlap-aware OCR merging
-  (`ReceiptTextMerger`).
-* **Japanese extras** — 支払期限 extraction with reminders, loyalty points
-  (dポイント / Ponta / Tポイント / 楽天ポイント), reduced-rate item totals.
-* **Export & analytics** — UTF-8 CSV (Excel-friendly) export from settings and a
-  month-over-month cumulative comparison chart.
-
----
-
-## Built-in Supabase credentials (skip the setup screen)
-
-The web build can ship with the project baked in, so users land on the
-**login screen** immediately:
-
-1. `lib/core/config/supabase_defaults.dart` — replace
-   `https://YOUR-PROJECT.supabase.co` and `YOUR-ANON-KEY`.
-2. Or set the repository secrets **`SUPABASE_URL`** / **`SUPABASE_ANON_KEY`**;
-   the *Deploy website (GitHub Pages)* workflow passes them as `--dart-define`
-   at build time.
-3. Or build locally:
-   `flutter build web --release --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...`
-
-Priority: built-ins / dart-defines → credentials saved in the browser →
-manual setup screen. If the built-in values are missing/invalid the setup
-screen is still shown as a fallback (the app is never bricked).
-
-> Note: a browser that previously chose **ローカルモード** keeps that choice
-> (stored in localStorage). Clear site data or use 設定 → Supabase に接続 to
-> return to the Supabase login.
+Settings → Language offers **日本語 / English / العربية**. The choice is
+persisted per device; Arabic switches the whole UI to RTL and date formatting
+uses the selected locale.

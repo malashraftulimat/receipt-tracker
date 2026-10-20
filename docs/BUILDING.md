@@ -80,10 +80,10 @@ cd build/web && python -m http.server 8080
 Deploy the folder to Netlify / Vercel / Firebase Hosting / S3 + CloudFront.
 The web build uses the browser's `getUserMedia` stream for live 1D barcode
 scanning and OCR frame capture; `web/zxing.min.js` is bundled automatically.
-In Supabase mode OCR runs through the `ocr` edge function; in local mode it runs
-client-side with Tesseract.js (`web/tesseract.min.js`, WASM/worker/language data
-from CDN, cached by the browser). Camera permission requires HTTPS (or
-`localhost`); if access is denied, the scanner falls back to photo upload.
+OCR runs client-side with Tesseract.js (`web/tesseract.min.js`, WASM/worker/
+language data from CDN, cached by the browser). Firebase provides Auth + Firestore.
+Camera permission requires HTTPS (or `localhost`); if access is denied, the
+scanner falls back to photo upload.
 
 ---
 
@@ -146,8 +146,8 @@ GitHub runners and uploads them as artifacts:
 * push a tag (`git tag v1.0.0 && git push --tags`), or
 * Actions → **Build apps** → *Run workflow*.
 
-Set `SUPABASE_URL` / `SUPABASE_ANON_KEY` as repository **secrets** to bake the
-credentials in; otherwise the produced app will show the in-app 接続設定 screen.
+The Firebase configuration is hard-coded in
+`lib/core/config/firebase_config.dart`; CI needs no credentials or secrets.
 
 ### Publish this repo and run the build
 
@@ -158,11 +158,7 @@ git push -u origin main
 
 Then on GitHub:
 
-1. **Settings → Secrets and variables → Actions → New repository secret**
-   * `SUPABASE_URL` — `https://xxxx.supabase.co`
-   * `SUPABASE_ANON_KEY` — the anon / publishable key
-
-   (Skippable — without them the app opens the in-app 接続設定 screen.)
+1. No repository secrets are required (Firebase config is in the source).
 
 2. **Actions → Build apps → Run workflow** (branch `main`).
 3. Wait ~8–15 min, then download the artifacts from the run page:
@@ -181,8 +177,6 @@ Then on GitHub:
 
    ```bash
    gh repo create receipt-tracker --private --source=. --push
-   gh secret set SUPABASE_URL -b"https://xxxx.supabase.co"
-   gh secret set SUPABASE_ANON_KEY -b"eyJhbGciOi..."
    gh workflow run build.yml
    gh run list --workflow=build.yml
    gh run download <run-id>

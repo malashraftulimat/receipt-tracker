@@ -24,9 +24,8 @@ class OcrResult {
 
 /// Platform-agnostic OCR contract.
 ///
-/// * Android / iOS       -> on-device ML Kit (Japanese + English script)
-/// * Web (local mode)    -> Tesseract.js WASM inside the browser
-/// * Web / desktop sync  -> Supabase Edge Function (`ocr`) using Cloud Vision
+/// * Android / iOS -> on-device ML Kit (Japanese + English script)
+/// * Web           -> Tesseract.js WASM inside the browser
 abstract class OcrService {
   Future<OcrResult> recognize(Uint8List bytes);
 
@@ -36,8 +35,7 @@ abstract class OcrService {
 /// Resolves the implementation for the current platform.
 OcrService createOcrService() => platform.createOcrService();
 
-/// Used when OCR cannot run: local (offline) mode on desktop, where the only
-/// engine is the Supabase edge function.
+/// Used when OCR cannot run on the current platform (desktop).
 class UnavailableOcrService implements OcrService {
   const UnavailableOcrService(this.message);
 
@@ -54,6 +52,15 @@ class UnavailableOcrService implements OcrService {
 
 class OcrUnavailableException implements Exception {
   const OcrUnavailableException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+class OcrException implements Exception {
+  const OcrException(this.message);
 
   final String message;
 

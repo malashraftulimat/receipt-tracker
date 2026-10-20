@@ -1,76 +1,66 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../core/config/app_config.dart';
-
+/// Firebase Email/Password authentication.
 class AuthRepository {
-  AuthRepository([this._client]);
+  AuthRepository([FirebaseAuth? auth]) : _auth = auth ?? FirebaseAuth.instance;
 
-  final SupabaseClient? _client;
+  final FirebaseAuth _auth;
 
-  SupabaseClient get _supabase => _client ?? Supabase.instance.client;
+  FirebaseAuth get auth => _auth;
 
-  User? get currentUser => AppConfig.isLocal ? null : _supabase.auth.currentUser;
+  User? get currentUser => _auth.currentUser;
 
-  Session? get currentSession =>
-      AppConfig.isLocal ? null : _supabase.auth.currentSession;
-
-  Future<AuthResponse> signIn({
+  Future<UserCredential> signIn({
     required String email,
     required String password,
   }) {
-    if (AppConfig.isLocal) {
-      return Future<AuthResponse>.value(AuthResponse());
-    }
-    return _supabase.auth.signInWithPassword(
+    return _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
   }
 
-  Future<AuthResponse> signUp({
+  Future<UserCredential> signUp({
     required String email,
     required String password,
   }) {
-    if (AppConfig.isLocal) {
-      return Future<AuthResponse>.value(AuthResponse());
-    }
-    return _supabase.auth.signUp(
+    return _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
   }
 
-  Future<void> signOut() async {
-    if (AppConfig.isLocal) return;
-    await _supabase.auth.signOut();
-  }
+  Future<void> signOut() => _auth.signOut();
 
-  Future<void> sendPasswordReset(String email) async {
-    if (AppConfig.isLocal) return;
-    await _supabase.auth.resetPasswordForEmail(email.trim());
-  }
+  Future<void> sendPasswordReset(String email) =>
+      _auth.sendPasswordResetEmail(email: email.trim());
 
-  /// Human readable (Japanese) message for auth failures.
+  /// Human readable (Japanese) message for Firebase Auth failures.
   static String describeError(Object error) {
-    if (error is AuthException) {
-      final message = error.message.toLowerCase();
-      if (message.contains('invalid login credentials')) {
-        return 'メールアドレスまたはパスワードが違います。';
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'invalid-email':
+          return 'メールアドレスの形式が正しくありません。';
+        case 'user-disabled':
+          return 'このアカウントは無効化されています。';
+        case 'user-not-found':
+        case 'wrong-password':
+        case 'invalid-credential':
+          return 'メールアドレスまたはパスワードが違います。';
+        case 'email-already-in-use':
+          return 'このメールアドレスは既に登録されています。';
+        case 'weak-password':
+          return 'パスワードは6文字以上で入力してください。';
+        case 'too-many-requests':
+          return '試行回数が多すぎます。しばらく待ってから再試行してください。';
+        case 'operation-not-allowed':
+          return 'メール/パスワード認証が Firebase で有効になっていません。';
+        case 'network-request-failed':
+          return '通信に失敗しました。ネットワークを確認してください。';
+        case 'requires-recent-login':
+          return '再度ログインしてから操作してください。';
       }
-      if (message.contains('email not confirmed')) {
-        return 'メールアドレスが未確認です。確認メールをご確認ください。';
-      }
-      if (message.contains('already registered') ||
-          message.contains('user already exists')) {
-        return 'このメールアドレスは既に登録されています。';
-      }
-      if (error.statusCode == '429' || message.contains('rate limit')) {
-        return '試行回数が多すぎます。しばらく待ってから再試行してください。';
-      }
-      if (message.contains('password should be at least')) {
-        return 'パスワードは6文字以上で入力してください。';
-      }
-      return error.message;
+      return error.message ?? '認証に失敗しました。';
     }
     return '通信に失敗しました。ネットワークを確認してください。';
   }
