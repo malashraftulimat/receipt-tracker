@@ -70,9 +70,9 @@ Required one-time setup in the Firebase console:
 4. **Authentication → Settings → Authorized domains** → add
    `malashraftulimat.github.io`. `localhost` is already authorized.
 5. **Firebase AI Logic** → Get started (Gemini Developer API backend, Spark plan).
-   The app uses the current Flash model documented by Firebase: `gemini-3.8-flash`.
-   Override with `--dart-define=GEMINI_RECEIPT_MODEL=...` only if your project
-   still exposes another Gemini Flash model.
+   The app defaults to `gemini-2.0-flash` and automatically tries
+   `gemini-1.5-flash` / `gemini-3.8-flash` when a model is unavailable or not
+   exposed. Override with `--dart-define=GEMINI_RECEIPT_MODEL=...` if needed.
 6. **App Check** → register the web app, create a reCAPTCHA v3 site key, then set
    the `RECAPTCHA_V3_SITE_KEY` build value (or the GitHub Actions repository
    secret of the same name). On web, debug builds use the App Check debug
@@ -179,7 +179,7 @@ lib/
 | `firebase_core` | Firebase app initialization |
 | `firebase_auth` | Email/password auth and persistent sessions |
 | `cloud_firestore` | Per-user receipts, items, categories and budgets |
-| `firebase_ai` | Gemini Developer API via Firebase AI Logic (`gemini-3.8-flash`). This is the official replacement for the discontinued `firebase_vertexai` package. |
+| `firebase_ai` | Gemini Developer API via Firebase AI Logic (`gemini-2.0-flash` primary, with legacy/current model fallbacks). This is the official replacement for the discontinued `firebase_vertexai` package. |
 | `firebase_app_check` | App Check protection for AI / Firebase requests |
 | `mobile_scanner` | 1D barcode scanning: ML Kit mobile, WebRTC + ZXing web |
 | `google_mlkit_text_recognition` | On-device OCR (Android/iOS, ja + en) |
@@ -245,7 +245,7 @@ line-item extraction.
    stored and the review screen opens with the barcode / invoice number filled.
 2. **AI OCR mode** — a still image is captured from the live web frame, the
    device-camera file input, or `image_picker` on mobile. The JPEG is sent to
-   `AiReceiptOcrService` (Gemini `gemini-3.8-flash`) with a JSON response
+   `AiReceiptOcrService` (Gemini `gemini-2.0-flash` with model fallbacks) with a JSON response
    schema, then mapped into `ReceiptDraft` / `ReceiptItem`.
 3. **Automatic fallback** — if Gemini errors, is offline or is out of quota, the
    existing ML Kit (mobile) / Tesseract.js (web) service and `ReceiptParser` run

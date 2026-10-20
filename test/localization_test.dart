@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:receipt_tracker/core/config/ai_config.dart';
 import 'package:receipt_tracker/core/localization/app_language.dart';
 import 'package:receipt_tracker/core/localization/app_localizations.dart';
 
@@ -44,6 +45,23 @@ void main() {
       'You are saving ¥500 compared with the plan.\n'
       'At this pace you will reach the savings goal of ¥30,000.',
     );
+  });
+
+  test('AI unavailable toast is localized', () {
+    expect(
+      en.translate('AIサービスを準備しています。しばらくしてからお試しください。'),
+      'The AI service is getting ready. Please try again in a moment.',
+    );
+    expect(
+      ar.translate('AIサービスを準備しています。しばらくしてからお試しください。'),
+      'جاري تجهيز خدمة الذكاء الاصطناعي، يرجى المحاولة بعد لحظات',
+    );
+  });
+
+  test('Gemini model configuration has explicit fallbacks', () {
+    expect(kGeminiReceiptModel, 'gemini-2.0-flash');
+    expect(kGeminiReceiptFallbackModels, contains('gemini-1.5-flash'));
+    expect(kGeminiReceiptFallbackModels, contains('gemini-3.8-flash'));
   });
 
   test('category screen messages are localized', () {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -165,12 +166,7 @@ Rules:
       throw const AiReceiptOcrException('レシート画像が空です。');
     }
 
-    final model = _firebaseAi.generativeModel(
-      model: modelName,
-      systemInstruction: Content.system(_prompt),
-    );
-
-    final response = await model.generateContent(
+    final response = await _generateContent(
       <Content>[
         Content.multi(<Part>[
           const TextPart(
@@ -203,6 +199,98 @@ Rules:
     }
 
     return _toParsedReceipt(json, text);
+  }
+
+  /// Sends the request with retry and model fallback.
+  ///
+  /// Transient 503/unavailable responses are retried once, then the next
+  /// configured Flash model is tried. A 404/unsupported model also moves to the
+  /// next model. Configuration and quota errors are surfaced immediately.
+  Future<GenerateContentResponse> _generateContent(
+    List<Content> content, {
+    required GenerationConfig generationConfig,
+  }) async {
+    final modelNames = <String>{
+      kGeminiReceiptModel,
+      ...kGeminiReceiptFallbackModels,
+    };
+    Object? lastError;
+
+    for (final name in modelNames) {
+      final model = _firebaseAi.generativeModel(
+        model: name,
+        systemInstruction: Content.system(_prompt),
+      );
+
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          return await model
+              .generateContent(content, generationConfig: generationConfig)
+              .timeout(const Duration(seconds: 25));
+        } catch (error) {
+          lastError = error;
+          final mapped = _mapAiError(error);
+
+          if (mapped.kind == AiReceiptFailureKind.unavailable && attempt == 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 800));
+            continue;
+          }
+
+          if (mapped.kind == AiReceiptFailureKind.unavailable ||
+              mapped.kind == AiReceiptFailureKind.notFound) {
+            break; // Try the next Flash model.
+          }
+
+          throw mapped;
+        }
+      }
+    }
+
+    throw _mapAiError(lastError ?? Exception('AI service unavailable'));
+  }
+
+  static AiReceiptOcrException _mapAiError(Object error) {
+    if (error is AiReceiptOcrException) return error;
+
+    final text = error.toString().toLowerCase();
+    final AiReceiptFailureKind kind;
+
+    if (error is QuotaExceeded ||
+        text.contains('quota') ||
+        text.contains('resource_exhausted') ||
+        text.contains('429')) {
+      kind = AiReceiptFailureKind.quota;
+    } else if (error is ServiceApiNotEnabled ||
+        error is InvalidApiKey ||
+        text.contains('permission_denied') ||
+        text.contains('api key') ||
+        text.contains('app check') ||
+        text.contains('403')) {
+      kind = AiReceiptFailureKind.configuration;
+    } else if (text.contains('404') ||
+        text.contains('not found') ||
+        text.contains('not supported') ||
+        text.contains('unsupported')) {
+      kind = AiReceiptFailureKind.notFound;
+    } else if (error is UnsupportedUserLocation ||
+        text.contains('503') ||
+        text.contains('unavailable') ||
+        text.contains('overloaded') ||
+        text.contains('deadline') ||
+        text.contains('timeout')) {
+      kind = AiReceiptFailureKind.unavailable;
+    } else {
+      kind = AiReceiptFailureKind.other;
+    }
+
+    final message = switch (kind) {
+      AiReceiptFailureKind.unavailable => 'AIサービスが一時的に利用できません。',
+      AiReceiptFailureKind.notFound => '選択したAIモデルを利用できません。',
+      AiReceiptFailureKind.quota => 'AIの利用上限に達しました。',
+      AiReceiptFailureKind.configuration => 'AIの設定を確認してください。',
+      AiReceiptFailureKind.other => 'AIで読み取れませんでした。',
+    };
+    return AiReceiptOcrException(message, kind: kind, cause: error);
   }
 
   ParsedReceipt _toParsedReceipt(
@@ -407,10 +495,28 @@ Rules:
   }
 }
 
+enum AiReceiptFailureKind {
+  unavailable,
+  notFound,
+  quota,
+  configuration,
+  other,
+}
+
 class AiReceiptOcrException implements Exception {
-  const AiReceiptOcrException(this.message);
+  const AiReceiptOcrException(
+    this.message, {
+    this.kind = AiReceiptFailureKind.other,
+    this.cause,
+  });
 
   final String message;
+  final AiReceiptFailureKind kind;
+  final Object? cause;
+
+  bool get isTemporaryServiceIssue =>
+      kind == AiReceiptFailureKind.unavailable ||
+      kind == AiReceiptFailureKind.notFound;
 
   @override
   String toString() => message;

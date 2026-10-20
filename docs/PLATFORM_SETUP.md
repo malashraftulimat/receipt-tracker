@@ -21,7 +21,9 @@ In the Firebase console:
    hostname (for example `malashraftulimat.github.io`). `localhost` is already
    authorized.
 5. **Firebase AI Logic** → Get started with the Gemini Developer API backend.
-   The app uses `gemini-3.8-flash` (see `AiReceiptOcrService`).
+   The app defaults to `gemini-2.0-flash` and falls back through
+   `gemini-1.5-flash` / `gemini-3.8-flash` automatically (see
+   `AiReceiptOcrService`).
 6. **App Check** → register the web app and create a reCAPTCHA v3 site key. Pass
    it with `--dart-define=RECAPTCHA_V3_SITE_KEY=...` (or set the GitHub Actions
    secret) to activate App Check in release web builds. Debug web builds use the

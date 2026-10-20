@@ -151,6 +151,8 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   'AIがレシートを解析しています…': 'Gemini is reading the receipt…',
   'AIを利用できないため、端末内OCRで解析しています…': 'AI unavailable. Reading with on-device OCR…',
   '端末内OCRでレシートを解析しています…': 'Reading the receipt with on-device OCR…',
+  'AIサービスを準備しています。しばらくしてからお試しください。':
+      'The AI service is getting ready. Please try again in a moment.',
   'AIを利用できないため、端末内OCRで読み取りました。':
       'AI was unavailable, so the receipt was read with on-device OCR.',
   '撮影した写真はGoogle（Firebase AI）に送信して解析します。写真は保存されません。':

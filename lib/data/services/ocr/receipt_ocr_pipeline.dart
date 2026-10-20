@@ -21,6 +21,10 @@ class ReceiptExtractionResult {
   final Object? aiError;
 
   bool get usedFallback => engine == ReceiptExtractionEngine.onDeviceFallback;
+
+  bool get aiServiceUnavailable =>
+      aiError is AiReceiptOcrException &&
+      (aiError! as AiReceiptOcrException).isTemporaryServiceIssue;
 }
 
 /// Gemini (Firebase AI Logic) first, ML Kit / Tesseract.js on error, offline

@@ -333,8 +333,12 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     setState(() => _processing = false);
     if (result.usedFallback) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: AppText('AIを利用できないため、端末内OCRで読み取りました。'),
+        SnackBar(
+          content: result.aiServiceUnavailable
+              ? const AppText(
+                  'AIサービスを準備しています。しばらくしてからお試しください。',
+                )
+              : const AppText('AIを利用できないため、端末内OCRで読み取りました。'),
         ),
       );
     }
