@@ -8,14 +8,14 @@ import 'package:firebase_core/firebase_core.dart';
 /// still targeting the Gemini Developer API backend.
 const String kGeminiReceiptModel = String.fromEnvironment(
   'GEMINI_RECEIPT_MODEL',
-  defaultValue: 'gemini-2.0-flash',
+  defaultValue: 'gemini-3.8-flash',
 );
 
 /// Model fallbacks tried automatically when the primary model is unavailable
 /// or not exposed by the current Firebase project.
 const List<String> kGeminiReceiptFallbackModels = <String>[
-  'gemini-1.5-flash',
-  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
 ];
 
 /// Creates the cached Gemini Developer API backend service after

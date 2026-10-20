@@ -56,12 +56,16 @@ void main() {
       ar.translate('AIサービスを準備しています。しばらくしてからお試しください。'),
       'جاري تجهيز خدمة الذكاء الاصطناعي، يرجى المحاولة بعد لحظات',
     );
+    expect(en.translate('AIエラーの詳細'), 'AI error details');
+    expect(ar.translate('AIエラーの詳細'), 'تفاصيل خطأ الذكاء الاصطناعي');
   });
 
-  test('Gemini model configuration has explicit fallbacks', () {
-    expect(kGeminiReceiptModel, 'gemini-2.0-flash');
-    expect(kGeminiReceiptFallbackModels, contains('gemini-1.5-flash'));
-    expect(kGeminiReceiptFallbackModels, contains('gemini-3.8-flash'));
+  test('Gemini model configuration uses current supported names', () {
+    expect(kGeminiReceiptModel, 'gemini-3.8-flash');
+    expect(kGeminiReceiptFallbackModels, contains('gemini-3.7-flash'));
+    expect(kGeminiReceiptFallbackModels, contains('gemini-3.5-flash'));
+    expect(kGeminiReceiptFallbackModels, isNot(contains('gemini-2.0-flash')));
+    expect(kGeminiReceiptFallbackModels, isNot(contains('gemini-1.5-flash')));
   });
 
   test('category screen messages are localized', () {

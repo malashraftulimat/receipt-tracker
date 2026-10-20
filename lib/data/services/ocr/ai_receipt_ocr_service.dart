@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:firebase_ai/firebase_ai.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/config/ai_config.dart';
 import '../../../domain/parser/receipt_parser.dart';
@@ -215,6 +215,7 @@ Rules:
       ...kGeminiReceiptFallbackModels,
     };
     Object? lastError;
+    String? lastModelName;
 
     for (final name in modelNames) {
       final model = _firebaseAi.generativeModel(
@@ -229,7 +230,13 @@ Rules:
               .timeout(const Duration(seconds: 25));
         } catch (error) {
           lastError = error;
-          final mapped = _mapAiError(error);
+          lastModelName = name;
+          final mapped = _mapAiError(error, modelName: name);
+          debugPrint(
+            '[AiReceiptOcrService] model=$name attempt=${attempt + 1} '
+            'runtimeType=${error.runtimeType} kind=${mapped.kind.name} '
+            'message=${mapped.message} raw=$error',
+          );
 
           if (mapped.kind == AiReceiptFailureKind.unavailable && attempt == 0) {
             await Future<void>.delayed(const Duration(milliseconds: 800));
@@ -246,11 +253,24 @@ Rules:
       }
     }
 
-    throw _mapAiError(lastError ?? Exception('AI service unavailable'));
+    throw _mapAiError(
+      lastError ?? Exception('AI service unavailable'),
+      modelName: lastModelName,
+    );
   }
 
-  static AiReceiptOcrException _mapAiError(Object error) {
-    if (error is AiReceiptOcrException) return error;
+  static AiReceiptOcrException _mapAiError(
+    Object error, {
+    String? modelName,
+  }) {
+    if (error is AiReceiptOcrException) {
+      return AiReceiptOcrException(
+        error.message,
+        kind: error.kind,
+        cause: error.cause ?? error,
+        modelName: modelName ?? error.modelName,
+      );
+    }
 
     final text = error.toString().toLowerCase();
     final AiReceiptFailureKind kind;
@@ -290,7 +310,12 @@ Rules:
       AiReceiptFailureKind.configuration => 'AIの設定を確認してください。',
       AiReceiptFailureKind.other => 'AIで読み取れませんでした。',
     };
-    return AiReceiptOcrException(message, kind: kind, cause: error);
+    return AiReceiptOcrException(
+      message,
+      kind: kind,
+      cause: error,
+      modelName: modelName,
+    );
   }
 
   ParsedReceipt _toParsedReceipt(
@@ -508,11 +533,13 @@ class AiReceiptOcrException implements Exception {
     this.message, {
     this.kind = AiReceiptFailureKind.other,
     this.cause,
+    this.modelName,
   });
 
   final String message;
   final AiReceiptFailureKind kind;
   final Object? cause;
+  final String? modelName;
 
   bool get isTemporaryServiceIssue =>
       kind == AiReceiptFailureKind.unavailable ||

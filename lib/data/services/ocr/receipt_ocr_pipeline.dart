@@ -22,9 +22,12 @@ class ReceiptExtractionResult {
 
   bool get usedFallback => engine == ReceiptExtractionEngine.onDeviceFallback;
 
-  bool get aiServiceUnavailable =>
-      aiError is AiReceiptOcrException &&
-      (aiError! as AiReceiptOcrException).isTemporaryServiceIssue;
+  /// Typed failure details for diagnostics on the scan screen.
+  AiReceiptOcrException? get aiFailure => aiError is AiReceiptOcrException
+      ? aiError as AiReceiptOcrException
+      : null;
+
+  bool get aiServiceUnavailable => aiFailure?.isTemporaryServiceIssue ?? false;
 }
 
 /// Gemini (Firebase AI Logic) first, ML Kit / Tesseract.js on error, offline
@@ -55,7 +58,12 @@ class ReceiptOcrPipeline {
         engine: ReceiptExtractionEngine.gemini,
       );
     } catch (error) {
-      aiError = error;
+      aiError = error is AiReceiptOcrException
+          ? error
+          : AiReceiptOcrException(
+              'AIで読み取れませんでした。',
+              cause: error,
+            );
     }
 
     onFallback?.call(aiError);

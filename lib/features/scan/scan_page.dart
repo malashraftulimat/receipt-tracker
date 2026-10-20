@@ -13,6 +13,7 @@ import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../data/services/camera/camera_frame.dart';
 import '../../data/services/image_input.dart';
+import '../../data/services/ocr/ai_receipt_ocr_service.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/parser/receipt_parser.dart';
@@ -38,6 +39,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   final List<String> _chunkTexts = <String>[];
   final List<Uint8List> _chunkImages = <Uint8List>[];
   String? _error;
+  AiReceiptOcrException? _aiFailure;
   String _processingLabel = 'AIがレシートを解析しています…';
   double? _focusX;
   double? _focusY;
@@ -265,6 +267,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       _processing = true;
       _processingLabel = 'AIがレシートを解析しています…';
       _error = null;
+      _aiFailure = null;
     });
 
     try {
@@ -291,6 +294,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       _processing = true;
       _processingLabel = 'AIがレシートを解析しています…';
       _error = null;
+      _aiFailure = null;
     });
 
     try {
@@ -314,10 +318,11 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     final result = await ref.read(receiptOcrPipelineProvider).recognize(
       bytes,
       barcodeId: barcode,
-      onFallback: (_) {
+      onFallback: (aiError) {
         if (!mounted) return;
         setState(() {
           _processingLabel = 'AIを利用できないため、端末内OCRで解析しています…';
+          _aiFailure = aiError is AiReceiptOcrException ? aiError : null;
         });
       },
     );
@@ -330,7 +335,11 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     );
 
     if (!mounted) return;
-    setState(() => _processing = false);
+    setState(() {
+      _processing = false;
+      _aiFailure =
+          result.usedFallback ? (result.aiFailure ?? _aiFailure) : null;
+    });
     if (result.usedFallback) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -522,7 +531,10 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                         ),
                       ),
                     if (_processing)
-                      _ProcessingOverlay(label: _processingLabel),
+                      _ProcessingOverlay(
+                        label: _processingLabel,
+                        failure: _aiFailure,
+                      ),
                   ],
                 );
               },
@@ -598,6 +610,10 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                   if (_error != null) ...<Widget>[
                     const SizedBox(height: 12),
                     _ErrorBanner(message: _error!),
+                  ],
+                  if (_aiFailure != null) ...<Widget>[
+                    const SizedBox(height: 10),
+                    _AiDiagnosticLine(failure: _aiFailure!),
                   ],
                   const SizedBox(height: 14),
                   if (session.mode == ScanMode.longReceipt)
@@ -870,6 +886,72 @@ class _ErrorBanner extends StatelessWidget {
 }
 
 /// Rounded guide frame for the barcode / receipt.
+class _AiDiagnosticLine extends StatelessWidget {
+  const _AiDiagnosticLine({required this.failure});
+
+  final AiReceiptOcrException failure;
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = failure.cause?.toString() ?? failure.toString();
+    final runtimeType = failure.cause?.runtimeType.toString() ?? '-';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppPalette.amber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppPalette.amber.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          dense: true,
+          leading: const Icon(
+            Icons.bug_report_outlined,
+            size: 18,
+            color: AppPalette.amber,
+          ),
+          title: const AppText(
+            'AIエラーの詳細',
+            style: TextStyle(
+              color: AppPalette.amber,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          subtitle: Text(
+            '${failure.kind.name}'
+            '${failure.modelName == null ? '' : ' · ${failure.modelName}'}',
+            style: const TextStyle(
+              color: AppPalette.textMuted,
+              fontSize: 10.5,
+            ),
+          ),
+          children: <Widget>[
+            SelectableText(
+              'kind: ${failure.kind.name}\n'
+              'model: ${failure.modelName ?? '-'}\n'
+              'message: ${failure.message}\n'
+              'runtimeType: $runtimeType\n'
+              'raw: $raw',
+              style: const TextStyle(
+                color: AppPalette.textMuted,
+                fontFamily: 'monospace',
+                fontSize: 10.5,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ScanFrame extends StatelessWidget {
   const _ScanFrame();
 
@@ -998,30 +1080,41 @@ class _TapFocusRingState extends State<_TapFocusRing>
 }
 
 class _ProcessingOverlay extends StatelessWidget {
-  const _ProcessingOverlay({required this.label});
+  const _ProcessingOverlay({required this.label, this.failure});
 
   final String label;
+  final AiReceiptOcrException? failure;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: AppPalette.backgroundDeep.withValues(alpha: 0.78),
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const CircularProgressIndicator(color: AppPalette.cyan),
-            const SizedBox(height: 14),
-            AppText(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppPalette.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const CircularProgressIndicator(color: AppPalette.cyan),
+                const SizedBox(height: 14),
+                AppText(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppPalette.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (failure != null) ...<Widget>[
+                  const SizedBox(height: 14),
+                  _AiDiagnosticLine(failure: failure!),
+                ],
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
