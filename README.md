@@ -5,8 +5,9 @@ paper receipts and invoices with a **dual scanner**:
 
 - **1D barcode engine** — JAN-13 / EAN-8 / UPC-A / Code 128 / Code 39 / ITF via `mobile_scanner`,
   used to capture invoice / payment reference numbers and to block duplicate entries.
-- **OCR engine** — Japanese + English text recognition via **ML Kit** on mobile and a
-  **Supabase Edge Function (Google Cloud Vision)** on web/desktop.
+- **OCR engine** — Japanese + English text recognition via **ML Kit** on mobile,
+  **Supabase Edge Function (Google Cloud Vision)** in synced web/desktop mode, and
+  **Tesseract.js (WASM)** inside the browser in local web mode.
 
 Both engines feed a deterministic parser that detects **store name, date/time
 (`2026年10月19日`, `令和8年10月19日`, `R8.10.19`, `2026/10/19`), total (`合計`, `税込合計`,
@@ -121,7 +122,7 @@ receipt_tracker/
 │   │       └── ocr/                # interface + conditional platform impls
 │   │           ├── ocr_service.dart        # OcrService + OcrResult + factory
 │   │           ├── ocr_service_io.dart     # Android/iOS -> ML Kit, desktop -> remote
-│   │           ├── ocr_service_web.dart    # Web -> Supabase Edge Function
+│   │           ├── ocr_service_web.dart    # Web: Tesseract (local) / Edge Function (sync)
 │   │           ├── mlkit_ocr_service.dart
 │   │           └── remote_ocr_service.dart
 │   └── features/
@@ -172,6 +173,7 @@ receipt_tracker/
 | `mobile_scanner` | 1D/2D barcode scanning (`ean13`, `ean8`, `code128`, `code39`, `itf`, `upcA`); ML Kit on Android/iOS and HTML5/WebRTC + ZXing on web |
 | `google_mlkit_text_recognition` | On-device OCR (Android/iOS) with the Japanese script model |
 | `image_picker` | Native camera capture on mobile, photo/file picker fallback on web & desktop |
+| `web/tesseract.min.js` | Client-side Tesseract.js OCR for local web mode (worker/WASM/language data loaded from CDN and cached) |
 | `web` | Browser interop used to capture an OCR still from the live `<video>` stream |
 | `web/zxing.min.js` | Bundled ZXing browser build (Apache-2.0), so web barcode scanning does not depend on a CDN |
 | `path_provider` | Temp file needed by ML Kit `InputImage` |
@@ -249,7 +251,8 @@ change amounts, 8%/10% tax lines, tax-inclusive bases and reference numbers.
    level; the UI shows the existing receipt instead of saving a copy.
 2. **OCR mode** – a still image is captured from the live camera frame on web, or
    via native `image_picker` on mobile. It is recognised by `MlKitOcrService` on
-   Android/iOS or `RemoteOcrService` → edge function on web/desktop, then
+   Android/iOS, `TesseractOcrService` (client-side WASM) in local web mode, or
+   `RemoteOcrService` → edge function in synced web/desktop mode. Then
    `ReceiptParser` extracts structured fields.
 3. **Auto mode** – barcode is detected first; a banner then offers
    “撮影して自動入力” which runs OCR and merges the barcode into the same draft.
@@ -281,8 +284,10 @@ change amounts, 8%/10% tax lines, tax-inclusive bases and reference numbers.
 - **Web live camera** requires a secure context (HTTPS or `localhost`) and browser
   permission for `getUserMedia`. Only an explicit denial/unsupported browser falls
   back to photo upload. Desktop platforms still use the file picker + server OCR.
-- **Web OCR** depends on the `ocr` edge function (Cloud Vision); barcode scanning
-  remains fully client-side.
+- **Web OCR** uses Tesseract.js in local mode (no server required) and the `ocr`
+  edge function (Cloud Vision) in Supabase mode. Barcode scanning is always
+  client-side. The first Tesseract run downloads worker/WASM/language data, which
+  the browser caches for subsequent scans.
 - **Server OCR cost**: Cloud Vision is billed per request; ML Kit on mobile is free and
   offline.
 - Receipt images are stored privately and served with 7-day signed URLs; add a

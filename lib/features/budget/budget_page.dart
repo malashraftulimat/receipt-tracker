@@ -6,6 +6,7 @@ import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/monthly_budget.dart';
+import '../../core/localization/localization.dart';
 
 /// Income / savings goal / fixed expenses for a month + live pacing.
 class BudgetPage extends ConsumerStatefulWidget {
@@ -102,7 +103,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       ref.invalidate(budgetProvider(_month));
       ref.invalidate(budgetSummaryProvider(_month));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('予算を保存しました')),
+        const SnackBar(content: AppText('予算を保存しました')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -119,7 +120,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     final summaryAsync = ref.watch(budgetSummaryProvider(_month));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('予算と貯蓄')),
+      appBar: AppBar(title: const AppText('予算と貯蓄')),
       body: ListView(
         padding: EdgeInsets.fromLTRB(
           context.pagePadding,
@@ -142,7 +143,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Text(
+                  AppText(
                     '毎月のプラン',
                     style: theme.textTheme.labelLarge
                         ?.copyWith(fontWeight: FontWeight.w700),
@@ -170,7 +171,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                   ),
                   if (_error != null) ...<Widget>[
                     const SizedBox(height: 12),
-                    Text(
+                    AppText(
                       _error!,
                       style: TextStyle(
                         fontSize: 12,
@@ -188,7 +189,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.check),
-                    label: const Text('プランを保存'),
+                    label: const AppText('プランを保存'),
                   ),
                 ],
               ),
@@ -213,7 +214,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                   .withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Text(
+            child: AppText(
               '自由に使える金額 = 月収 − 貯蓄目標 − 固定費。\n'
               'レシートを登録すると、その月の残り予算から自動で差し引かれます。\n'
               '「1日あたり」は残り予算 ÷ 残り日数です。',
@@ -246,12 +247,12 @@ class _MonthSelector extends StatelessWidget {
     return Row(
       children: <Widget>[
         IconButton(
-          tooltip: '前の月',
+          tooltip: context.tr('前の月'),
           onPressed: onPrevious,
           icon: const Icon(Icons.chevron_left),
         ),
         Expanded(
-          child: Text(
+          child: AppText(
             formatMonthJa(month),
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium
@@ -259,7 +260,7 @@ class _MonthSelector extends StatelessWidget {
           ),
         ),
         IconButton(
-          tooltip: '次の月',
+          tooltip: context.tr('次の月'),
           onPressed: onNext,
           icon: const Icon(Icons.chevron_right),
         ),
@@ -313,7 +314,7 @@ class _SummaryCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: _cardDecoration(theme),
-        child: Text('集計を読み込めませんでした\n$error'),
+        child: AppText('集計を読み込めませんでした\n$error'),
       );
     }
 
@@ -326,7 +327,7 @@ class _SummaryCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: _cardDecoration(theme),
-        child: Text(
+        child: AppText(
           'この月のプランは未設定です。上のフォームに月収を入力してください。',
           style: theme.textTheme.bodySmall,
         ),
@@ -348,7 +349,7 @@ class _SummaryCard extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Text(
+              AppText(
                 '今月の状況',
                 style: theme.textTheme.labelLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
@@ -361,7 +362,7 @@ class _SummaryCard extends StatelessWidget {
                   color: statusColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
+                child: AppText(
                   data.statusLabel,
                   style: TextStyle(
                     fontSize: 11,
@@ -373,14 +374,14 @@ class _SummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
+          AppText(
             formatYen(data.remaining.abs()),
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
               color: data.remaining < 0 ? theme.colorScheme.error : null,
             ),
           ),
-          Text(
+          AppText(
             data.remaining < 0 ? '予算オーバー額' : '今月の残り予算',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -396,7 +397,7 @@ class _SummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
+          AppText(
             '支出 ${formatYen(data.spent)} / 自由枠 ${formatYen(data.disposable)} '
             '(${(data.progress * 100).clamp(0, 999).toStringAsFixed(0)}%)',
             style: theme.textTheme.bodySmall
@@ -426,7 +427,7 @@ class _SummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(
+          AppText(
             _pacingMessage(data),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -463,13 +464,13 @@ class _Metric extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
+        AppText(
           label,
           style: theme.textTheme.labelSmall
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 2),
-        Text(
+        AppText(
           value,
           style: theme.textTheme.titleSmall
               ?.copyWith(fontWeight: FontWeight.w700),

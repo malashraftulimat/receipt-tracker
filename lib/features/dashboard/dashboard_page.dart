@@ -8,6 +8,7 @@ import 'widgets/budget_card.dart';
 import 'widgets/due_reminders_card.dart';
 import 'widgets/filter_bar.dart';
 import 'widgets/receipt_collection.dart';
+import '../../core/localization/localization.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -38,11 +39,11 @@ class DashboardPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('レシート帳'),
+        title: const AppText('レシート帳'),
         actions: <Widget>[
           if (!expanded)
             IconButton(
-              tooltip: '集計',
+              tooltip: context.tr('集計'),
               onPressed: () => _showAnalyticsSheet(context),
               icon: const Icon(Icons.insights_outlined),
             ),
@@ -52,7 +53,7 @@ class DashboardPage extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/scan'),
         icon: const Icon(Icons.document_scanner_outlined),
-        label: const Text('スキャン'),
+        label: const AppText('スキャン'),
       ),
       body: SafeArea(
         child: expanded

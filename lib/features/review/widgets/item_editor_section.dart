@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/category.dart';
 import '../../../domain/models/receipt_item.dart';
+import '../../../core/localization/localization.dart';
 
 /// Mutable per-row state for the item editor.
 class ReceiptItemEditor {
@@ -120,13 +121,13 @@ class ItemEditorSection extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Text(
+              AppText(
                 '明細（商品）',
                 style: theme.textTheme.labelLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),
-              Text(
+              AppText(
                 '${items.length} 行',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -150,7 +151,7 @@ class ItemEditorSection extends StatelessWidget {
             child: TextButton.icon(
               onPressed: onAdd,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('明細を追加'),
+              label: const AppText('明細を追加'),
             ),
           ),
           const Divider(height: 18),
@@ -204,15 +205,15 @@ class _ItemCard extends StatelessWidget {
                   controller: editor.name,
                   onChanged: (_) => onChanged(),
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: '商品名',
+                  decoration: InputDecoration(
+                    labelText: context.tr('商品名'),
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
               ),
               IconButton(
-                tooltip: '削除',
+                tooltip: context.tr('削除'),
                 onPressed: onRemove,
                 icon: Icon(
                   Icons.delete_outline,
@@ -275,16 +276,16 @@ class _ItemCard extends StatelessWidget {
                   isDense: true,
                   style: theme.textTheme.labelSmall
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  hint: const Text('カテゴリ自動', style: TextStyle(fontSize: 11)),
+                  hint: const AppText('カテゴリ自動', style: TextStyle(fontSize: 11)),
                   items: <DropdownMenuItem<String?>>[
                     const DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('未分類', style: TextStyle(fontSize: 11)),
+                      child: AppText('未分類', style: TextStyle(fontSize: 11)),
                     ),
                     for (final category in categories)
                       DropdownMenuItem<String?>(
                         value: category.id,
-                        child: Text(
+                        child: AppText(
                           category.name,
                           style: const TextStyle(fontSize: 11),
                         ),
@@ -347,12 +348,12 @@ class _TaxSelector extends StatelessWidget {
     final label = rate == 8 ? '8%' : (rate == 10 ? '10%' : '税率');
 
     return PopupMenuButton<int?>(
-      tooltip: '税率',
+      tooltip: context.tr('税率'),
       onSelected: onChanged,
       itemBuilder: (context) => const <PopupMenuEntry<int?>>[
-        PopupMenuItem<int?>(value: 8, child: Text('8%（軽減）')),
-        PopupMenuItem<int?>(value: 10, child: Text('10%（標準）')),
-        PopupMenuItem<int?>(value: null, child: Text('指定なし')),
+        PopupMenuItem<int?>(value: 8, child: AppText('8%（軽減）')),
+        PopupMenuItem<int?>(value: 10, child: AppText('10%（標準）')),
+        PopupMenuItem<int?>(value: null, child: AppText('指定なし')),
       ],
       child: Container(
         height: 44,
@@ -363,7 +364,7 @@ class _TaxSelector extends StatelessWidget {
         ),
         child: Row(
           children: <Widget>[
-            Text(
+            AppText(
               label,
               style: TextStyle(
                 fontSize: 11,
@@ -420,7 +421,7 @@ class _ValidationRow extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: Text(
+            child: AppText(
               '明細が未入力です。必要な場合は「明細を追加」から入力できます。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -447,7 +448,7 @@ class _ValidationRow extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Expanded(
-              child: Text(
+              child: AppText(
                 ok
                     ? '明細合計 ${formatYen(itemsTotal)} は合計と一致しています'
                     : '明細合計と合計が一致しません（差額 ${formatYen(difference.abs())}）',
@@ -460,7 +461,7 @@ class _ValidationRow extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        Text(
+        AppText(
           '明細 ${formatYen(itemsTotal)}'
           '${taxTotal > 0 ? ' + 税 ${formatYen(taxTotal)} = ${formatYen(withTax)}' : ''}'
           ' / レシート合計 ${formatYen(totalAmount)}',
@@ -473,7 +474,7 @@ class _ValidationRow extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onMatchTotal,
-              child: const Text('合計金額に合わせる'),
+              child: const AppText('合計金額に合わせる'),
             ),
           ),
       ],

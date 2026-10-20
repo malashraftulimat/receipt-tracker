@@ -9,8 +9,10 @@ import 'core/config/app_config.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Japanese date formatting (yyyy年M月d日(E)).
+  // Date symbols for every UI language (Japanese / English / Arabic).
   await initializeDateFormatting('ja');
+  await initializeDateFormatting('en');
+  await initializeDateFormatting('ar');
 
   // Connect to Supabase with dart-defines or previously saved credentials.
   // When neither exists, the app opens the "接続設定" screen.

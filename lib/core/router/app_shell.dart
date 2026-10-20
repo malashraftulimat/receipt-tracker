@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../utils/responsive.dart';
+import '../localization/localization.dart';
 
 /// Responsive chrome: NavigationRail on desktop, NavigationBar on mobile.
 class AppShell extends StatelessWidget {
@@ -41,7 +42,7 @@ class AppShell extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 12, bottom: 8),
                 child: FloatingActionButton(
                   heroTag: 'scan-rail',
-                  tooltip: 'レシートをスキャン',
+                  tooltip: context.tr('レシートをスキャン'),
                   onPressed: () => context.push('/scan'),
                   child: const Icon(Icons.document_scanner_outlined),
                 ),
@@ -50,17 +51,17 @@ class AppShell extends StatelessWidget {
                 NavigationRailDestination(
                   icon: Icon(Icons.space_dashboard_outlined),
                   selectedIcon: Icon(Icons.space_dashboard),
-                  label: Text('ホーム'),
+                  label: AppText('ホーム'),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.sell_outlined),
                   selectedIcon: Icon(Icons.sell),
-                  label: Text('カテゴリ'),
+                  label: AppText('カテゴリ'),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.settings_outlined),
                   selectedIcon: Icon(Icons.settings),
-                  label: Text('設定'),
+                  label: AppText('設定'),
                 ),
               ],
             ),
@@ -76,21 +77,21 @@ class AppShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (index) => _go(context, index),
-        destinations: const <NavigationDestination>[
+        destinations: <NavigationDestination>[
           NavigationDestination(
-            icon: Icon(Icons.space_dashboard_outlined),
-            selectedIcon: Icon(Icons.space_dashboard),
-            label: 'ホーム',
+            icon: const Icon(Icons.space_dashboard_outlined),
+            selectedIcon: const Icon(Icons.space_dashboard),
+            label: context.tr('ホーム'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.sell_outlined),
-            selectedIcon: Icon(Icons.sell),
-            label: 'カテゴリ',
+            icon: const Icon(Icons.sell_outlined),
+            selectedIcon: const Icon(Icons.sell),
+            label: context.tr('カテゴリ'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: '設定',
+            icon: const Icon(Icons.settings_outlined),
+            selectedIcon: const Icon(Icons.settings),
+            label: context.tr('設定'),
           ),
         ],
       ),

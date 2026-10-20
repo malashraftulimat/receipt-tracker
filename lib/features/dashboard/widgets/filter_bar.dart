@@ -6,6 +6,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/category.dart';
 import '../../../domain/models/receipt_filter.dart';
+import '../../../core/localization/localization.dart';
 
 /// Search field, quick month/category chips and view toggle.
 class FilterBar extends ConsumerStatefulWidget {
@@ -46,12 +47,12 @@ class _FilterBarState extends ConsumerState<FilterBar> {
       firstDate: DateTime(now.year - 10),
       lastDate: now,
       initialDateRange: initialRange,
-      helpText: '期間を選択',
-      saveText: '決定',
-      cancelText: 'キャンセル',
-      fieldStartLabelText: '開始日',
-      fieldEndLabelText: '終了日',
-      locale: const Locale('ja'),
+      helpText: context.tr('期間を選択'),
+      saveText: context.tr('決定'),
+      cancelText: context.tr('キャンセル'),
+      fieldStartLabelText: context.tr('開始日'),
+      fieldEndLabelText: context.tr('終了日'),
+      locale: Localizations.localeOf(context),
     );
 
     if (range != null) {
@@ -84,13 +85,13 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                   textInputAction: TextInputAction.search,
                   onChanged: notifier.setSearch,
                   decoration: InputDecoration(
-                    hintText: '店舗名・メモ・バーコードで検索',
+                    hintText: context.tr('店舗名・メモ・バーコードで検索'),
                     isDense: true,
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: filter.searchTerm.isEmpty
                         ? null
                         : IconButton(
-                            tooltip: 'クリア',
+                            tooltip: context.tr('クリア'),
                             onPressed: () {
                               _searchController.clear();
                               notifier.setSearch('');
@@ -111,7 +112,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
               ),
               const SizedBox(width: 4),
               IconButton.filledTonal(
-                tooltip: '期間指定',
+                tooltip: context.tr('期間指定'),
                 onPressed: _pickRange,
                 icon: const Icon(Icons.date_range_outlined),
               ),
@@ -184,7 +185,9 @@ class _ViewToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton.filledTonal(
-      tooltip: view == ReceiptViewMode.list ? 'グリッド表示' : 'リスト表示',
+      tooltip: context.tr(
+        view == ReceiptViewMode.list ? 'グリッド表示' : 'リスト表示',
+      ),
       onPressed: onPressed,
       icon: Icon(
         view == ReceiptViewMode.list ? Icons.grid_view : Icons.view_list,
@@ -225,7 +228,7 @@ class _FilterChip extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          child: Text(
+          child: AppText(
             label,
             style: TextStyle(
               fontSize: 12.5,

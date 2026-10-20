@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/monthly_budget.dart';
+import '../../../core/localization/localization.dart';
 
 /// Compact "remaining budget / daily allowance / pacing" widget.
 class BudgetCard extends ConsumerWidget {
@@ -25,7 +26,7 @@ class BudgetCard extends ConsumerWidget {
           child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
         ),
         error: (error, _) => _Shell(
-          child: Text(
+          child: AppText(
             '予算を読み込めませんでした',
             style: theme.textTheme.bodySmall,
           ),
@@ -44,12 +45,12 @@ class BudgetCard extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(
+                        AppText(
                           '今月の予算を設定',
                           style: theme.textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
-                        Text(
+                        AppText(
                           '月収・貯蓄目標・固定費から、1日に使える金額を計算します',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -60,7 +61,7 @@ class BudgetCard extends ConsumerWidget {
                   ),
                   FilledButton.tonal(
                     onPressed: () => context.push('/budget'),
-                    child: const Text('設定'),
+                    child: const AppText('設定'),
                   ),
                 ],
               ),
@@ -81,7 +82,7 @@ class BudgetCard extends ConsumerWidget {
               children: <Widget>[
                 Row(
                   children: <Widget>[
-                    Text(
+                    AppText(
                       '今月の残り予算',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
@@ -97,7 +98,7 @@ class BudgetCard extends ConsumerWidget {
                         color: statusColor.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
+                      child: AppText(
                         summary.statusLabel,
                         style: TextStyle(
                           fontSize: 10.5,
@@ -109,7 +110,7 @@ class BudgetCard extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(
+                AppText(
                   formatYen(summary.remaining.abs()),
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
@@ -131,20 +132,20 @@ class BudgetCard extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: <Widget>[
-                    Text(
+                    AppText(
                       '1日 ${formatYen(summary.dailyAllowance)}',
                       style: theme.textTheme.labelSmall
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 12),
-                    Text(
+                    AppText(
                       '今日 ${formatYen(summary.todaySpent)}',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const Spacer(),
-                    Text(
+                    AppText(
                       '貯蓄 ${(summary.savingsProgress * 100).round()}%',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,

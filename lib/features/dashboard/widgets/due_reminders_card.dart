@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../../data/providers.dart';
+import '../../../core/localization/localization.dart';
 
 /// Upcoming 支払期限 (utility bills / 振込用紙) with a countdown.
 class DueRemindersCard extends ConsumerWidget {
@@ -43,13 +44,13 @@ class DueRemindersCard extends ConsumerWidget {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text(
+                AppText(
                   '支払期限が近いもの',
                   style: theme.textTheme.labelLarge
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
-                Text(
+                AppText(
                   '${receipts.length}件',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -117,14 +118,14 @@ class _DueRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
+                  AppText(
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  Text(
+                  AppText(
                     '${formatDateShortJa(dueDate)} ・ ${formatYen(amount)}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -139,7 +140,7 @@ class _DueRow extends StatelessWidget {
                 color: color.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
+              child: AppText(
                 label,
                 style: TextStyle(
                   fontSize: 11,

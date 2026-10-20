@@ -17,6 +17,7 @@ import '../../domain/parser/receipt_parser.dart';
 import '../../domain/parser/receipt_text_merger.dart';
 import '../review/review_page.dart';
 import 'scan_session.dart';
+import '../../core/localization/localization.dart';
 
 /// Live camera view with a 1D-barcode engine and a receipt-OCR engine.
 class ScanPage extends ConsumerStatefulWidget {
@@ -291,7 +292,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${_chunkTexts.length} 枚目を読み取りました。続きを撮影してください'),
+          content: AppText('${_chunkTexts.length} 枚目を読み取りました。続きを撮影してください'),
         ),
       );
     } catch (error) {
@@ -354,7 +355,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     if (saved != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('「${saved.displayMerchant}」を保存しました'),
+          content: AppText('「${saved.displayMerchant}」を保存しました'),
         ),
       );
       if (context.canPop()) context.pop();
@@ -381,7 +382,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
     if (!_hasLiveCamera || _cameraBlocked) {
       return Scaffold(
-        appBar: AppBar(title: const Text('スキャン')),
+        appBar: AppBar(title: const AppText('スキャン')),
         body: _NoCameraView(
           onPickImage: _captureAndRecognize,
           onManual: _openManual,
@@ -399,11 +400,11 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('スキャン'),
+        title: const AppText('スキャン'),
         actions: <Widget>[
           if (!kIsWeb)
             IconButton(
-              tooltip: 'ライト',
+              tooltip: context.tr('ライト'),
               onPressed: _toggleTorch,
               icon: const Icon(Icons.flashlight_on_outlined),
             ),
@@ -443,7 +444,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                       for (final mode in ScanMode.values)
                         ButtonSegment<ScanMode>(
                           value: mode,
-                          label: Text(mode.label),
+                          label: AppText(mode.label),
                         ),
                     ],
                     selected: <ScanMode>{session.mode},
@@ -452,7 +453,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                         notifier.setMode(selection.first),
                   ),
                   const SizedBox(height: 10),
-                  Text(
+                  AppText(
                     session.mode.hint,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
@@ -540,7 +541,7 @@ class _ActionButtons extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: busy ? null : onCapture,
               icon: const Icon(Icons.photo_camera_outlined),
-              label: const Text('レシートを撮影'),
+              label: const AppText('レシートを撮影'),
             ),
           ),
           const SizedBox(width: 8),
@@ -548,7 +549,7 @@ class _ActionButtons extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: busy ? null : onManual,
               icon: const Icon(Icons.edit_outlined),
-              label: const Text('手入力'),
+              label: const AppText('手入力'),
             ),
           ),
         ],
@@ -564,13 +565,13 @@ class _ActionButtons extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: busy ? null : onCapture,
                   icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('撮影して自動入力'),
+                  label: const AppText('撮影して自動入力'),
                 ),
               ),
               const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: busy ? null : onUseBarcodeOnly,
-                child: const Text('このまま登録'),
+                child: const AppText('このまま登録'),
               ),
             ],
           ),
@@ -580,7 +581,7 @@ class _ActionButtons extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: busy ? null : onCapture,
               icon: const Icon(Icons.photo_camera_outlined),
-              label: Text(
+              label: AppText(
                 mode == ScanMode.barcode ? 'レシートを撮影' : 'レシートを撮影して読み取る',
               ),
             ),
@@ -589,7 +590,7 @@ class _ActionButtons extends StatelessWidget {
           const SizedBox(height: 8),
           TextButton(
             onPressed: busy ? null : onManual,
-            child: const Text('手入力で登録する'),
+            child: const AppText('手入力で登録する'),
           ),
         ],
       ],
@@ -628,11 +629,11 @@ class _BarcodeBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
+                AppText(
                   valid ? 'バーコード検出' : 'バーコード（チェックディジット不一致）',
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
-                Text(
+                AppText(
                   BarcodeUtils.format(barcode),
                   style: const TextStyle(
                     color: Colors.white,
@@ -644,7 +645,7 @@ class _BarcodeBanner extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'クリア',
+            tooltip: context.tr('クリア'),
             onPressed: onClear,
             icon: const Icon(Icons.close, color: Colors.white70, size: 18),
           ),
@@ -675,7 +676,7 @@ class _ErrorBanner extends StatelessWidget {
           const Icon(Icons.error_outline, color: Colors.redAccent, size: 18),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
+            child: AppText(
               message,
               style: const TextStyle(color: Colors.white, fontSize: 12),
             ),
@@ -763,7 +764,7 @@ class _ProcessingOverlay extends StatelessWidget {
           children: <Widget>[
             CircularProgressIndicator(color: Colors.white),
             SizedBox(height: 14),
-            Text(
+            AppText(
               'レシートを解析しています…',
               style: TextStyle(color: Colors.white, fontSize: 13),
             ),
@@ -822,14 +823,14 @@ class _NoCameraView extends StatelessWidget {
                 color: theme.colorScheme.outline,
               ),
               const SizedBox(height: 16),
-              Text(
+              AppText(
                 title,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              Text(
+              AppText(
                 description,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall
@@ -844,7 +845,7 @@ class _NoCameraView extends StatelessWidget {
                     color: theme.colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
+                  child: AppText(
                     error!,
                     style: TextStyle(
                       fontSize: 12,
@@ -858,7 +859,7 @@ class _NoCameraView extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: busy ? null : onRetryCamera,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('カメラを再試行'),
+                  label: const AppText('カメラを再試行'),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -871,13 +872,13 @@ class _NoCameraView extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.photo_library_outlined),
-                label: Text(busy ? '解析中…' : '画像を選択してOCR'),
+                label: AppText(busy ? '解析中…' : '画像を選択してOCR'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: busy ? null : onManual,
                 icon: const Icon(Icons.edit_outlined),
-                label: const Text('手入力で登録'),
+                label: const AppText('手入力で登録'),
               ),
             ],
           ),
@@ -910,7 +911,7 @@ class _LongReceiptControls extends StatelessWidget {
           children: <Widget>[
             const Icon(Icons.receipt_long, color: Colors.white70, size: 18),
             const SizedBox(width: 8),
-            Text(
+            AppText(
               '取り込み済み: $chunkCount 枚',
               style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
@@ -918,7 +919,7 @@ class _LongReceiptControls extends StatelessWidget {
             if (chunkCount > 0)
               TextButton(
                 onPressed: busy ? null : onClear,
-                child: const Text('クリア'),
+                child: const AppText('クリア'),
               ),
           ],
         ),
@@ -929,7 +930,7 @@ class _LongReceiptControls extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: busy ? null : onAdd,
                 icon: const Icon(Icons.add_a_photo_outlined),
-                label: Text(
+                label: AppText(
                   busy
                       ? '読み取り中…'
                       : (chunkCount == 0 ? '1枚目を撮影' : '次のチャンクを撮影'),
@@ -939,7 +940,7 @@ class _LongReceiptControls extends StatelessWidget {
             const SizedBox(width: 8),
             OutlinedButton(
               onPressed: busy || chunkCount == 0 ? null : onMerge,
-              child: const Text('結合して確認'),
+              child: const AppText('結合して確認'),
             ),
           ],
         ),

@@ -52,10 +52,12 @@ bool get _hasOnDeviceOcr =>
     (defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS);
 
-/// ML Kit on mobile, Supabase Edge Function on web / desktop.
-/// Local mode on web/desktop has no OCR engine (no server available).
+/// ML Kit on mobile, Tesseract.js on local web, Supabase Edge Function in
+/// Supabase mode (web / desktop). Desktop local mode has no OCR engine.
 final ocrServiceProvider = Provider<OcrService>((ref) {
-  if (AppConfig.isLocal && !_hasOnDeviceOcr) {
+  ref.watch(appModeProvider);
+
+  if (AppConfig.isLocal && !_hasOnDeviceOcr && !kIsWeb) {
     return const UnavailableOcrService(
       'ローカルモードではサーバーOCRを使えません。'
       '「手入力で登録」を使うか、設定から Supabase に接続してください。',

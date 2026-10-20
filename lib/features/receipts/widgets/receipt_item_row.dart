@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/receipt_item.dart';
+import '../../../core/localization/localization.dart';
 
 /// Read-only item row used on the receipt detail screen.
 class ReceiptItemRow extends StatelessWidget {
@@ -29,13 +30,13 @@ class ReceiptItemRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
+                AppText(
                   item.name,
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Text(
+                AppText(
                   subtitle,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -52,7 +53,7 @@ class ReceiptItemRow extends StatelessWidget {
                 color: taxColor.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(
+              child: AppText(
                 '${item.taxRate}%',
                 style: TextStyle(
                   fontSize: 10,
@@ -61,7 +62,7 @@ class ReceiptItemRow extends StatelessWidget {
                 ),
               ),
             ),
-          Text(
+          AppText(
             formatYen(item.totalPrice),
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w700,

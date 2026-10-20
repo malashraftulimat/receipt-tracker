@@ -17,6 +17,7 @@ import '../../domain/parser/receipt_parser.dart';
 import 'widgets/item_editor_section.dart';
 import '../dashboard/analytics_provider.dart';
 import '../shared/stored_image.dart';
+import '../../core/localization/localization.dart';
 
 /// Arguments passed through `context.push('/review', extra: ...)`.
 class ReviewArgs {
@@ -407,8 +408,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   Widget build(BuildContext context) {
     if (_initial == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('内容の確認')),
-        body: const Center(child: Text('読み取りデータがありません。')),
+        appBar: AppBar(title: const AppText('内容の確認')),
+        body: const Center(child: AppText('読み取りデータがありません。')),
       );
     }
 
@@ -416,11 +417,11 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_existingId == null ? '内容の確認' : 'レシートを編集'),
+        title: AppText(_existingId == null ? '内容の確認' : 'レシートを編集'),
         actions: <Widget>[
           if (_imageBytes != null || _imagePath != null)
             IconButton(
-              tooltip: '画像を撮り直す',
+              tooltip: context.tr('画像を撮り直す'),
               onPressed: _recognizing ? null : _recognizeAgain,
               icon: const Icon(Icons.document_scanner_outlined),
             ),
@@ -489,7 +490,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.check),
-            label: Text(
+            label: AppText(
               _duplicateId != null
                   ? '重複のため保存できません'
                   : (_existingId == null ? '保存する' : '変更を保存'),
@@ -535,12 +536,13 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             TextFormField(
               controller: _merchant,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: '店舗名・取引先',
-                prefixIcon: Icon(Icons.storefront_outlined),
+              decoration: InputDecoration(
+                labelText: context.tr('店舗名・取引先'),
+                prefixIcon: const Icon(Icons.storefront_outlined),
               ),
-              validator: (value) =>
-                  (value ?? '').trim().isEmpty ? '店舗名を入力してください' : null,
+              validator: (value) => (value ?? '').trim().isEmpty
+                  ? context.tr('店舗名を入力してください')
+                  : null,
             ),
             const SizedBox(height: 12),
             Row(
@@ -549,7 +551,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   child: OutlinedButton.icon(
                     onPressed: _pickDate,
                     icon: const Icon(Icons.event_outlined, size: 18),
-                    label: Text(
+                    label: AppText(
                       formatDateJa(_purchasedAt),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -560,7 +562,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                 OutlinedButton.icon(
                   onPressed: _pickTime,
                   icon: const Icon(Icons.schedule, size: 18),
-                  label: Text(formatTimeJa(_purchasedAt)),
+                  label: AppText(formatTimeJa(_purchasedAt)),
                 ),
               ],
             ),
@@ -570,12 +572,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               textInputAction: TextInputAction.next,
               onChanged: (_) => _checkDuplicate(),
               decoration: InputDecoration(
-                labelText: 'バーコード / 請求番号',
+                labelText: context.tr('バーコード / 請求番号'),
                 prefixIcon: const Icon(Icons.qr_code_2),
                 suffixIcon: _barcode.text.isEmpty
                     ? null
                     : IconButton(
-                        tooltip: 'クリア',
+                        tooltip: context.tr('クリア'),
                         onPressed: () {
                           _barcode.clear();
                           _checkDuplicate();
@@ -591,7 +593,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   child: OutlinedButton.icon(
                     onPressed: _pickDueDate,
                     icon: const Icon(Icons.event_available_outlined, size: 18),
-                    label: Text(
+                    label: AppText(
                       _dueDate == null
                           ? '支払期限を設定（振込用紙）'
                           : '支払期限 ${formatDateShortJa(_dueDate!)}',
@@ -602,7 +604,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                 ),
                 if (_dueDate != null)
                   IconButton(
-                    tooltip: '支払期限をクリア',
+                    tooltip: context.tr('支払期限をクリア'),
                     onPressed: () => setState(() => _dueDate = null),
                     icon: const Icon(Icons.close, size: 18),
                   ),
@@ -615,10 +617,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   child: TextFormField(
                     controller: _pointBrand,
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'ポイント種別',
-                      hintText: 'dポイント / Ponta など',
-                      prefixIcon: Icon(Icons.stars_outlined),
+                    decoration: InputDecoration(
+                      labelText: context.tr('ポイント種別'),
+                      hintText: context.tr('dポイント / Ponta など'),
+                      prefixIcon: const Icon(Icons.stars_outlined),
                     ),
                   ),
                 ),
@@ -631,8 +633,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     inputFormatters: <TextInputFormatter>[
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
                     ],
-                    decoration: const InputDecoration(
-                      labelText: 'ポイント数',
+                    decoration: InputDecoration(
+                      labelText: context.tr('ポイント数'),
                       suffixText: 'pt',
                     ),
                   ),
@@ -642,7 +644,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text(
+              child: AppText(
                 'カテゴリ',
                 style: theme.textTheme.labelMedium
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -654,7 +656,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               runSpacing: 8,
               children: <Widget>[
                 ChoiceChip(
-                  label: const Text('未分類'),
+                  label: const AppText('未分類'),
                   selected: _categoryId == null,
                   onSelected: (_) => setState(() => _categoryId = null),
                 ),
@@ -667,7 +669,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                           ? Colors.white
                           : category.colorValue,
                     ),
-                    label: Text(category.name),
+                    label: AppText(category.name),
                     selected: _categoryId == category.id,
                     selectedColor: category.colorValue,
                     labelStyle: TextStyle(
@@ -707,14 +709,18 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               ],
               style: theme.textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w700),
-              decoration: const InputDecoration(
-                labelText: '合計金額',
+              decoration: InputDecoration(
+                labelText: context.tr('合計金額'),
                 prefixText: '¥ ',
-                prefixIcon: Icon(Icons.payments_outlined),
+                prefixIcon: const Icon(Icons.payments_outlined),
               ),
               validator: (value) {
-                if ((value ?? '').trim().isEmpty) return '合計金額を入力してください';
-                if (parseYenInput(value!) == null) return '数字で入力してください';
+                if ((value ?? '').trim().isEmpty) {
+                  return context.tr('合計金額を入力してください');
+                }
+                if (parseYenInput(value!) == null) {
+                  return context.tr('数字で入力してください');
+                }
                 return null;
               },
             ),
@@ -754,8 +760,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               controller: _note,
               minLines: 2,
               maxLines: 5,
-              decoration: const InputDecoration(
-                hintText: '用途や補足（例: 友人との昼食、備品購入）',
+              decoration: InputDecoration(
+                hintText: context.tr('用途や補足（例: 友人との昼食、備品購入）'),
               ),
             ),
           ],
@@ -768,7 +774,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
-                title: Text(
+                title: AppText(
                   '${_rawOcrText!.split('\n').length} 行を表示',
                   style: theme.textTheme.bodySmall,
                 ),
@@ -805,8 +811,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 14)),
       firstDate: DateTime(2000),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
-      helpText: '支払期限を選択',
-      locale: const Locale('ja'),
+      helpText: context.tr('支払期限を選択'),
+      locale: Localizations.localeOf(context),
     );
     if (picked == null) return;
     setState(() => _dueDate = picked);
@@ -818,8 +824,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       initialDate: _purchasedAt,
       firstDate: DateTime(2000),
       lastDate: DateTime.now().add(const Duration(days: 1)),
-      helpText: '日付を選択',
-      locale: const Locale('ja'),
+      helpText: context.tr('日付を選択'),
+      locale: Localizations.localeOf(context),
     );
     if (picked == null) return;
     setState(() {
@@ -837,7 +843,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_purchasedAt),
-      helpText: '時刻を選択',
+      helpText: context.tr('時刻を選択'),
     );
     if (picked == null) return;
     setState(() {
@@ -877,7 +883,7 @@ class _Section extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text(
+          AppText(
             title,
             style: theme.textTheme.labelLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
@@ -956,7 +962,7 @@ class _TaxSummary extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(
+          child: AppText(
             messages.isEmpty
                 ? '税額合計 ${formatYen(taxTotal)}'
                 : messages.join(' / '),
@@ -994,7 +1000,7 @@ class _WarningCard extends StatelessWidget {
             children: <Widget>[
               const Icon(Icons.warning_amber_rounded, size: 18),
               const SizedBox(width: 6),
-              Text(
+              AppText(
                 '読み取り結果を確認してください',
                 style: theme.textTheme.labelLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
@@ -1005,7 +1011,7 @@ class _WarningCard extends StatelessWidget {
           for (final warning in warnings)
             Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Text(
+              child: AppText(
                 '・$warning',
                 style: theme.textTheme.bodySmall,
               ),
@@ -1030,7 +1036,7 @@ class _ErrorCard extends StatelessWidget {
         color: theme.colorScheme.errorContainer,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
+      child: AppText(
         message,
         style: TextStyle(
           fontSize: 12.5,
@@ -1064,7 +1070,7 @@ class _DuplicateCard extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
+            child: AppText(
               'このバーコードは登録済みです（二重登録を防止しています）。',
               style: TextStyle(
                 fontSize: 12,
@@ -1072,7 +1078,7 @@ class _DuplicateCard extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(onPressed: onOpen, child: const Text('開く')),
+          TextButton(onPressed: onOpen, child: const AppText('開く')),
         ],
       ),
     );
@@ -1104,7 +1110,7 @@ class _ImagePanel extends ConsumerWidget {
       content = url.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
-          child: Text(
+          child: AppText(
             '画像を読み込めませんでした',
             style: theme.textTheme.bodySmall,
           ),
@@ -1122,7 +1128,7 @@ class _ImagePanel extends ConsumerWidget {
               color: theme.colorScheme.outline,
             ),
             const SizedBox(height: 8),
-            Text(
+            AppText(
               'レシート画像は未添付です',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -1156,7 +1162,7 @@ class _ImagePanel extends ConsumerWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.document_scanner_outlined, size: 18),
-          label: Text(
+          label: AppText(
             busy
                 ? '読み取り中…'
                 : (bytes == null && path == null

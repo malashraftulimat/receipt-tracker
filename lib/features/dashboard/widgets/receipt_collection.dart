@@ -8,6 +8,7 @@ import '../../../data/providers.dart';
 import '../../../domain/models/receipt.dart';
 import '../../../domain/models/receipt_filter.dart';
 import 'receipt_tile.dart';
+import '../../../core/localization/localization.dart';
 
 /// List (grouped by year / month / day) or grid of receipts.
 class ReceiptCollection extends ConsumerWidget {
@@ -76,7 +77,7 @@ class _SummaryStrip extends StatelessWidget {
           _SummaryValue(label: '平均', value: formatYen(average)),
           const Spacer(),
           IconButton(
-            tooltip: '最新の状態に更新',
+            tooltip: context.tr('最新の状態に更新'),
             visualDensity: VisualDensity.compact,
             onPressed: onRefresh,
             icon: Icon(
@@ -103,12 +104,12 @@ class _SummaryValue extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
+        AppText(
           label,
           style: theme.textTheme.labelSmall
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
-        Text(
+        AppText(
           value,
           style: theme.textTheme.titleSmall
               ?.copyWith(fontWeight: FontWeight.w700),
@@ -221,7 +222,7 @@ class _HeaderTile extends StatelessWidget {
       case 0:
         return Padding(
           padding: base.copyWith(top: 18, bottom: 4),
-          child: Text(
+          child: AppText(
             header.label,
             style: theme.textTheme.titleLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
@@ -232,7 +233,7 @@ class _HeaderTile extends StatelessWidget {
           padding: base.copyWith(top: 10, bottom: 2),
           child: Row(
             children: <Widget>[
-              Text(
+              AppText(
                 header.label,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
@@ -241,7 +242,7 @@ class _HeaderTile extends StatelessWidget {
               ),
               const Spacer(),
               if (header.total != null)
-                Text(
+                AppText(
                   formatYen(header.total!),
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: theme.colorScheme.primary,
@@ -254,7 +255,7 @@ class _HeaderTile extends StatelessWidget {
       default:
         return Padding(
           padding: base.copyWith(top: 8, bottom: 4),
-          child: Text(
+          child: AppText(
             header.label,
             style: theme.textTheme.labelMedium
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -324,13 +325,13 @@ class _EmptyState extends StatelessWidget {
               color: theme.colorScheme.outline,
             ),
             const SizedBox(height: 16),
-            Text(
+            AppText(
               'レシートがまだありません',
               style: theme.textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
-            Text(
+            AppText(
               'カメラでバーコードとレシート文字を同時に読み取り、\n'
               '店舗名・日付・合計・消費税を自動入力します。',
               textAlign: TextAlign.center,
@@ -341,7 +342,7 @@ class _EmptyState extends StatelessWidget {
             FilledButton.icon(
               onPressed: () => context.push('/scan'),
               icon: const Icon(Icons.document_scanner_outlined),
-              label: const Text('スキャンする'),
+              label: const AppText('スキャンする'),
             ),
           ],
         ),
@@ -367,13 +368,13 @@ class _ErrorState extends StatelessWidget {
           children: <Widget>[
             Icon(Icons.cloud_off, size: 44, color: theme.colorScheme.error),
             const SizedBox(height: 12),
-            Text(
+            AppText(
               'データを読み込めませんでした',
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
-            Text(
+            AppText(
               error.toString(),
               textAlign: TextAlign.center,
               maxLines: 3,
@@ -382,7 +383,7 @@ class _ErrorState extends StatelessWidget {
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: onRetry, child: const Text('再試行')),
+            OutlinedButton(onPressed: onRetry, child: const AppText('再試行')),
           ],
         ),
       ),

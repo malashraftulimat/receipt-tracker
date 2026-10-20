@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/app_config.dart';
+import 'core/localization/localization.dart';
 import 'data/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -14,8 +15,16 @@ class ReceiptTrackerApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Rebuilds when the storage mode is switched (local <-> Supabase).
+    // Rebuilds when the storage mode or UI language changes.
     ref.watch(appModeProvider);
+    final language = ref.watch(languageProvider);
+
+    const delegates = <LocalizationsDelegate<dynamic>>[
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ];
 
     if (!AppConfig.isConfigured && !AppConfig.isLocal) {
       // No Supabase credentials and no local mode yet:
@@ -25,31 +34,24 @@ class ReceiptTrackerApp extends ConsumerWidget {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: ref.watch(themeModeProvider),
-        locale: const Locale('ja'),
-        supportedLocales: const <Locale>[Locale('ja'), Locale('en')],
-        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
+        locale: language.locale,
+        supportedLocales: kSupportedAppLocales,
+        localizationsDelegates: delegates,
+        onGenerateTitle: (context) => context.tr('レシート帳'),
         home: const ConnectionSetupPage(),
       );
     }
 
     return MaterialApp.router(
-      title: 'レシート帳',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(routerProvider),
-      locale: const Locale('ja'),
-      supportedLocales: const <Locale>[Locale('ja'), Locale('en')],
-      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+      locale: language.locale,
+      supportedLocales: kSupportedAppLocales,
+      localizationsDelegates: delegates,
+      onGenerateTitle: (context) => context.tr('レシート帳'),
     );
   }
 }

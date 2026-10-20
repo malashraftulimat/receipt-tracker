@@ -1,0 +1,353 @@
+/// English translations keyed by the original Japanese UI string.
+const Map<String, String> kEnglishTranslations = <String, String>{
+  // App / navigation
+  'レシート帳': 'Receipt Tracker',
+  'ホーム': 'Home',
+  'カテゴリ': 'Categories',
+  '設定': 'Settings',
+  'スキャン': 'Scan',
+  'レシートをスキャン': 'Scan a receipt',
+  '紙のレシートをスキャンして、支出をかしこく管理':
+      'Scan paper receipts and manage your spending smartly',
+
+  // Auth
+  'ログイン': 'Sign in',
+  '新規登録': 'Sign up',
+  'アカウントを作成': 'Create account',
+  'メールアドレス': 'Email address',
+  'メールアドレスを入力してください': 'Please enter your email address',
+  'メールアドレスの形式が正しくありません': 'Invalid email address format',
+  'パスワード': 'Password',
+  'パスワードは6文字以上で入力してください':
+      'Password must be at least 6 characters',
+  'パスワードを忘れた場合': 'Forgot password?',
+  'ローカルモード: この端末だけのアカウントです（複数端末で同期するには Supabase に接続）':
+      'Local mode: this account stays on this device (connect Supabase to sync across devices)',
+  'レシート画像とデータはアカウントに紐づけて暗号化保存され、\nすべての端末で同期されます。':
+      'Receipt images and data are stored encrypted with your account\nand synced across all devices.',
+  '確認メールを送信しました。メール内のリンクから認証してください。':
+      'Confirmation email sent. Please verify using the link in the email.',
+  'ローカルアカウントのパスワード再設定はできません。新しいアカウントを作成してください。':
+      'Local accounts cannot reset passwords. Please create a new account.',
+  'パスワード再設定にはメールアドレスを入力してください。':
+      'Enter your email address to reset your password.',
+  'パスワード再設定メールを送信しました。':
+      'Password reset email sent.',
+
+  // Settings
+  'アカウント': 'Account',
+  '未ログイン': 'Not signed in',
+  'ローカルアカウント（この端末のみ・他の端末とは同期しません）':
+      'Local account (this device only, no sync)',
+  'すべての端末でレシート・画像・カテゴリが同期されます':
+      'Receipts, images and categories sync across all devices',
+  'ユーザーIDをコピー': 'Copy user ID',
+  'ユーザーIDをコピーしました': 'User ID copied',
+  'ログアウト': 'Sign out',
+  'ログアウトしますか？': 'Sign out?',
+  'ローカルアカウントからログアウトします。データはこの端末に残ります。':
+      'You will sign out of the local account. Data stays on this device.',
+  'データはサーバーに保存されています。次回ログインで復元されます。':
+      'Your data is stored on the server and will be restored on the next sign-in.',
+  '表示': 'Appearance',
+  '自動': 'Auto',
+  'ライト': 'Light',
+  'ダーク': 'Dark',
+  '言語 / Language': 'Language / 言語 / اللغة',
+  '日本語': 'Japanese',
+  'English': 'English',
+  'العربية': 'Arabic',
+  'アラビア語・英語・日本語を切り替えられます。アラビア語では画面が右から左に表示されます。':
+      'Switch between Japanese, English and Arabic. Arabic uses right-to-left layout.',
+  'データ': 'Data',
+  '標準カテゴリを再作成': 'Recreate default categories',
+  '食費・外食・日用品・光熱費・交通費・娯楽など':
+      'Food, dining, daily goods, utilities, transport, entertainment and more',
+  'CSVエクスポート（今月）': 'Export CSV (this month)',
+  'Excel / Numbers で開ける UTF-8 CSV': 'UTF-8 CSV for Excel / Numbers',
+  'CSVエクスポート（全期間）': 'Export CSV (all time)',
+  'すべてのレシートを1ファイルにまとめます':
+      'Combine all receipts into one file',
+  'ローカル保存（この端末のみ）': 'Local storage (this device only)',
+  'Supabase と同期中': 'Syncing with Supabase',
+  'レシートはブラウザの localStorage に保存されます。\n他の端末とは共有されません。':
+      'Receipts are stored in the browser localStorage.\nThey are not shared with other devices.',
+  'Postgres / Storage に保存され、すべての端末で共有されます。':
+      'Stored in Postgres / Storage and shared across all devices.',
+  'Supabase に接続する': 'Connect to Supabase',
+  'ローカルモードに切り替える': 'Switch to local mode',
+  'アカウントを作成して複数端末で同期できます':
+      'Create an account to sync across devices',
+  'サーバーを使わず、この端末だけに保存します':
+      'Keep data on this device without a server',
+  'ローカルデータを削除': 'Delete local data',
+  'この端末のレシート・画像・カテゴリを消去します':
+      'Erase receipts, images and categories on this device',
+  'ローカルデータを削除しますか？': 'Delete local data?',
+  'この端末に保存したレシート・画像・カテゴリをすべて削除します。':
+      'Delete all receipts, images and categories stored on this device.',
+  'ローカルモードに切り替えますか？': 'Switch to local mode?',
+  'レシートとカテゴリはこの端末（ブラウザ）にのみ保存されます。\nサーバー上のデータはそのまま残り、いつでも戻せます。':
+      'Receipts and categories will be stored only on this device (browser).\nServer data remains and you can switch back anytime.',
+  'キャンセル': 'Cancel',
+  '切り替える': 'Switch',
+  '削除': 'Delete',
+  '標準カテゴリを確認しました': 'Default categories checked',
+  'このアプリについて': 'About this app',
+  'スキャンエンジン': 'Scanning engine',
+  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nOCR: ML Kit（iOS・Android オンデバイス）/ Cloud Vision（同期Web・デスクトップ）/ Tesseract.js（ローカルWeb）':
+      '1D barcode: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nOCR: ML Kit (on-device iOS/Android) / Cloud Vision (synced web/desktop) / Tesseract.js (local web)',
+  'バージョン': 'Version',
+  '対象のレシートがありません': 'No matching receipts',
+  'CSVを書き出しました: ': 'CSV exported: ',
+  '書き出しに失敗しました: ': 'Export failed: ',
+  '失敗しました: ': 'Failed: ',
+
+  // Scan
+  'バーコード': 'Barcode',
+  'レシートOCR': 'Receipt OCR',
+  '長レシート': 'Long receipt',
+  'バーコード検出': 'Barcode detected',
+  'バーコード（チェックディジット不一致）':
+      'Barcode (check digit mismatch)',
+  'クリア': 'Clear',
+  'レシートを撮影': 'Capture receipt',
+  'レシートを撮影して読み取る': 'Capture and read receipt',
+  'レシートを撮影して自動入力': 'Capture and auto-fill',
+  '撮影して自動入力': 'Capture and auto-fill',
+  'このまま登録': 'Save this barcode',
+  '手入力': 'Manual entry',
+  '手入力で登録': 'Enter manually',
+  '手入力で登録する': 'Enter manually',
+  'レシートを解析しています…': 'Analysing receipt…',
+  '解析中…': 'Analysing…',
+  '画像を選択してOCR': 'Choose an image for OCR',
+  'カメラを再試行': 'Retry camera',
+  'カメラへのアクセスを許可してください':
+      'Please allow camera access',
+  'このデバイスではライブカメラを利用できません':
+      'Live camera is not available on this device',
+  'ブラウザまたは端末の設定でこのサイトのカメラ利用を許可し、\n「カメラを再試行」を押してください。\n許可できない場合も、画像を選択してOCRできます。':
+      'Allow camera access for this site in your browser or device settings,\nthen tap “Retry camera”.\nYou can also choose an image for OCR.',
+  'レシート画像を選択すると、OCRで店舗名・日付・合計・消費税を\n自動入力します。スマートフォンで撮影した画像も利用できます。':
+      'Choose a receipt image and OCR will auto-fill the store, date, total and tax.\nYou can also use a photo taken with your phone.',
+  'ブラウザまたは端末でカメラへのアクセスが拒否されています。\nサイト設定でカメラを許可して再試行してください。':
+      'Camera access was denied by the browser or device.\nAllow the camera in site settings and retry.',
+  'このブラウザではライブカメラを利用できません。\n画像を選択してOCRするか、手入力で登録してください。':
+      'Live camera is not supported in this browser.\nChoose an image for OCR or enter the receipt manually.',
+  'カメラを起動できませんでした。': 'Could not start the camera.',
+  'ブラウザOCRエンジンを読み込めませんでした。通信環境を確認して再試行してください。':
+      'Could not load the browser OCR engine. Check your connection and try again.',
+  'ブラウザOCRでエラーが発生しました: ':
+      'Browser OCR error: ',
+  '文字を認識できませんでした。明るい場所で、レシート全体が入るように撮影してください。':
+      'No text was recognised. Use good lighting and fit the whole receipt in the frame.',
+  'ローカルモードではサーバーOCRを使えません。「手入力で登録」を使うか、設定から Supabase に接続してください。':
+      'Server OCR is unavailable in local mode. Use manual entry or connect Supabase in Settings.',
+  '画像を選択してOCRするか、手入力で登録してください。':
+      'Choose an image for OCR or enter the receipt manually.',
+  '許可できない場合も、画像を選択してOCRできます。':
+      'If you cannot allow it, you can still choose an image for OCR.',
+  '結合して確認': 'Merge and review',
+  '次のチャンクを撮影': 'Capture next part',
+  '1枚目を撮影': 'Capture first part',
+  '読み取り中…': 'Reading…',
+  '取り込み済み: ': 'Captured: ',
+
+  // Dashboard
+  '集計': 'Analytics',
+  '集計を読み込めませんでした\n': 'Could not load analytics\n',
+  '支出の集計': 'Spending analytics',
+  '今月の支出': 'This month\'s spending',
+  '件数': 'Count',
+  '平均': 'Average',
+  '6か月合計': '6-month total',
+  '直近6か月の推移': 'Last 6 months',
+  'カテゴリ別（今月）': 'By category (this month)',
+  '今月のデータがありません': 'No data for this month',
+  '前月比（累計支出）': 'vs last month (cumulative)',
+  'よく使う店舗': 'Frequent stores',
+  'データがありません': 'No data',
+  '先月のデータがありません': 'No data for last month',
+  '先月より ': 'Compared with last month: ',
+  '多い': 'more',
+  '少ない': 'less',
+  '今月': 'This month',
+  '先月': 'Last month',
+  '予算を読み込めませんでした': 'Could not load the budget',
+  '今月の予算を設定': 'Set this month\'s budget',
+  '月収・貯蓄目標・固定費から、1日に使える金額を計算します':
+      'Calculate a daily allowance from income, savings goal and fixed costs',
+  '今月の残り予算': 'Remaining budget this month',
+  '1日あたり': 'Per day',
+  '今日の支出': 'Today\'s spending',
+  '貯蓄ペース': 'Savings pace',
+  '貯蓄目標': 'Savings goal',
+  '支払期限が近いもの': 'Upcoming due dates',
+  '今日': 'Today',
+  '今日が期限です': 'Due today',
+  '最新の状態に更新': 'Refresh',
+  'レシートがまだありません': 'No receipts yet',
+  'カメラでバーコードとレシート文字を同時に読み取り、\n店舗名・日付・合計・消費税を自動入力します。':
+      'Read barcodes and receipt text with the camera,\nthen auto-fill store, date, total and tax.',
+  'スキャンする': 'Scan',
+  'データを読み込めませんでした': 'Could not load data',
+  '再試行': 'Retry',
+  'すべて': 'All',
+  '期間指定': 'Date range',
+  '期間を選択': 'Select a date range',
+  '決定': 'OK',
+  '開始日': 'Start date',
+  '終了日': 'End date',
+  '店舗名・メモ・バーコードで検索': 'Search store, note or barcode',
+  'グリッド表示': 'Grid view',
+  'リスト表示': 'List view',
+  '合計': 'Total',
+  '読み込めませんでした\n': 'Could not load\n',
+
+  // Categories
+  'カテゴリを追加': 'Add category',
+  'カテゴリを編集': 'Edit category',
+  'カテゴリを削除しますか？': 'Delete category?',
+  'このカテゴリに紐づくレシートは「未分類」になります。':
+      'Receipts using this category will become “Uncategorised”.',
+  'カテゴリがありません': 'No categories',
+  '標準': 'Default',
+  '編集': 'Edit',
+  'カテゴリ名': 'Category name',
+  '例: 交際費、サブスク': 'e.g. social expenses, subscriptions',
+  '色': 'Colour',
+  'アイコン': 'Icon',
+  '保存': 'Save',
+  '保存に失敗しました: ': 'Could not save: ',
+  '削除に失敗しました: ': 'Could not delete: ',
+
+  // Budget
+  '予算と貯蓄': 'Budget and savings',
+  '毎月のプラン': 'Monthly plan',
+  '月収（手取り）': 'Monthly income (take-home)',
+  '例: 250,000': 'e.g. 250,000',
+  '例: 30,000': 'e.g. 30,000',
+  '固定費（家賃・光熱費・サブスク）': 'Fixed costs (rent, utilities, subscriptions)',
+  '例: 80,000': 'e.g. 80,000',
+  'プランを保存': 'Save plan',
+  '自由に使える金額 = 月収 − 貯蓄目標 − 固定費。\nレシートを登録すると、その月の残り予算から自動で差し引かれます。\n「1日あたり」は残り予算 ÷ 残り日数です。':
+      'Available = income − savings goal − fixed costs.\nSaving a receipt automatically deducts it from that month\'s remaining budget.\n“Per day” is remaining budget ÷ remaining days.',
+  '前の月': 'Previous month',
+  '次の月': 'Next month',
+  'この月のプランは未設定です。上のフォームに月収を入力してください。':
+      'No plan for this month. Enter your income in the form above.',
+  '今月の状況': 'This month\'s status',
+  '予算オーバー額': 'Over budget',
+  '予算を超えています。': 'You are over budget.',
+  '予算を保存しました': 'Budget saved',
+  '保存に失敗しました': 'Could not save',
+
+  // Review / receipt detail
+  '内容の確認': 'Review',
+  'レシートを編集': 'Edit receipt',
+  '読み取りデータがありません。': 'No scanned data.',
+  '画像を撮り直す': 'Retake photo',
+  '基本情報': 'Basic information',
+  '店舗名・取引先': 'Store / vendor',
+  '店舗名を入力してください': 'Please enter the store name',
+  'バーコード / 請求番号': 'Barcode / invoice number',
+  '支払期限を設定（振込用紙）': 'Set due date (payment slip)',
+  '支払期限をクリア': 'Clear due date',
+  '支払期限を選択': 'Select due date',
+  'ポイント種別': 'Point type',
+  'dポイント / Ponta など': 'd Point / Ponta, etc.',
+  'ポイント数': 'Points',
+  '未分類': 'Uncategorised',
+  '金額（税込・円）': 'Amount (tax included, JPY)',
+  '合計金額': 'Total amount',
+  '合計金額を入力してください': 'Please enter the total amount',
+  '数字で入力してください': 'Please enter a number',
+  '小計（税抜）': 'Subtotal (tax excluded)',
+  '消費税 8%': 'Consumption tax 8%',
+  '消費税 10%': 'Consumption tax 10%',
+  'メモ': 'Note',
+  '用途や補足（例: 友人との昼食、備品購入）':
+      'Purpose or notes (e.g. lunch with a friend, supplies)',
+  'OCRテキスト': 'OCR text',
+  'OCRテキスト（原本）': 'OCR text (original)',
+  '支払期限': 'Due date',
+  '日付を選択': 'Select date',
+  '時刻を選択': 'Select time',
+  '保存する': 'Save',
+  '変更を保存': 'Save changes',
+  '重複のため保存できません': 'Cannot save: duplicate receipt',
+  '読み取り結果を確認してください': 'Please review the scan result',
+  'このバーコードは登録済みです（二重登録を防止しています）。':
+      'This barcode is already registered (duplicate protection).',
+  '開く': 'Open',
+  '画像を読み込めませんでした': 'Could not load the image',
+  'レシート画像は未添付です': 'No receipt image attached',
+  '撮り直して再読み取り': 'Retake and re-read',
+  '同じバーコードのレシートが既に登録されています。':
+      'A receipt with the same barcode is already registered.',
+  'レシート詳細': 'Receipt details',
+  '金額の内訳': 'Amount breakdown',
+  '合計（税込）': 'Total (tax included)',
+  '消費税合計': 'Total consumption tax',
+  '8%対象商品の合計（推定）': '8% taxable subtotal (estimated)',
+  '10%対象商品の合計（推定）': '10% taxable subtotal (estimated)',
+  '明細（商品）': 'Items',
+  'リマインダー': 'Reminder',
+  'ポイント': 'Points',
+  'コピー': 'Copy',
+  'コピーしました': 'Copied',
+  'JAN-13 のチェックディジットが一致しません。読み取り値を確認してください。':
+      'JAN-13 check digit does not match. Please verify the scanned value.',
+  '原本を表示': 'Show original',
+  '登録': 'Created',
+  '更新': 'Updated',
+  '削除しました': 'Deleted',
+  'このレシートを削除しますか？': 'Delete this receipt?',
+  'この操作は取り消せません。': 'This action cannot be undone.',
+
+  // Item editor
+  '明細を追加': 'Add item',
+  '明細が未入力です。必要な場合は「明細を追加」から入力できます。':
+      'No items entered. Use “Add item” if needed.',
+  '商品名': 'Item name',
+  '数量': 'Quantity',
+  '単価': 'Unit price',
+  '金額': 'Amount',
+  'カテゴリ自動': 'Auto category',
+  '税率': 'Tax rate',
+  '8%（軽減）': '8% (reduced)',
+  '10%（標準）': '10% (standard)',
+  '指定なし': 'Not specified',
+  '合計金額に合わせる': 'Match total amount',
+
+  // Setup
+  'はじめに Supabase プロジェクトへ接続します。\nレシート・画像・カテゴリはこのプロジェクトに保存され、\nすべての端末で同期されます。':
+      'First connect to your Supabase project.\nReceipts, images and categories are stored in this project\nand synced across all devices.',
+  'Project URL を入力してください': 'Please enter the Project URL',
+  'https:// から始まる URL を入力してください':
+      'Please enter a URL starting with https://',
+  'eyJhbGciOi... または sb_publishable_...': 'eyJhbGciOi... or sb_publishable_...',
+  'anon / publishable key を入力してください':
+      'Please enter the anon / publishable key',
+  '表示を切り替え': 'Toggle visibility',
+  '接続しています…': 'Connecting…',
+  '接続して開始': 'Connect and start',
+  'この端末だけで使う（ローカルアカウント）':
+      'Use on this device only (local account)',
+  '値の取得場所': 'Where to find these values',
+  'Supabase ダッシュボード → Project Settings → API の ':
+      'In the Supabase dashboard → Project Settings → API, copy the ',
+  '「Project URL」と「anon public / publishable key」。\nこれらのキーはクライアント公開前提の値です。\nテーブルは supabase/schema.sql で作成してください。':
+      '“Project URL” and “anon public / publishable key”.\nThese keys are intended to be public in the client.\nCreate the tables with supabase/schema.sql.',
+
+  // Category names (seeded defaults)
+  '食費': 'Food',
+  '外食': 'Dining out',
+  '日用品': 'Daily goods',
+  '光熱費': 'Utilities',
+  '交通費': 'Transport',
+  '娯楽': 'Entertainment',
+  '医療・医薬品': 'Medical / pharmacy',
+  'その他': 'Other',
+};

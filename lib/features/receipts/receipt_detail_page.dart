@@ -13,6 +13,7 @@ import '../dashboard/widgets/receipt_tile.dart';
 import '../review/review_page.dart';
 import 'widgets/receipt_item_row.dart';
 import '../shared/stored_image.dart';
+import '../../core/localization/localization.dart';
 
 class ReceiptDetailPage extends ConsumerWidget {
   const ReceiptDetailPage({super.key, required this.receiptId});
@@ -27,19 +28,19 @@ class ReceiptDetailPage extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('このレシートを削除しますか？'),
-        content: Text(
+        title: const AppText('このレシートを削除しますか？'),
+        content: AppText(
           '${receipt.displayMerchant}（${formatYen(receipt.totalAmount)}）を削除します。'
           'この操作は取り消せません。',
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('キャンセル'),
+            child: const AppText('キャンセル'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('削除'),
+            child: const AppText('削除'),
           ),
         ],
       ),
@@ -61,13 +62,13 @@ class ReceiptDetailPage extends ConsumerWidget {
       ref.invalidate(analyticsProvider);
       ref.invalidate(receiptByIdProvider(receipt.id));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('削除しました')),
+        const SnackBar(content: AppText('削除しました')),
       );
       if (context.canPop()) context.pop();
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('削除に失敗しました: $error')),
+        SnackBar(content: AppText('削除に失敗しました: $error')),
       );
     }
   }
@@ -78,7 +79,7 @@ class ReceiptDetailPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('レシート詳細'),
+        title: const AppText('レシート詳細'),
         actions: <Widget>[
           asyncReceipt.maybeWhen(
             data: (receipt) => PopupMenuButton<String>(
@@ -97,7 +98,7 @@ class ReceiptDetailPage extends ConsumerWidget {
                   value: 'edit',
                   child: ListTile(
                     leading: Icon(Icons.edit_outlined),
-                    title: Text('編集'),
+                    title: AppText('編集'),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
@@ -105,7 +106,7 @@ class ReceiptDetailPage extends ConsumerWidget {
                   value: 'delete',
                   child: ListTile(
                     leading: Icon(Icons.delete_outline),
-                    title: Text('削除'),
+                    title: AppText('削除'),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
@@ -126,12 +127,12 @@ class ReceiptDetailPage extends ConsumerWidget {
               children: <Widget>[
                 const Icon(Icons.cloud_off, size: 40),
                 const SizedBox(height: 12),
-                Text('読み込めませんでした\n$error', textAlign: TextAlign.center),
+                AppText('読み込めませんでした\n$error', textAlign: TextAlign.center),
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: () =>
                       ref.invalidate(receiptByIdProvider(receiptId)),
-                  child: const Text('再試行'),
+                  child: const AppText('再試行'),
                 ),
               ],
             ),
@@ -195,13 +196,13 @@ class _DetailBody extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              Text(
+                              AppText(
                                 receipt.displayMerchant,
                                 style: theme.textTheme.titleLarge
                                     ?.copyWith(fontWeight: FontWeight.w700),
                               ),
                               const SizedBox(height: 2),
-                              Text(
+                              AppText(
                                 formatDateTimeJa(receipt.purchasedAt),
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
@@ -213,7 +214,7 @@ class _DetailBody extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Text(
+                    AppText(
                       formatYen(receipt.totalAmount),
                       style: theme.textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w800,
@@ -232,7 +233,7 @@ class _DetailBody extends StatelessWidget {
                         ),
                         Chip(
                           visualDensity: VisualDensity.compact,
-                          label: Text(
+                          label: AppText(
                             receiptSourceLabel(receipt.source),
                             style: const TextStyle(fontSize: 11),
                           ),
@@ -310,7 +311,7 @@ class _DetailBody extends StatelessWidget {
                     if (receipt.reminderAt != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
-                        child: Text(
+                        child: AppText(
                           'リマインダー: ${formatDateJa(receipt.reminderAt!)}',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -350,14 +351,14 @@ class _DetailBody extends StatelessWidget {
                           ),
                         ),
                         IconButton(
-                          tooltip: 'コピー',
+                          tooltip: context.tr('コピー'),
                           onPressed: () async {
                             await Clipboard.setData(
                               ClipboardData(text: receipt.barcodeId!),
                             );
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('コピーしました')),
+                              const SnackBar(content: AppText('コピーしました')),
                             );
                           },
                           icon: const Icon(Icons.copy_all_outlined, size: 18),
@@ -366,7 +367,7 @@ class _DetailBody extends StatelessWidget {
                     ),
                     if (BarcodeUtils.looksLikeJan(receipt.barcodeId!) &&
                         !BarcodeUtils.isValidEan13(receipt.barcodeId!))
-                      Text(
+                      AppText(
                         'JAN-13 のチェックディジットが一致しません。読み取り値を確認してください。',
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: theme.colorScheme.error),
@@ -379,7 +380,7 @@ class _DetailBody extends StatelessWidget {
                 _InfoCard(
                   title: 'メモ',
                   children: <Widget>[
-                    Text(
+                    AppText(
                       receipt.note!.trim(),
                       style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
                     ),
@@ -394,7 +395,7 @@ class _DetailBody extends StatelessWidget {
                     ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       childrenPadding: EdgeInsets.zero,
-                      title: Text(
+                      title: AppText(
                         '原本を表示',
                         style: theme.textTheme.bodySmall,
                       ),
@@ -422,7 +423,7 @@ class _DetailBody extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              Text(
+              AppText(
                 '登録: ${formatDateTimeJa(receipt.createdAt)}  /  '
                 '更新: ${formatDateTimeJa(receipt.updatedAt)}',
                 style: theme.textTheme.labelSmall
@@ -454,7 +455,7 @@ class _ReceiptImage extends ConsumerWidget {
         child: url.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => Center(
-            child: Text('画像を読み込めませんでした', style: theme.textTheme.bodySmall),
+            child: AppText('画像を読み込めませんでした', style: theme.textTheme.bodySmall),
           ),
           data: (value) => InkWell(
             onTap: () => showDialog<void>(
@@ -511,7 +512,7 @@ class _DueDateRow extends StatelessWidget {
     return Row(
       children: <Widget>[
         Expanded(
-          child: Text(
+          child: AppText(
             formatDateJa(dueDate),
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
@@ -524,7 +525,7 @@ class _DueDateRow extends StatelessWidget {
             color: color.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(
+          child: AppText(
             label,
             style: TextStyle(
               fontSize: 11,
@@ -559,7 +560,7 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text(
+          AppText(
             title,
             style: theme.textTheme.labelLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
@@ -592,7 +593,7 @@ class _InfoRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Expanded(
-            child: Text(
+            child: AppText(
               label,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -600,7 +601,7 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
+          AppText(
             value,
             style: emphasized
                 ? theme.textTheme.titleSmall

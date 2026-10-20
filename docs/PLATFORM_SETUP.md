@@ -77,8 +77,14 @@ fallback instead of the live preview.
 Supabase Storage must allow your origin — the default `*` CORS policy works, but you
 can restrict it in *Project Settings → API → CORS*.
 
-> Web uses the `ocr` **Edge Function**. Without `GOOGLE_VISION_API_KEY` the review
-> screen simply opens with empty fields and a warning — manual entry still works.
+> **Synced web mode** uses the `ocr` **Edge Function**. Without
+> `GOOGLE_VISION_API_KEY` the review screen opens with empty fields and a warning —
+> manual entry still works.
+>
+> **Local web mode** uses **Tesseract.js** entirely in the browser
+> (`web/tesseract.min.js` + WASM). No Supabase Edge Function or API key is needed.
+> The first run downloads worker/WASM/Japanese+English language data from the
+> Tesseract.js CDN and the browser caches it afterwards.
 
 ---
 

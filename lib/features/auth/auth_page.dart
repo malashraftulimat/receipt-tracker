@@ -8,6 +8,7 @@ import '../../data/providers.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/services/local_auth.dart';
 import '../../data/services/local_store.dart';
+import '../../core/localization/localization.dart';
 
 enum _AuthMode { signIn, signUp }
 
@@ -113,7 +114,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(content: AppText(message)),
     );
   }
 
@@ -137,14 +138,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(height: 12),
-                Text(
+                AppText(
                   'レシート帳',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineMedium
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
-                Text(
+                AppText(
                   '紙のレシートをスキャンして、支出をかしこく管理',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium
@@ -161,7 +162,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                       color: theme.colorScheme.primary.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text(
+                    child: AppText(
                       'ローカルモード: この端末だけのアカウントです（複数端末で同期するには Supabase に接続）',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -175,11 +176,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   segments: const <ButtonSegment<_AuthMode>>[
                     ButtonSegment<_AuthMode>(
                       value: _AuthMode.signIn,
-                      label: Text('ログイン'),
+                      label: AppText('ログイン'),
                     ),
                     ButtonSegment<_AuthMode>(
                       value: _AuthMode.signUp,
-                      label: Text('新規登録'),
+                      label: AppText('新規登録'),
                     ),
                   ],
                   selected: <_AuthMode>{_mode},
@@ -200,16 +201,18 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           textInputAction: TextInputAction.next,
                           autocorrect: false,
                           autofillHints: const <String>[AutofillHints.email],
-                          decoration: const InputDecoration(
-                            labelText: 'メールアドレス',
-                            prefixIcon: Icon(Icons.mail_outline),
+                          decoration: InputDecoration(
+                            labelText: context.tr('メールアドレス'),
+                            prefixIcon: const Icon(Icons.mail_outline),
                           ),
                           validator: (value) {
                             final text = (value ?? '').trim();
-                            if (text.isEmpty) return 'メールアドレスを入力してください';
+                            if (text.isEmpty) {
+                              return context.tr('メールアドレスを入力してください');
+                            }
                             if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
                                 .hasMatch(text)) {
-                              return 'メールアドレスの形式が正しくありません';
+                              return context.tr('メールアドレスの形式が正しくありません');
                             }
                             return null;
                           },
@@ -226,7 +229,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           ],
                           onFieldSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
-                            labelText: 'パスワード',
+                            labelText: context.tr('パスワード'),
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
                               onPressed: () =>
@@ -240,7 +243,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           ),
                           validator: (value) {
                             if ((value ?? '').length < 6) {
-                              return 'パスワードは6文字以上で入力してください';
+                              return context.tr('パスワードは6文字以上で入力してください');
                             }
                             return null;
                           },
@@ -266,7 +269,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
+                          child: AppText(
                             _error!,
                             style: TextStyle(
                               color: theme.colorScheme.onErrorContainer,
@@ -287,15 +290,15 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(isSignUp ? 'アカウントを作成' : 'ログイン'),
+                      : AppText(isSignUp ? 'アカウントを作成' : 'ログイン'),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: _loading ? null : _resetPassword,
-                  child: const Text('パスワードを忘れた場合'),
+                  child: const AppText('パスワードを忘れた場合'),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                AppText(
                   'レシート画像とデータはアカウントに紐づけて暗号化保存され、'
                   'すべての端末で同期されます。',
                   textAlign: TextAlign.center,

@@ -17,11 +17,18 @@ String formatYen(num amount, {bool withSymbol = true}) {
 String formatCompactYen(num amount) {
   final value = amount.round();
   if (value.abs() >= 10000) {
-    final man = value / 10000;
-    final text = man.abs() >= 100
-        ? man.round().toString()
-        : man.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
-    return '$text万円';
+    final language = _dateLanguage;
+    if (language == 'ja') {
+      final man = value / 10000;
+      final text = man.abs() >= 100
+          ? man.round().toString()
+          : man.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
+      return '$text万円';
+    }
+    if (value.abs() >= 1000000) {
+      return '¥${(value / 1000000).toStringAsFixed(1)}M';
+    }
+    return '¥${(value / 1000).toStringAsFixed(0)}k';
   }
   return formatYen(value);
 }
@@ -46,34 +53,60 @@ int? parseYenInput(String input) {
 }
 
 // ---------------------------------------------------------------------------
-// Dates — `ja` locale symbol data must be loaded in main() via
-// initializeDateFormatting('ja').
+// Dates — symbol data for ja / en / ar is loaded in main() via
+// initializeDateFormatting(). The active language comes from Intl.defaultLocale,
+// which is updated by the language provider.
 // ---------------------------------------------------------------------------
 
-String formatDateJa(DateTime date) =>
-    DateFormat('yyyy年M月d日(E)', 'ja').format(date);
+String get _dateLanguage => Intl.defaultLocale ?? 'ja';
 
-String formatDateShortJa(DateTime date) =>
-    DateFormat('yyyy/M/d(E)', 'ja').format(date);
+bool get _isJapanese => _dateLanguage.startsWith('ja');
+bool get _isArabic => _dateLanguage.startsWith('ar');
 
-String formatMonthJa(DateTime date) =>
-    DateFormat('yyyy年M月', 'ja').format(date);
+String formatDateJa(DateTime date) {
+  final pattern = _isJapanese
+      ? 'yyyy年M月d日(E)'
+      : (_isArabic ? 'EEEE، d MMMM y' : 'EEE, MMM d, y');
+  return DateFormat(pattern, _dateLanguage).format(date);
+}
 
-String formatDayJa(DateTime date) => DateFormat('M月d日(E)', 'ja').format(date);
+String formatDateShortJa(DateTime date) {
+  final pattern = _isJapanese
+      ? 'yyyy/M/d(E)'
+      : (_isArabic ? 'd/M/y (EEE)' : 'M/d/yy (EEE)');
+  return DateFormat(pattern, _dateLanguage).format(date);
+}
+
+String formatMonthJa(DateTime date) {
+  final pattern = _isJapanese
+      ? 'yyyy年M月'
+      : (_isArabic ? 'MMMM y' : 'MMMM y');
+  return DateFormat(pattern, _dateLanguage).format(date);
+}
+
+String formatDayJa(DateTime date) {
+  final pattern = _isJapanese
+      ? 'M月d日(E)'
+      : (_isArabic ? 'EEEE، d MMMM' : 'EEE, MMM d');
+  return DateFormat(pattern, _dateLanguage).format(date);
+}
 
 String formatTimeJa(DateTime date) => DateFormat('HH:mm').format(date);
 
 String formatDateTimeJa(DateTime date) =>
-    DateFormat('yyyy年M月d日(E) HH:mm', 'ja').format(date);
+    '${formatDateJa(date)} ${formatTimeJa(date)}';
 
-String formatYearJa(DateTime date) => DateFormat('yyyy年', 'ja').format(date);
+String formatYearJa(DateTime date) =>
+    DateFormat(_isJapanese ? 'yyyy年' : 'y', _dateLanguage).format(date);
 
-String formatMonthShortJa(DateTime date) => DateFormat('M月', 'ja').format(date);
+String formatMonthShortJa(DateTime date) =>
+    DateFormat(_isJapanese ? 'M月' : 'MMM', _dateLanguage).format(date);
 
 String formatRangeJa(DateTime start, DateTime endInclusive) {
   final sameDay = start.year == endInclusive.year &&
       start.month == endInclusive.month &&
       start.day == endInclusive.day;
   if (sameDay) return formatDateJa(start);
-  return '${formatDateShortJa(start)} 〜 ${formatDateShortJa(endInclusive)}';
+  final separator = _isJapanese ? ' 〜 ' : ' – ';
+  return '${formatDateShortJa(start)}$separator${formatDateShortJa(endInclusive)}';
 }

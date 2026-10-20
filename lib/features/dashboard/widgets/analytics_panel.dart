@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../analytics_provider.dart';
+import '../../../core/localization/localization.dart';
 
 /// Monthly trend + category breakdown + top merchants.
 class AnalyticsPanel extends ConsumerWidget {
@@ -23,7 +24,7 @@ class AnalyticsPanel extends ConsumerWidget {
       ),
       error: (error, _) => _ChartCard(
         title: '集計',
-        child: Text(
+        child: AppText(
           '集計を読み込めませんでした\n$error',
           style: theme.textTheme.bodySmall,
         ),
@@ -32,7 +33,7 @@ class AnalyticsPanel extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Text(
+            AppText(
               '支出の集計',
               style: theme.textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w700),
@@ -85,7 +86,7 @@ class AnalyticsPanel extends ConsumerWidget {
                             child: Row(
                               children: <Widget>[
                                 Expanded(
-                                  child: Text(
+                                  child: AppText(
                                     merchant.name,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -93,14 +94,14 @@ class AnalyticsPanel extends ConsumerWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
+                                AppText(
                                   '${merchant.count}件',
                                   style: theme.textTheme.labelSmall?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
+                                AppText(
                                   formatYen(merchant.amount),
                                   style: theme.textTheme.bodySmall
                                       ?.copyWith(fontWeight: FontWeight.w700),
@@ -149,13 +150,13 @@ class _Metric extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Text(
+          AppText(
             label,
             style: theme.textTheme.labelSmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 2),
-          Text(
+          AppText(
             value,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
@@ -190,7 +191,7 @@ class _ChartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
+          AppText(
             title,
             style: theme.textTheme.labelLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
@@ -214,7 +215,7 @@ class _EmptyChart extends StatelessWidget {
     return SizedBox(
       height: 80,
       child: Center(
-        child: Text(
+        child: AppText(
           message,
           style: theme.textTheme.bodySmall
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -273,7 +274,7 @@ class _MonthlyBarChart extends StatelessWidget {
                 }
                 return Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text(
+                  child: AppText(
                     data.months[index].label,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -361,21 +362,21 @@ class _CategoryBreakdown extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
+                      child: AppText(
                         slice.label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
-                    Text(
+                    AppText(
                       '${slice.percentOf(total).toStringAsFixed(1)}%',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Text(
+                    AppText(
                       formatYen(slice.amount),
                       style: theme.textTheme.bodySmall
                           ?.copyWith(fontWeight: FontWeight.w700),
@@ -424,7 +425,7 @@ class _MonthComparison extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Expanded(
-              child: Text(
+              child: AppText(
                 data.previousMonthTotal == 0
                     ? '先月のデータがありません'
                     : '先月より ${formatYen(data.momDelta.abs())} '
@@ -435,7 +436,7 @@ class _MonthComparison extends StatelessWidget {
               ),
             ),
             if (data.previousMonthTotal > 0)
-              Text(
+              AppText(
                 '${data.momPercent >= 0 ? '+' : ''}'
                 '${data.momPercent.toStringAsFixed(1)}%',
                 style: theme.textTheme.labelMedium?.copyWith(
@@ -509,7 +510,7 @@ class _MonthComparison extends StatelessWidget {
             const SizedBox(width: 14),
             _LegendDot(color: theme.colorScheme.outline, label: '先月'),
             const Spacer(),
-            Text(
+            AppText(
               '${data.monthCount}件 / ${data.previousMonthCount}件',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -543,7 +544,7 @@ class _LegendDot extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 5),
-        Text(
+        AppText(
           label,
           style: theme.textTheme.labelSmall
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),

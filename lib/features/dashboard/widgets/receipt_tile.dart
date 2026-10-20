@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/receipt.dart';
+import '../../../core/localization/localization.dart';
 
 /// Small colour-coded category pill.
 class CategoryPill extends StatelessWidget {
@@ -31,7 +32,7 @@ class CategoryPill extends StatelessWidget {
             Icon(icon, size: 12, color: color),
             const SizedBox(width: 4),
           ],
-          Text(
+          AppText(
             label,
             style: TextStyle(
               fontSize: 11,
@@ -90,7 +91,7 @@ class ReceiptTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Text(
+                      AppText(
                         receipt.displayMerchant,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -100,7 +101,7 @@ class ReceiptTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: <Widget>[
-                          Text(
+                          AppText(
                             formatTimeJa(receipt.purchasedAt),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
@@ -135,7 +136,7 @@ class ReceiptTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
+                AppText(
                   formatYen(receipt.totalAmount),
                   style: theme.textTheme.titleMedium
                       ?.copyWith(fontWeight: FontWeight.w700),
@@ -197,7 +198,7 @@ class ReceiptGridCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
+              AppText(
                 receipt.displayMerchant,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -205,13 +206,13 @@ class ReceiptGridCard extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.w600, height: 1.25),
               ),
               const Spacer(),
-              Text(
+              AppText(
                 formatYen(receipt.totalAmount),
                 style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 2),
-              Text(
+              AppText(
                 '${formatDateShortJa(receipt.purchasedAt)} ${formatTimeJa(receipt.purchasedAt)}',
                 style: theme.textTheme.labelSmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),

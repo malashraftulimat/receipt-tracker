@@ -5,6 +5,7 @@ import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/category.dart';
 import '../dashboard/analytics_provider.dart';
+import '../../core/localization/localization.dart';
 
 class CategoriesPage extends ConsumerWidget {
   const CategoriesPage({super.key});
@@ -42,7 +43,7 @@ class CategoriesPage extends ConsumerWidget {
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存に失敗しました: $error')),
+        SnackBar(content: AppText('保存に失敗しました: $error')),
       );
     }
   }
@@ -55,19 +56,19 @@ class CategoriesPage extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('カテゴリを削除しますか？'),
-        content: Text(
+        title: const AppText('カテゴリを削除しますか？'),
+        content: AppText(
           '「${category.name}」を削除します。'
           'このカテゴリに紐づくレシートは「未分類」になります。',
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('キャンセル'),
+            child: const AppText('キャンセル'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('削除'),
+            child: const AppText('削除'),
           ),
         ],
       ),
@@ -83,7 +84,7 @@ class CategoriesPage extends ConsumerWidget {
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('削除に失敗しました: $error')),
+        SnackBar(content: AppText('削除に失敗しました: $error')),
       );
     }
   }
@@ -94,10 +95,10 @@ class CategoriesPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('カテゴリ'),
+        title: const AppText('カテゴリ'),
         actions: <Widget>[
           IconButton(
-            tooltip: 'カテゴリを追加',
+            tooltip: context.tr('カテゴリを追加'),
             onPressed: () => _openEditor(context, ref),
             icon: const Icon(Icons.add),
           ),
@@ -109,12 +110,12 @@ class CategoriesPage extends ConsumerWidget {
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('カテゴリを読み込めませんでした\n$error'),
+            child: AppText('カテゴリを読み込めませんでした\n$error'),
           ),
         ),
         data: (categories) {
           if (categories.isEmpty) {
-            return const Center(child: Text('カテゴリがありません'));
+            return const Center(child: AppText('カテゴリがありません'));
           }
           return ListView.separated(
             padding: EdgeInsets.fromLTRB(
@@ -153,7 +154,7 @@ class CategoriesPage extends ConsumerWidget {
                   title: Row(
                     children: <Widget>[
                       Flexible(
-                        child: Text(
+                        child: AppText(
                           category.name,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w600),
@@ -172,7 +173,7 @@ class CategoriesPage extends ConsumerWidget {
                                 .surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(
+                          child: AppText(
                             '標準',
                             style: TextStyle(
                               fontSize: 10,
@@ -185,7 +186,7 @@ class CategoriesPage extends ConsumerWidget {
                       ],
                     ],
                   ),
-                  subtitle: Text(
+                  subtitle: AppText(
                     category.color,
                     style: const TextStyle(fontSize: 11),
                   ),
@@ -200,11 +201,11 @@ class CategoriesPage extends ConsumerWidget {
                     itemBuilder: (context) => const <PopupMenuEntry<String>>[
                       PopupMenuItem<String>(
                         value: 'edit',
-                        child: Text('編集'),
+                        child: AppText('編集'),
                       ),
                       PopupMenuItem<String>(
                         value: 'delete',
-                        child: Text('削除'),
+                        child: AppText('削除'),
                       ),
                     ],
                   ),
@@ -272,7 +273,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      title: Text(widget.category == null ? 'カテゴリを追加' : 'カテゴリを編集'),
+      title: AppText(widget.category == null ? 'カテゴリを追加' : 'カテゴリを編集'),
       content: SizedBox(
         width: 400,
         child: SingleChildScrollView(
@@ -285,13 +286,13 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                 autofocus: true,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _submit(),
-                decoration: const InputDecoration(
-                  labelText: 'カテゴリ名',
-                  hintText: '例: 交際費、サブスク',
+                decoration: InputDecoration(
+                  labelText: context.tr('カテゴリ名'),
+                  hintText: context.tr('例: 交際費、サブスク'),
                 ),
               ),
               const SizedBox(height: 18),
-              Text('色', style: theme.textTheme.labelMedium),
+              AppText('色', style: theme.textTheme.labelMedium),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 10,
@@ -306,7 +307,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
                 ],
               ),
               const SizedBox(height: 18),
-              Text('アイコン', style: theme.textTheme.labelMedium),
+              AppText('アイコン', style: theme.textTheme.labelMedium),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -349,9 +350,9 @@ class _CategoryDialogState extends State<_CategoryDialog> {
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('キャンセル'),
+          child: const AppText('キャンセル'),
         ),
-        FilledButton(onPressed: _submit, child: const Text('保存')),
+        FilledButton(onPressed: _submit, child: const AppText('保存')),
       ],
     );
   }

@@ -80,7 +80,9 @@ cd build/web && python -m http.server 8080
 Deploy the folder to Netlify / Vercel / Firebase Hosting / S3 + CloudFront.
 The web build uses the browser's `getUserMedia` stream for live 1D barcode
 scanning and OCR frame capture; `web/zxing.min.js` is bundled automatically.
-OCR runs through the `ocr` edge function. Camera permission requires HTTPS (or
+In Supabase mode OCR runs through the `ocr` edge function; in local mode it runs
+client-side with Tesseract.js (`web/tesseract.min.js`, WASM/worker/language data
+from CDN, cached by the browser). Camera permission requires HTTPS (or
 `localhost`); if access is denied, the scanner falls back to photo upload.
 
 ---

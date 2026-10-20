@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
+import '../../core/localization/localization.dart';
 
 /// First-launch screen for builds that were not compiled with
 /// `--dart-define=SUPABASE_URL/...` (e.g. a sideloaded APK or a web bundle).
@@ -95,14 +96,14 @@ class _ConnectionSetupPageState extends ConsumerState<ConnectionSetupPage> {
                     color: theme.colorScheme.primary,
                   ),
                   const SizedBox(height: 12),
-                  Text(
+                  AppText(
                     'レシート帳',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.headlineMedium
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
-                  Text(
+                  AppText(
                     'はじめに Supabase プロジェクトへ接続します。\n'
                     'レシート・画像・カテゴリはこのプロジェクトに保存され、'
                     'すべての端末で同期されます。',
@@ -123,10 +124,12 @@ class _ConnectionSetupPageState extends ConsumerState<ConnectionSetupPage> {
                     ),
                     validator: (value) {
                       final text = (value ?? '').trim();
-                      if (text.isEmpty) return 'Project URL を入力してください';
+                      if (text.isEmpty) {
+                        return context.tr('Project URL を入力してください');
+                      }
                       if (!text.startsWith('https://') &&
                           !text.startsWith('http://')) {
-                        return 'https:// から始まる URL を入力してください';
+                        return context.tr('https:// から始まる URL を入力してください');
                       }
                       return null;
                     },
@@ -138,10 +141,10 @@ class _ConnectionSetupPageState extends ConsumerState<ConnectionSetupPage> {
                     autocorrect: false,
                     decoration: InputDecoration(
                       labelText: 'anon / publishable key',
-                      hintText: 'eyJhbGciOi... または sb_publishable_...',
+                      hintText: context.tr('eyJhbGciOi... または sb_publishable_...'),
                       prefixIcon: const Icon(Icons.key_outlined),
                       suffixIcon: IconButton(
-                        tooltip: '表示を切り替え',
+                        tooltip: context.tr('表示を切り替え'),
                         onPressed: () => setState(() => _obscure = !_obscure),
                         icon: Icon(
                           _obscure
@@ -162,7 +165,7 @@ class _ConnectionSetupPageState extends ConsumerState<ConnectionSetupPage> {
                         color: theme.colorScheme.errorContainer,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
+                      child: AppText(
                         _error!,
                         style: TextStyle(
                           fontSize: 12.5,
@@ -181,13 +184,13 @@ class _ConnectionSetupPageState extends ConsumerState<ConnectionSetupPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.cloud_done_outlined),
-                    label: Text(_busy ? '接続しています…' : '接続して開始'),
+                    label: AppText(_busy ? '接続しています…' : '接続して開始'),
                   ),
                   const SizedBox(height: 14),
                   OutlinedButton.icon(
                     onPressed: _busy ? null : _startLocalMode,
                     icon: const Icon(Icons.phone_android),
-                    label: const Text('この端末だけで使う（ローカルアカウント）'),
+                    label: const AppText('この端末だけで使う（ローカルアカウント）'),
                   ),
                   const SizedBox(height: 18),
                   Container(
@@ -200,13 +203,13 @@ class _ConnectionSetupPageState extends ConsumerState<ConnectionSetupPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(
+                        AppText(
                           '値の取得場所',
                           style: theme.textTheme.labelLarge
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 6),
-                        Text(
+                        AppText(
                           'Supabase ダッシュボード → Project Settings → API の '
                           '「Project URL」と「anon public / publishable key」。\n'
                           'これらのキーはクライアント公開前提の値です。'
