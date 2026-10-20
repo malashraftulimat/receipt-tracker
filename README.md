@@ -26,8 +26,11 @@ Opens in any phone or desktop browser. On first launch choose:
   the browser (`localStorage`) and are scoped per account.
 * **Supabase に接続** — paste your Project URL + anon key for multi-device sync.
 
-On the web, receipts are captured with the file picker and OCR runs through the
-`ocr` edge function (live barcode scanning is available in the Android/iOS app).
+On the web, the scanner uses the browser's **HTML5/WebRTC camera
+(`getUserMedia`)** for live 1D barcode detection (JAN-13 / Code 128 via the
+bundled ZXing engine) and for OCR frame capture. OCR itself runs through the
+`ocr` edge function. If the browser explicitly denies camera access, the scanner
+falls back to photo upload and manual entry.
 
 ---
 
@@ -84,7 +87,7 @@ receipt_tracker/
 ├── ios/                            # Xcode project  (requires macOS to build)
 ├── windows/                        # Win32 C++ runner (requires VS 2022)
 ├── macos/  linux/                  # desktop runners
-├── web/                            # PWA shell      (built here)
+├── web/                            # PWA shell + bundled zxing.min.js
 ├── dist/                           # compiled APKs + web zip + install notes
 ├── .github/workflows/build.yml     # CI: Android / Windows / iOS / Web artifacts
 ├── supabase/
@@ -113,7 +116,8 @@ receipt_tracker/
 │   │   ├── providers.dart          # Riverpod graph (client, repos, auth, queries)
 │   │   ├── repositories/           # auth / receipt / category / storage
 │   │   └── services/
-│   │       ├── image_input.dart    # camera (mobile) / gallery (web, desktop)
+│   │       ├── image_input.dart    # native camera (mobile) / photo fallback
+│   │       ├── camera/             # web <video> frame capture for OCR
 │   │       └── ocr/                # interface + conditional platform impls
 │   │           ├── ocr_service.dart        # OcrService + OcrResult + factory
 │   │           ├── ocr_service_io.dart     # Android/iOS -> ML Kit, desktop -> remote
@@ -165,9 +169,11 @@ receipt_tracker/
 | `flutter_riverpod` | State management & DI (repositories, filters, queries, auth stream) |
 | `go_router` | Declarative navigation, auth redirect, deep links to `/receipt/:id` |
 | `supabase_flutter` | Email/password auth, Postgres client, Storage, Edge Functions |
-| `mobile_scanner` | 1D/2D barcode scanning (`ean13`, `ean8`, `code128`, `code39`, `itf`, `upcA`) |
+| `mobile_scanner` | 1D/2D barcode scanning (`ean13`, `ean8`, `code128`, `code39`, `itf`, `upcA`); ML Kit on Android/iOS and HTML5/WebRTC + ZXing on web |
 | `google_mlkit_text_recognition` | On-device OCR (Android/iOS) with the Japanese script model |
-| `image_picker` | Camera capture on mobile, gallery/file picker on web & desktop |
+| `image_picker` | Native camera capture on mobile, photo/file picker fallback on web & desktop |
+| `web` | Browser interop used to capture an OCR still from the live `<video>` stream |
+| `web/zxing.min.js` | Bundled ZXing browser build (Apache-2.0), so web barcode scanning does not depend on a CDN |
 | `path_provider` | Temp file needed by ML Kit `InputImage` |
 | `fl_chart` | Monthly bar chart + category donut |
 | `intl` | Japanese date formatting (`yyyy年M月d日(E)`) |
@@ -235,13 +241,15 @@ change amounts, 8%/10% tax lines, tax-inclusive bases and reference numbers.
 
 ## 5. How the scanning pipeline works
 
-1. **Barcode mode** – `mobile_scanner` streams `BarcodeCapture`s. The first non-empty
-   `rawValue` is stored in `scanSessionProvider` (JAN-13 check digit validated for
-   display) and the review screen is opened immediately with `barcodeId` filled.
-   A Postgres partial unique index `(user_id, barcode_id)` also prevents duplicates at
-   the database level; the UI shows the existing receipt instead of saving a copy.
-2. **OCR mode** – a still photo is taken (`image_picker`), recognised
-   (`MlKitOcrService` on mobile, `RemoteOcrService` → edge function elsewhere), then
+1. **Barcode mode** – `mobile_scanner` streams `BarcodeCapture`s (ML Kit on
+   Android/iOS, ZXing over `getUserMedia` on web). The first non-empty `rawValue` is
+   stored in `scanSessionProvider` (JAN-13 check digit validated for display) and the
+   review screen is opened immediately with `barcodeId` filled. A Postgres partial
+   unique index `(user_id, barcode_id)` also prevents duplicates at the database
+   level; the UI shows the existing receipt instead of saving a copy.
+2. **OCR mode** – a still image is captured from the live camera frame on web, or
+   via native `image_picker` on mobile. It is recognised by `MlKitOcrService` on
+   Android/iOS or `RemoteOcrService` → edge function on web/desktop, then
    `ReceiptParser` extracts structured fields.
 3. **Auto mode** – barcode is detected first; a banner then offers
    “撮影して自動入力” which runs OCR and merges the barcode into the same draft.
@@ -270,10 +278,11 @@ change amounts, 8%/10% tax lines, tax-inclusive bases and reference numbers.
 
 ## 6. Known limitations / next steps
 
-- **Web & desktop live camera**: `mobile_scanner`'s live preview is only wired to
-  Android/iOS here. On desktop/web the app falls back to picking an image and running
-  server OCR. (You can add a web barcode overlay using `mobile_scanner`'s web support
-  if the browser exposes a camera.)
+- **Web live camera** requires a secure context (HTTPS or `localhost`) and browser
+  permission for `getUserMedia`. Only an explicit denial/unsupported browser falls
+  back to photo upload. Desktop platforms still use the file picker + server OCR.
+- **Web OCR** depends on the `ocr` edge function (Cloud Vision); barcode scanning
+  remains fully client-side.
 - **Server OCR cost**: Cloud Vision is billed per request; ML Kit on mobile is free and
   offline.
 - Receipt images are stored privately and served with 7-day signed URLs; add a

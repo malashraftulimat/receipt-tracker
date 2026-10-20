@@ -3,7 +3,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/config/app_config.dart';
 
-/// Camera on Android / iOS, gallery picker on web & desktop.
+/// Native camera on Android / iOS, photo picker fallback on web / desktop.
+///
+/// The web scanner captures OCR frames from its live `getUserMedia` stream via
+/// `CameraFrame`; this picker is only used there when camera access is denied.
 class ImageInput {
   const ImageInput._();
 

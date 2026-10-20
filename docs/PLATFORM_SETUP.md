@@ -64,9 +64,15 @@ platform :ios, '15.5'   # google_mlkit_text_recognition requires iOS 15.5+
 
 ## Web (`web/index.html`)
 
-No permissions block is required for the file picker. If you later enable
-`mobile_scanner` on web, serve the app over HTTPS (or `localhost`) so `getUserMedia`
-works.
+Camera access needs a **secure context**: serve the app over HTTPS (GitHub Pages,
+Netlify, etc.) or `localhost`, otherwise `getUserMedia` is unavailable. The scanner
+uses `mobile_scanner`'s HTML5/WebRTC backend for live barcode detection and grabs
+OCR stills from the same `<video>` stream. ZXing is bundled at `web/zxing.min.js`,
+so no CDN script is required.
+
+Browser/OS camera permission must be granted. If it is explicitly denied or the
+browser cannot expose a camera, the scanner automatically shows the photo-upload
+fallback instead of the live preview.
 
 Supabase Storage must allow your origin — the default `*` CORS policy works, but you
 can restrict it in *Project Settings → API → CORS*.

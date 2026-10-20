@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/barcode_utils.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
+import '../../data/services/camera/camera_frame.dart';
 import '../../data/services/image_input.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
@@ -29,34 +30,26 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   MobileScannerController? _scanner;
   bool _processing = false;
   bool _navigating = false;
+  bool _cameraBlocked = false;
+  String? _cameraError;
   final List<String> _chunkTexts = <String>[];
   final List<Uint8List> _chunkImages = <Uint8List>[];
   String? _error;
 
-  /// Live preview is Android/iOS only. On web the platform view overflows its
-  /// widget bounds and swallows taps meant for the controls, so the browser
-  /// uses image-pick OCR + manual entry instead.
+  /// Android / iOS use the native ML Kit camera pipeline, while the web build
+  /// uses `mobile_scanner`'s HTML5/WebRTC implementation (getUserMedia + ZXing).
+  /// Both feed the same barcode + OCR UI.
   bool get _hasLiveCamera =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
 
   @override
   void initState() {
     super.initState();
     if (_hasLiveCamera) {
-      _scanner = MobileScannerController(
-        detectionSpeed: DetectionSpeed.noDuplicates,
-        facing: CameraFacing.back,
-        formats: const <BarcodeFormat>[
-          BarcodeFormat.ean13,
-          BarcodeFormat.ean8,
-          BarcodeFormat.upcA,
-          BarcodeFormat.code128,
-          BarcodeFormat.code39,
-          BarcodeFormat.itf,
-        ],
-      );
+      _installWebBarcodeLibrary();
+      _scanner = _createScanner();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _startScanner();
       });
@@ -65,15 +58,94 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
   @override
   void dispose() {
+    _scanner?.removeListener(_handleScannerState);
     _scanner?.dispose();
     super.dispose();
+  }
+
+  /// Serve ZXing from the app bundle (web/zxing.min.js) rather than unpkg, so
+  /// barcode detection keeps working on GitHub Pages without an extra CDN hop.
+  void _installWebBarcodeLibrary() {
+    if (!kIsWeb) return;
+    MobileScannerPlatform.instance.setBarcodeLibraryScriptUrl(
+      Uri.base.resolve('zxing.min.js').toString(),
+    );
+  }
+
+  MobileScannerController _createScanner() {
+    final controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+      formats: const <BarcodeFormat>[
+        BarcodeFormat.ean13,
+        BarcodeFormat.ean8,
+        BarcodeFormat.upcA,
+        BarcodeFormat.code128,
+        BarcodeFormat.code39,
+        BarcodeFormat.itf,
+      ],
+    );
+    controller.addListener(_handleScannerState);
+    return controller;
+  }
+
+  /// Permission / unsupported errors are the only cases where we replace the
+  /// live preview with the image-upload fallback.
+  void _handleScannerState() {
+    final scanner = _scanner;
+    if (scanner == null || !mounted) return;
+
+    final state = scanner.value;
+    final error = state.error;
+    if (error == null) {
+      if (_cameraBlocked && state.isRunning) {
+        setState(() {
+          _cameraBlocked = false;
+          _cameraError = null;
+        });
+      }
+      return;
+    }
+
+    final blocked =
+        error.errorCode == MobileScannerErrorCode.permissionDenied ||
+            error.errorCode == MobileScannerErrorCode.unsupported;
+    if (!blocked || _cameraBlocked) return;
+
+    setState(() {
+      _cameraBlocked = true;
+      _cameraError = switch (error.errorCode) {
+        MobileScannerErrorCode.permissionDenied =>
+          'ブラウザまたは端末でカメラへのアクセスが拒否されています。'
+              'サイト設定でカメラを許可して再試行してください。',
+        MobileScannerErrorCode.unsupported =>
+          'このブラウザではライブカメラを利用できません。'
+              '画像を選択してOCRするか、手入力で登録してください。',
+        _ => error.errorDetails?.message ?? 'カメラを起動できませんでした。',
+      };
+    });
+  }
+
+  Future<void> _retryCamera() async {
+    final old = _scanner;
+    old?.removeListener(_handleScannerState);
+    await old?.dispose();
+    if (!mounted) return;
+
+    final controller = _createScanner();
+    setState(() {
+      _scanner = controller;
+      _cameraBlocked = false;
+      _cameraError = null;
+    });
+    await _startScanner();
   }
 
   Future<void> _startScanner() async {
     try {
       await _scanner?.start();
     } catch (_) {
-      // Camera permission denied / already running — ignore.
+      // Permission denied / already running: the state listener handles UI.
     }
   }
 
@@ -91,6 +163,32 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     } catch (_) {
       // ignore
     }
+  }
+
+  /// Gets the still image used for OCR.
+  ///
+  /// Web: captures the current frame from the same live camera stream.
+  /// Android/iOS: uses the native camera via `image_picker` (ML Kit input).
+  /// If no frame is available, both platforms fall back to the photo picker.
+  Future<Uint8List?> _acquireImageBytes() async {
+    if (kIsWeb) {
+      final frame = await CameraFrame.capture();
+      if (frame != null) {
+        // The frame is in memory, so the camera can be released during OCR.
+        await _stopScanner();
+        return frame;
+      }
+    }
+
+    await _stopScanner();
+    final file = await ImageInput.pickReceiptImage();
+    if (file == null) return null;
+    return file.readAsBytes();
+  }
+
+  Future<void> _restartScannerIfNeeded() async {
+    if (!_hasLiveCamera || _cameraBlocked || _navigating) return;
+    await _startScanner();
   }
 
   // -------------------------------------------------------------------------
@@ -134,13 +232,15 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       _processing = true;
       _error = null;
     });
-    await _stopScanner();
 
     try {
-      final file = await ImageInput.pickReceiptImage();
-      if (file == null) return;
+      final bytes = await _acquireImageBytes();
+      if (bytes == null) {
+        if (mounted) setState(() => _processing = false);
+        await _restartScannerIfNeeded();
+        return;
+      }
 
-      final bytes = await file.readAsBytes();
       final barcode = ref.read(scanSessionProvider).barcode;
       final result = await ref.read(ocrServiceProvider).recognize(bytes);
       final parsed = const ReceiptParser().parse(
@@ -159,6 +259,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       await _openReview(draft, bytes, parsed: parsed);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
+      await _restartScannerIfNeeded();
     } finally {
       if (mounted && _processing) setState(() => _processing = false);
     }
@@ -175,13 +276,11 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       _processing = true;
       _error = null;
     });
-    await _stopScanner();
 
     try {
-      final file = await ImageInput.pickReceiptImage();
-      if (file == null) return;
+      final bytes = await _acquireImageBytes();
+      if (bytes == null) return;
 
-      final bytes = await file.readAsBytes();
       final result = await ref.read(ocrServiceProvider).recognize(bytes);
       if (!mounted) return;
 
@@ -198,8 +297,10 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
-      if (mounted) setState(() => _processing = false);
-      await _startScanner();
+      if (mounted) {
+        setState(() => _processing = false);
+        await _startScanner();
+      }
     }
   }
 
@@ -278,14 +379,17 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     final session = ref.watch(scanSessionProvider);
     final notifier = ref.read(scanSessionProvider.notifier);
 
-    if (!_hasLiveCamera) {
+    if (!_hasLiveCamera || _cameraBlocked) {
       return Scaffold(
         appBar: AppBar(title: const Text('スキャン')),
         body: _NoCameraView(
           onPickImage: _captureAndRecognize,
           onManual: _openManual,
           busy: _processing,
-          error: _error,
+          error: _cameraError ?? _error,
+          cameraDenied: _cameraBlocked,
+          canRetryCamera: _hasLiveCamera,
+          onRetryCamera: _retryCamera,
         ),
       );
     }
@@ -297,11 +401,12 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         foregroundColor: Colors.white,
         title: const Text('スキャン'),
         actions: <Widget>[
-          IconButton(
-            tooltip: 'ライト',
-            onPressed: _toggleTorch,
-            icon: const Icon(Icons.flashlight_on_outlined),
-          ),
+          if (!kIsWeb)
+            IconButton(
+              tooltip: 'ライト',
+              onPressed: _toggleTorch,
+              icon: const Icon(Icons.flashlight_on_outlined),
+            ),
           const SizedBox(width: 4),
         ],
       ),
@@ -675,16 +780,32 @@ class _NoCameraView extends StatelessWidget {
     required this.onManual,
     required this.busy,
     this.error,
+    this.cameraDenied = false,
+    this.canRetryCamera = false,
+    this.onRetryCamera,
   });
 
   final VoidCallback onPickImage;
   final VoidCallback onManual;
   final bool busy;
   final String? error;
+  final bool cameraDenied;
+  final bool canRetryCamera;
+  final VoidCallback? onRetryCamera;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final title = cameraDenied
+        ? 'カメラへのアクセスを許可してください'
+        : 'このデバイスではライブカメラを利用できません';
+    final description = cameraDenied
+        ? 'ブラウザまたは端末の設定でこのサイトのカメラ利用を許可し、'
+            '「カメラを再試行」を押してください。'
+            '許可できない場合も、画像を選択してOCRできます。'
+        : 'レシート画像を選択すると、OCRで店舗名・日付・合計・消費税を'
+            '自動入力します。スマートフォンで撮影した画像も利用できます。';
+
     return Center(
       child: SingleChildScrollView(
         padding: EdgeInsets.all(context.pagePadding * 1.5),
@@ -694,22 +815,22 @@ class _NoCameraView extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Icon(
-                Icons.no_photography_outlined,
+                cameraDenied
+                    ? Icons.no_photography_outlined
+                    : Icons.camera_alt_outlined,
                 size: 52,
                 color: theme.colorScheme.outline,
               ),
               const SizedBox(height: 16),
               Text(
-                'このデバイスではライブカメラを利用できません',
+                title,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Text(
-                'レシート画像を選択すると、サーバーOCR（Supabase Edge Function）で'
-                '店舗名・日付・合計・消費税を自動入力します。'
-                'ブラウザではカメラ非対応のため、スマートフォンで撮影した画像を選択してください。',
+                description,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -733,6 +854,14 @@ class _NoCameraView extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 22),
+              if (canRetryCamera && onRetryCamera != null) ...<Widget>[
+                FilledButton.tonalIcon(
+                  onPressed: busy ? null : onRetryCamera,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('カメラを再試行'),
+                ),
+                const SizedBox(height: 8),
+              ],
               FilledButton.icon(
                 onPressed: busy ? null : onPickImage,
                 icon: busy

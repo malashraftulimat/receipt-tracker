@@ -26,15 +26,15 @@ dependencies:
   supabase_flutter: ^2.6.0
 
   # Scanning engine
-  mobile_scanner: ^5.2.3                     # 1D barcodes (JAN/EAN-13, Code 128, ...)
+  mobile_scanner: ^5.2.3                     # 1D barcodes: ML Kit (mobile) + ZXing/WebRTC (web)
   google_mlkit_text_recognition: ^0.13.0     # on-device OCR (Android / iOS, ja + en)
 
-  # Camera / gallery input (camera on mobile, file picker on desktop & web)
+  # Camera / gallery input (native camera on mobile, photo picker fallback)
   image_picker: ^1.1.2
 
   # Misc
   crypto: ^3.0.3
-  web: ^1.0.0
+  web: ^1.0.0                                # capture web camera frames for OCR
   path_provider: ^2.1.4
   fl_chart: ^0.69.0
   # `any` lets flutter_localizations pin the intl version that matches your SDK.

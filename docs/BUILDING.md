@@ -78,8 +78,10 @@ cd build/web && python -m http.server 8080
 ```
 
 Deploy the folder to Netlify / Vercel / Firebase Hosting / S3 + CloudFront.
-Live camera scanning is disabled on web; image picking runs OCR through the
-`ocr` edge function.
+The web build uses the browser's `getUserMedia` stream for live 1D barcode
+scanning and OCR frame capture; `web/zxing.min.js` is bundled automatically.
+OCR runs through the `ocr` edge function. Camera permission requires HTTPS (or
+`localhost`); if access is denied, the scanner falls back to photo upload.
 
 ---
 
