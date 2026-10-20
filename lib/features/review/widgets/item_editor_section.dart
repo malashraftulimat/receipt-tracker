@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/category.dart';
 import '../../../domain/models/receipt_item.dart';
@@ -192,8 +193,8 @@ class _ItemCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest
-            .withValues(alpha: 0.25),
+        color:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -329,8 +330,7 @@ class _NumberField extends StatelessWidget {
         labelText: label,
         isDense: true,
         border: const OutlineInputBorder(),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       ),
     );
   }
@@ -370,9 +370,9 @@ class _TaxSelector extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: rate == 8
-                    ? const Color(0xFF2E7D32)
+                    ? AppPalette.emerald
                     : rate == 10
-                        ? theme.colorScheme.primary
+                        ? AppPalette.violet
                         : theme.colorScheme.onSurfaceVariant,
               ),
             ),
@@ -432,8 +432,7 @@ class _ValidationRow extends StatelessWidget {
       );
     }
 
-    final color =
-        ok ? const Color(0xFF2E7D32) : const Color(0xFFEF6C00);
+    final color = ok ? AppPalette.emerald : AppPalette.amber;
     final difference = totalAmount - (taxMatch ? withTax : itemsTotal);
 
     return Column(

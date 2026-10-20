@@ -8,7 +8,8 @@ class ThemeModeController extends Notifier<ThemeMode> {
 
   @override
   ThemeMode build() {
-    // Fire-and-forget restore; the default (system) is used until it resolves.
+    // Fire-and-forget restore; the vibrant dark theme is the default until a
+    // saved preference resolves.
     Future<void>(() async {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -21,7 +22,7 @@ class ThemeModeController extends Notifier<ThemeMode> {
         // Storage unavailable (e.g. unit tests) — keep the default.
       }
     });
-    return ThemeMode.system;
+    return ThemeMode.dark;
   }
 
   Future<void> setMode(ThemeMode mode) async {

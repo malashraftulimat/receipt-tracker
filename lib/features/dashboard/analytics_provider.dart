@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_palette.dart';
 import '../../data/providers.dart';
 import '../../domain/models/receipt_filter.dart';
 
@@ -30,7 +31,8 @@ class CategorySlice {
 }
 
 class MerchantTotal {
-  const MerchantTotal({required this.name, required this.amount, required this.count});
+  const MerchantTotal(
+      {required this.name, required this.amount, required this.count});
 
   final String name;
   final int amount;
@@ -75,8 +77,9 @@ class AnalyticsData {
 
   int get average => monthCount == 0 ? 0 : monthTotal ~/ monthCount;
 
-  int get maxMonthTotal =>
-      months.isEmpty ? 0 : months.map((m) => m.total).reduce((a, b) => a > b ? a : b);
+  int get maxMonthTotal => months.isEmpty
+      ? 0
+      : months.map((m) => m.total).reduce((a, b) => a > b ? a : b);
 
   bool get isEmpty => sixMonthTotal == 0;
 
@@ -128,8 +131,10 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
       key,
       () => _CategoryBucket(
         label: receipt.displayCategory,
-        color: receipt.category?.colorValue ??
-            const Color(0xFF9E9E9E),
+        color: AppPalette.categoryAccent(
+          receipt.category?.name,
+          fallback: receipt.category?.colorValue ?? AppPalette.textFaint,
+        ),
       ),
     );
     bucket.amount += receipt.totalAmount;
@@ -154,7 +159,7 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
     final key = receipt.displayMerchant;
     final bucket = merchantBuckets.putIfAbsent(
       key,
-      () => _CategoryBucket(label: key, color: const Color(0xFF9E9E9E)),
+      () => _CategoryBucket(label: key, color: AppPalette.textFaint),
     );
     bucket.amount += receipt.totalAmount;
     bucket.count += 1;

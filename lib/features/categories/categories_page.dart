@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_palette.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/category.dart';
@@ -128,26 +129,25 @@ class CategoriesPage extends ConsumerWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final category = categories[index];
+              final accent = AppPalette.categoryAccent(
+                category.name,
+                fallback: category.colorValue,
+              );
               return Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .outlineVariant
-                        .withValues(alpha: 0.7),
-                  ),
+                decoration: AppPalette.card(
+                  context,
+                  accent: accent,
+                  radius: 18,
                 ),
                 child: ListTile(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   leading: CircleAvatar(
-                    backgroundColor: category.colorValue.withValues(alpha: 0.16),
+                    backgroundColor: accent.withValues(alpha: 0.18),
                     child: Icon(
                       category.iconData,
-                      color: category.colorValue,
+                      color: accent,
                       size: 20,
                     ),
                   ),
@@ -188,7 +188,10 @@ class CategoriesPage extends ConsumerWidget {
                   ),
                   subtitle: AppText(
                     category.color,
-                    style: const TextStyle(fontSize: 11),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: accent.withValues(alpha: 0.85),
+                    ),
                   ),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
@@ -357,8 +360,8 @@ class _CategoryDialogState extends State<_CategoryDialog> {
     );
   }
 
-  Color _parseColor(String hex) =>
-      Color(0xFF000000 | (int.tryParse(hex.replaceFirst('#', ''), radix: 16) ?? 0));
+  Color _parseColor(String hex) => Color(
+      0xFF000000 | (int.tryParse(hex.replaceFirst('#', ''), radix: 16) ?? 0));
 }
 
 class _ColorDot extends StatelessWidget {

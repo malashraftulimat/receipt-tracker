@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/press_scale.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/receipt_repository.dart';
@@ -67,6 +69,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   late DateTime _purchasedAt;
   String? _categoryId;
+  String? _suggestedCategory;
   int? _tax8Base;
   int? _tax10Base;
   int? _tax8ItemsTotal;
@@ -126,6 +129,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
     _purchasedAt = draft?.purchasedAt ?? DateTime.now();
     _categoryId = draft?.categoryId;
+    _suggestedCategory = widget.args.parsed?.suggestedCategory;
     _tax8Base = draft?.tax8Base;
     _tax10Base = draft?.tax10Base;
     _tax8ItemsTotal = draft?.tax8ItemsTotal;
@@ -194,14 +198,20 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     }
 
     var changed = false;
-    final guessed = CategoryGuesser.guessFromMany(<String>[
-      _merchant.text,
-      for (final item in _items) item.name.text,
-    ]);
-    final receiptCategory = idFor(guessed);
-    if (_categoryId == null && receiptCategory != null) {
-      _categoryId = receiptCategory;
+    final suggested = idFor(_suggestedCategory);
+    if (_categoryId == null && suggested != null) {
+      _categoryId = suggested;
       changed = true;
+    } else {
+      final guessed = CategoryGuesser.guessFromMany(<String>[
+        _merchant.text,
+        for (final item in _items) item.name.text,
+      ]);
+      final receiptCategory = idFor(guessed);
+      if (_categoryId == null && receiptCategory != null) {
+        _categoryId = receiptCategory;
+        changed = true;
+      }
     }
 
     for (final item in _items) {
@@ -279,6 +289,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         _imageBytes = bytes;
         _rawOcrText = parsed.rawText;
         _warnings = parsed.warnings;
+        _suggestedCategory = parsed.suggestedCategory;
+        if (parsed.suggestedCategory != null) _categoryId = null;
         _source = barcode == null ? ReceiptSource.ocr : ReceiptSource.barcode;
 
         if ((parsed.merchant ?? '').isNotEmpty) {
@@ -311,6 +323,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       for (final item in oldItems) {
         item.dispose();
       }
+      final categories =
+          ref.read(categoriesProvider).valueOrNull ?? const <ExpenseCategory>[];
+      if (mounted && categories.isNotEmpty) _autoTagItems(categories);
       if (result.usedFallback) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -502,19 +517,26 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             context.pagePadding,
             12,
           ),
-          child: FilledButton.icon(
-            onPressed: _saving || _duplicateId != null ? null : _save,
-            icon: _saving
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.check),
-            label: AppText(
-              _duplicateId != null
-                  ? '重複のため保存できません'
-                  : (_existingId == null ? '保存する' : '変更を保存'),
+          child: PressScale(
+            child: FilledButton.icon(
+              onPressed: _saving || _duplicateId != null ? null : _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppPalette.emerald,
+                foregroundColor: AppPalette.backgroundDeep,
+                minimumSize: const Size(0, 52),
+              ),
+              icon: _saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check),
+              label: AppText(
+                _duplicateId != null
+                    ? '重複のため保存できません'
+                    : (_existingId == null ? '保存する' : '変更を保存'),
+              ),
             ),
           ),
         ),
@@ -694,25 +716,33 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   onSelected: (_) => setState(() => _categoryId = null),
                 ),
                 for (final category in categories)
-                  ChoiceChip(
-                    avatar: Icon(
-                      category.iconData,
-                      size: 16,
-                      color: _categoryId == category.id
-                          ? Colors.white
-                          : category.colorValue,
-                    ),
-                    label: AppText(category.name),
-                    selected: _categoryId == category.id,
-                    selectedColor: category.colorValue,
-                    labelStyle: TextStyle(
-                      color: _categoryId == category.id
-                          ? Colors.white
-                          : theme.colorScheme.onSurface,
-                      fontSize: 12.5,
-                    ),
-                    onSelected: (_) =>
-                        setState(() => _categoryId = category.id),
+                  Builder(
+                    builder: (context) {
+                      final accent = AppPalette.categoryAccent(
+                        category.name,
+                        fallback: category.colorValue,
+                      );
+                      return ChoiceChip(
+                        avatar: Icon(
+                          category.iconData,
+                          size: 16,
+                          color: _categoryId == category.id
+                              ? Colors.white
+                              : accent,
+                        ),
+                        label: AppText(category.name),
+                        selected: _categoryId == category.id,
+                        selectedColor: accent,
+                        labelStyle: TextStyle(
+                          color: _categoryId == category.id
+                              ? Colors.white
+                              : theme.colorScheme.onSurface,
+                          fontSize: 12.5,
+                        ),
+                        onSelected: (_) =>
+                            setState(() => _categoryId = category.id),
+                      );
+                    },
                   ),
               ],
             ),

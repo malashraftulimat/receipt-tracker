@@ -28,19 +28,20 @@ const List<String> kCategoryIconKeys = <String>[
 ];
 
 const List<String> kCategoryColors = <String>[
-  '#4CAF50',
-  '#FF7043',
-  '#42A5F5',
-  '#FFB300',
-  '#26A69A',
-  '#AB47BC',
-  '#EF5350',
-  '#78909C',
-  '#EC407A',
-  '#8D6E63',
+  '#FF8FA3',
+  '#FFA36C',
+  '#A78BFA',
+  '#FFD166',
+  '#74B9FF',
+  '#C084FC',
+  '#55EFC4',
+  '#9AA8C7',
+  '#00CEC9',
+  '#FF6B81',
 ];
 
-IconData categoryIcon(String key) => kCategoryIcons[key] ?? Icons.category_outlined;
+IconData categoryIcon(String key) =>
+    kCategoryIcons[key] ?? Icons.category_outlined;
 
 /// Expense category (custom or seeded default).
 class ExpenseCategory {
@@ -117,20 +118,60 @@ class ExpenseCategory {
   /// Seeded into `users/{userId}/categories` on first sign-in.
   static const List<ExpenseCategory> templates = <ExpenseCategory>[
     ExpenseCategory(
-        id: '', name: '食費', color: '#4CAF50', icon: 'grocery', isDefault: true, sortOrder: 0),
+        id: '',
+        name: '食費',
+        color: '#FF8FA3',
+        icon: 'grocery',
+        isDefault: true,
+        sortOrder: 0),
     ExpenseCategory(
-        id: '', name: '外食', color: '#FF7043', icon: 'restaurant', isDefault: true, sortOrder: 1),
+        id: '',
+        name: '外食',
+        color: '#FFA36C',
+        icon: 'restaurant',
+        isDefault: true,
+        sortOrder: 1),
     ExpenseCategory(
-        id: '', name: '日用品', color: '#42A5F5', icon: 'shopping', isDefault: true, sortOrder: 2),
+        id: '',
+        name: '日用品',
+        color: '#A78BFA',
+        icon: 'shopping',
+        isDefault: true,
+        sortOrder: 2),
     ExpenseCategory(
-        id: '', name: '光熱費', color: '#FFB300', icon: 'bolt', isDefault: true, sortOrder: 3),
+        id: '',
+        name: '光熱費',
+        color: '#FFD166',
+        icon: 'bolt',
+        isDefault: true,
+        sortOrder: 3),
     ExpenseCategory(
-        id: '', name: '交通費', color: '#26A69A', icon: 'train', isDefault: true, sortOrder: 4),
+        id: '',
+        name: '交通費',
+        color: '#74B9FF',
+        icon: 'train',
+        isDefault: true,
+        sortOrder: 4),
     ExpenseCategory(
-        id: '', name: '娯楽', color: '#AB47BC', icon: 'games', isDefault: true, sortOrder: 5),
+        id: '',
+        name: '娯楽',
+        color: '#C084FC',
+        icon: 'games',
+        isDefault: true,
+        sortOrder: 5),
     ExpenseCategory(
-        id: '', name: '医療・医薬品', color: '#EF5350', icon: 'pharmacy', isDefault: true, sortOrder: 6),
+        id: '',
+        name: '医療・医薬品',
+        color: '#55EFC4',
+        icon: 'pharmacy',
+        isDefault: true,
+        sortOrder: 6),
     ExpenseCategory(
-        id: '', name: 'その他', color: '#78909C', icon: 'category', isDefault: true, sortOrder: 7),
+        id: '',
+        name: 'その他',
+        color: '#9AA8C7',
+        icon: 'category',
+        isDefault: true,
+        sortOrder: 7),
   ];
 }

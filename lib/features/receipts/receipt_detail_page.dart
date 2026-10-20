@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_palette.dart';
 import '../../core/utils/barcode_utils.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
@@ -145,7 +146,10 @@ class _DetailBody extends StatelessWidget {
     final theme = Theme.of(context);
     final padding = context.pagePadding;
     final category = receipt.category;
-    final accent = category?.colorValue ?? theme.colorScheme.outline;
+    final accent = AppPalette.categoryAccent(
+      category?.name,
+      fallback: category?.colorValue ?? theme.colorScheme.outline,
+    );
 
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(padding, 8, padding, 40),
@@ -157,13 +161,10 @@ class _DetailBody extends StatelessWidget {
             children: <Widget>[
               Container(
                 padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color:
-                        theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-                  ),
+                decoration: AppPalette.card(
+                  context,
+                  accent: accent,
+                  glow: true,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,7 +207,7 @@ class _DetailBody extends StatelessWidget {
                       formatYen(receipt.totalAmount),
                       style: theme.textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.primary,
+                        color: AppPalette.emerald,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -443,17 +444,17 @@ class _DueDateRow extends StatelessWidget {
     final Color color;
     final String label;
     if (days < 0) {
-      color = theme.colorScheme.error;
-      label = '\${-days} 日過ぎています';
+      color = AppPalette.danger;
+      label = '${-days} 日過ぎています';
     } else if (days == 0) {
-      color = theme.colorScheme.error;
+      color = AppPalette.danger;
       label = '今日が期限です';
     } else if (days <= 3) {
-      color = const Color(0xFFEF6C00);
-      label = 'あと \$days 日';
+      color = AppPalette.amber;
+      label = 'あと$days日';
     } else {
-      color = theme.colorScheme.primary;
-      label = 'あと \$days 日';
+      color = AppPalette.emerald;
+      label = 'あと$days日';
     }
 
     return Row(
@@ -497,12 +498,10 @@ class _InfoCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-        ),
+      decoration: AppPalette.card(
+        context,
+        accent: AppPalette.violet,
+        radius: 18,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -551,8 +550,10 @@ class _InfoRow extends StatelessWidget {
           AppText(
             value,
             style: emphasized
-                ? theme.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700)
+                ? theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppPalette.emerald,
+                  )
                 : theme.textTheme.bodyMedium,
           ),
         ],

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_palette.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/widgets/press_scale.dart';
 import 'widgets/analytics_panel.dart';
 import 'widgets/budget_card.dart';
 import 'widgets/due_reminders_card.dart';
@@ -50,10 +52,14 @@ class DashboardPage extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/scan'),
-        icon: const Icon(Icons.document_scanner_outlined),
-        label: const AppText('スキャン'),
+      floatingActionButton: PressScale(
+        child: FloatingActionButton.extended(
+          onPressed: () => context.push('/scan'),
+          backgroundColor: AppPalette.cyan,
+          foregroundColor: AppPalette.backgroundDeep,
+          icon: const Icon(Icons.document_scanner_outlined),
+          label: const AppText('スキャン'),
+        ),
       ),
       body: SafeArea(
         child: expanded
@@ -63,7 +69,8 @@ class DashboardPage extends ConsumerWidget {
                   const Expanded(child: _MainPane()),
                   Container(
                     width: 1,
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+                    color:
+                        theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
                   ),
                   const SizedBox(
                     width: 372,

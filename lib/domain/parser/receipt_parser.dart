@@ -36,6 +36,7 @@ class ParsedReceipt {
     this.pointBrand,
     this.pointAmount,
     this.barcodeId,
+    this.suggestedCategory,
     this.items = const <ParsedItem>[],
     this.rawText = '',
     this.warnings = const <String>[],
@@ -63,6 +64,9 @@ class ParsedReceipt {
   final int? pointAmount;
 
   final String? barcodeId;
+
+  /// Gemini-suggested seeded category name (e.g. 食費 / 交通費).
+  final String? suggestedCategory;
 
   /// Item rows extracted above the total section.
   final List<ParsedItem> items;
@@ -215,10 +219,13 @@ class ReceiptParser {
     }
 
     // --- reference / barcode ------------------------------------------------
-    final barcodeId = (scannedBarcode != null && scannedBarcode.trim().isNotEmpty)
-        ? scannedBarcode.trim()
-        : _detectReferenceNumber(lines);
-    if (barcodeId != null) confidence['barcode'] = scannedBarcode != null ? 1.0 : 0.5;
+    final barcodeId =
+        (scannedBarcode != null && scannedBarcode.trim().isNotEmpty)
+            ? scannedBarcode.trim()
+            : _detectReferenceNumber(lines);
+    if (barcodeId != null) {
+      confidence['barcode'] = scannedBarcode != null ? 1.0 : 0.5;
+    }
 
     // --- amounts ------------------------------------------------------------
     final subtotal = _detectByKeywords(lines, _subtotalKeywords);
@@ -363,9 +370,8 @@ class ReceiptParser {
       final value = int.tryParse(digits);
       if (value == null) continue;
 
-      final hasCurrency = token.contains('¥') ||
-          token.contains('￥') ||
-          token.contains('円');
+      final hasCurrency =
+          token.contains('¥') || token.contains('￥') || token.contains('円');
       final before = match.start > 0 ? masked[match.start - 1] : ' ';
       final after = match.end < masked.length ? masked[match.end] : ' ';
 
@@ -391,7 +397,9 @@ class ReceiptParser {
         if (keyword == '合計' && line.contains('税抜')) continue;
         if (keyword == '計') {
           // '計' is a substring of 合計 / 小計 / 会計 -> require a standalone use.
-          if (line.contains('合計') || line.contains('小計') || line.contains('会計')) {
+          if (line.contains('合計') ||
+              line.contains('小計') ||
+              line.contains('会計')) {
             continue;
           }
         }
@@ -589,8 +597,7 @@ class ReceiptParser {
         '平成' => 1988,
         _ => 1925,
       };
-      final eraYear =
-          match.group(2) == '元' ? 1 : int.parse(match.group(2)!);
+      final eraYear = match.group(2) == '元' ? 1 : int.parse(match.group(2)!);
       final parsed = _safeDate(
         base + eraYear,
         int.parse(match.group(3)!),
@@ -684,8 +691,7 @@ class ReceiptParser {
 
   static final RegExp _itemQtyTimes =
       RegExp(r'(\d{1,3})\s*[×xX]\s*¥?\s*(\d{1,3}(?:,\d{3})+|\d+)');
-  static final RegExp _itemQtyPiece =
-      RegExp(r'(\d{1,3})\s*(?:個|点|本|枚|袋|箱)');
+  static final RegExp _itemQtyPiece = RegExp(r'(\d{1,3})\s*(?:個|点|本|枚|袋|箱)');
   static final RegExp _itemNoise = RegExp(
     r'電話|TEL|住所|登録番号|レジ|担当|領収|レシート|ポイント|お預|お釣|釣銭|'
     r'カード|現金|クレジット|電子マネー|支払|対象|消費税|税率|軽減|割引|値引|'
@@ -724,8 +730,7 @@ class ReceiptParser {
       int? unitPrice;
       if (quantityMatch != null) {
         quantity = int.tryParse(quantityMatch.group(1)!) ?? 1;
-        unitPrice =
-            int.tryParse(quantityMatch.group(2)!.replaceAll(',', ''));
+        unitPrice = int.tryParse(quantityMatch.group(2)!.replaceAll(',', ''));
       } else if (pieceMatch != null) {
         quantity = int.tryParse(pieceMatch.group(1)!) ?? 1;
       }
@@ -735,8 +740,7 @@ class ReceiptParser {
         // "2×198" style: the printed price is the unit price.
         totalPrice = unitPrice * quantity;
       }
-      unitPrice ??=
-          quantity > 1 ? (totalPrice / quantity).round() : totalPrice;
+      unitPrice ??= quantity > 1 ? (totalPrice / quantity).round() : totalPrice;
 
       var name = line;
       if (quantityMatch != null) {
@@ -774,8 +778,7 @@ class ReceiptParser {
           line.contains('軽減') ||
           line.contains('(8%)') ||
           line.contains('（8%）');
-      final standardMarker =
-          line.contains('(10%)') || line.contains('（10%）');
+      final standardMarker = line.contains('(10%)') || line.contains('（10%）');
       final taxRate = reducedMarker ? 8 : (standardMarker ? 10 : null);
 
       items.add(
@@ -882,8 +885,7 @@ class ReceiptParser {
 
     final withoutYear =
         RegExp(r'(?<!\d)(\d{1,2})\s*月\s*(\d{1,2})\s*日').firstMatch(text) ??
-            RegExp(r'(?<!\d)(\d{1,2})\s*/\s*(\d{1,2})(?!\d)')
-                .firstMatch(text);
+            RegExp(r'(?<!\d)(\d{1,2})\s*/\s*(\d{1,2})(?!\d)').firstMatch(text);
     if (withoutYear == null) return null;
 
     final now = DateTime.now();
@@ -930,9 +932,7 @@ class ReceiptParser {
       final lower = line.toLowerCase();
       if (!line.contains('ポイント') && !lower.contains('point')) continue;
       if (line.contains('倍') || line.contains('%')) continue;
-      if (line.contains('残高') &&
-          !line.contains('今回') &&
-          !line.contains('獲得')) {
+      if (line.contains('残高') && !line.contains('今回') && !line.contains('獲得')) {
         continue;
       }
       if (line.contains('ポイントカード') &&

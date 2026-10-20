@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../core/theme/app_palette.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/press_scale.dart';
 import '../../core/utils/barcode_utils.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
@@ -472,10 +474,10 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppPalette.backgroundDeep,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        backgroundColor: AppPalette.backgroundDeep,
+        foregroundColor: AppPalette.text,
         title: const AppText('スキャン'),
         actions: <Widget>[
           if (!kIsWeb)
@@ -525,12 +527,26 @@ class _ScanPageState extends ConsumerState<ScanPage> {
           Theme(
             data: AppTheme.dark,
             child: Container(
-              color: Colors.black,
               padding: EdgeInsets.fromLTRB(
                 context.pagePadding,
                 14,
                 context.pagePadding,
                 20,
+              ),
+              decoration: BoxDecoration(
+                color: AppPalette.background,
+                border: Border(
+                  top: BorderSide(
+                    color: AppPalette.cyan.withValues(alpha: 0.35),
+                  ),
+                ),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: AppPalette.cyan.withValues(alpha: 0.1),
+                    blurRadius: 24,
+                    offset: const Offset(0, -8),
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -553,7 +569,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                     session.mode.hint,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: Colors.white70,
+                      color: AppPalette.textMuted,
                       fontSize: 12,
                       height: 1.4,
                     ),
@@ -563,7 +579,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                     '撮影した写真はGoogle（Firebase AI）に送信して解析します。写真は保存されません。',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white54,
+                      color: AppPalette.textFaint,
                       fontSize: 10.5,
                       height: 1.4,
                     ),
@@ -611,6 +627,12 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                     const SizedBox(height: 8),
                     OutlinedButton.icon(
                       onPressed: _processing ? null : _captureWithDeviceCamera,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppPalette.cyan,
+                        side: BorderSide(
+                          color: AppPalette.cyan.withValues(alpha: 0.55),
+                        ),
+                      ),
                       icon: const Icon(Icons.phone_iphone),
                       label: const AppText('端末のカメラを使う'),
                     ),
@@ -652,10 +674,16 @@ class _ActionButtons extends StatelessWidget {
       return Row(
         children: <Widget>[
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: busy ? null : onCapture,
-              icon: const Icon(Icons.photo_camera_outlined),
-              label: const AppText('レシートを撮影'),
+            child: PressScale(
+              child: FilledButton.icon(
+                onPressed: busy ? null : onCapture,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppPalette.cyan,
+                  foregroundColor: AppPalette.backgroundDeep,
+                ),
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const AppText('レシートを撮影'),
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -676,15 +704,27 @@ class _ActionButtons extends StatelessWidget {
           Row(
             children: <Widget>[
               Expanded(
-                child: FilledButton.icon(
-                  onPressed: busy ? null : onCapture,
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const AppText('撮影して自動入力'),
+                child: PressScale(
+                  child: FilledButton.icon(
+                    onPressed: busy ? null : onCapture,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppPalette.cyan,
+                      foregroundColor: AppPalette.backgroundDeep,
+                    ),
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const AppText('撮影して自動入力'),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: busy ? null : onUseBarcodeOnly,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppPalette.emerald,
+                  side: BorderSide(
+                    color: AppPalette.emerald.withValues(alpha: 0.5),
+                  ),
+                ),
                 child: const AppText('このまま登録'),
               ),
             ],
@@ -692,11 +732,18 @@ class _ActionButtons extends StatelessWidget {
         ] else
           SizedBox(
             width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: busy ? null : onCapture,
-              icon: const Icon(Icons.photo_camera_outlined),
-              label: AppText(
-                mode == ScanMode.barcode ? 'レシートを撮影' : 'レシートを撮影して読み取る',
+            child: PressScale(
+              child: FilledButton.icon(
+                onPressed: busy ? null : onCapture,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppPalette.cyan,
+                  foregroundColor: AppPalette.backgroundDeep,
+                  minimumSize: const Size(0, 52),
+                ),
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: AppText(
+                  mode == ScanMode.barcode ? 'レシートを撮影' : 'レシートを撮影して読み取る',
+                ),
               ),
             ),
           ),
@@ -724,18 +771,19 @@ class _BarcodeBanner extends StatelessWidget {
         ? BarcodeUtils.isValidEan13(barcode)
         : true;
 
+    final accent = valid ? AppPalette.emerald : AppPalette.amber;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white10,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white24),
+        color: AppPalette.surfaceAlt.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withValues(alpha: 0.45)),
       ),
       child: Row(
         children: <Widget>[
           Icon(
             valid ? Icons.qr_code_2 : Icons.warning_amber_outlined,
-            color: valid ? Colors.greenAccent : Colors.orangeAccent,
+            color: accent,
             size: 20,
           ),
           const SizedBox(width: 10),
@@ -745,12 +793,15 @@ class _BarcodeBanner extends StatelessWidget {
               children: <Widget>[
                 AppText(
                   valid ? 'バーコード検出' : 'バーコード（チェックディジット不一致）',
-                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  style: const TextStyle(
+                    color: AppPalette.textMuted,
+                    fontSize: 11,
+                  ),
                 ),
                 AppText(
                   BarcodeUtils.format(barcode),
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppPalette.text,
                     fontSize: 14,
                     letterSpacing: 0.5,
                   ),
@@ -761,7 +812,11 @@ class _BarcodeBanner extends StatelessWidget {
           IconButton(
             tooltip: context.tr('クリア'),
             onPressed: onClear,
-            icon: const Icon(Icons.close, color: Colors.white70, size: 18),
+            icon: const Icon(
+              Icons.close,
+              color: AppPalette.textMuted,
+              size: 18,
+            ),
           ),
         ],
       ),
@@ -780,19 +835,28 @@ class _ErrorBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+        color: AppPalette.danger.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppPalette.danger.withValues(alpha: 0.45),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Icon(Icons.error_outline, color: Colors.redAccent, size: 18),
+          const Icon(
+            Icons.error_outline,
+            color: AppPalette.danger,
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: AppText(
               message,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+              style: const TextStyle(
+                color: AppPalette.text,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -815,7 +879,9 @@ class _ScanFrame extends StatelessWidget {
             (constraints.maxHeight * 0.55).clamp(160.0, 320.0).toDouble();
         return Center(
           child: CustomPaint(
-            painter: _CornerPainter(Colors.white.withValues(alpha: 0.85)),
+            painter: _CornerPainter(
+              AppPalette.cyan.withValues(alpha: 0.9),
+            ),
             child: SizedBox(width: width, height: height),
           ),
         );
@@ -902,9 +968,12 @@ class _TapFocusRingState extends State<_TapFocusRing>
         height: 72,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(color: Colors.black26, blurRadius: 8),
+          border: Border.all(color: AppPalette.cyan, width: 2),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: AppPalette.cyan.withValues(alpha: 0.35),
+              blurRadius: 12,
+            ),
           ],
         ),
         child: const Center(
@@ -914,7 +983,7 @@ class _TapFocusRingState extends State<_TapFocusRing>
             child: DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white,
+                color: AppPalette.cyan,
               ),
             ),
           ),
@@ -932,17 +1001,21 @@ class _ProcessingOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black54,
+      color: AppPalette.backgroundDeep.withValues(alpha: 0.78),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const CircularProgressIndicator(color: Colors.white),
+            const CircularProgressIndicator(color: AppPalette.cyan),
             const SizedBox(height: 14),
             AppText(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: const TextStyle(
+                color: AppPalette.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -1100,11 +1173,14 @@ class _LongReceiptControls extends StatelessWidget {
       children: <Widget>[
         Row(
           children: <Widget>[
-            const Icon(Icons.receipt_long, color: Colors.white70, size: 18),
+            const Icon(Icons.receipt_long, color: AppPalette.cyan, size: 18),
             const SizedBox(width: 8),
             AppText(
               '取り込み済み: $chunkCount 枚',
-              style: const TextStyle(color: Colors.white, fontSize: 13),
+              style: const TextStyle(
+                color: AppPalette.text,
+                fontSize: 13,
+              ),
             ),
             const Spacer(),
             if (chunkCount > 0)

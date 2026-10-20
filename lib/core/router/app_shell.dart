@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../theme/app_palette.dart';
 import '../utils/responsive.dart';
+import '../widgets/press_scale.dart';
 import '../localization/localization.dart';
 
 /// Responsive chrome: NavigationRail on desktop, NavigationBar on mobile.
@@ -40,11 +42,15 @@ class AppShell extends StatelessWidget {
               onDestinationSelected: (index) => _go(context, index),
               leading: Padding(
                 padding: const EdgeInsets.only(top: 12, bottom: 8),
-                child: FloatingActionButton(
-                  heroTag: 'scan-rail',
-                  tooltip: context.tr('レシートをスキャン'),
-                  onPressed: () => context.push('/scan'),
-                  child: const Icon(Icons.document_scanner_outlined),
+                child: PressScale(
+                  child: FloatingActionButton(
+                    heroTag: 'scan-rail',
+                    tooltip: context.tr('レシートをスキャン'),
+                    backgroundColor: AppPalette.cyan,
+                    foregroundColor: AppPalette.backgroundDeep,
+                    onPressed: () => context.push('/scan'),
+                    child: const Icon(Icons.document_scanner_outlined),
+                  ),
                 ),
               ),
               destinations: const <NavigationRailDestination>[

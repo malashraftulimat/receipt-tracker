@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../analytics_provider.dart';
 import '../../../core/localization/localization.dart';
@@ -50,7 +51,9 @@ class AnalyticsPanel extends ConsumerWidget {
                 ),
                 _Metric(label: '件数', value: '${data.monthCount}件'),
                 _Metric(label: '平均', value: formatYen(data.average)),
-                _Metric(label: '6か月合計', value: formatCompactYen(data.sixMonthTotal)),
+                _Metric(
+                    label: '6か月合計',
+                    value: formatCompactYen(data.sixMonthTotal)),
               ],
             ),
             const SizedBox(height: 14),
@@ -135,16 +138,11 @@ class _Metric extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: emphasized
-            ? theme.colorScheme.primary.withValues(alpha: 0.12)
-            : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: emphasized
-              ? theme.colorScheme.primary.withValues(alpha: 0.3)
-              : theme.colorScheme.outlineVariant,
-        ),
+      decoration: AppPalette.card(
+        context,
+        accent: emphasized ? AppPalette.violet : null,
+        radius: 14,
+        glow: emphasized,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,7 +158,7 @@ class _Metric extends StatelessWidget {
             value,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: emphasized ? theme.colorScheme.primary : null,
+              color: emphasized ? AppPalette.violet : AppPalette.text,
             ),
           ),
         ],
@@ -181,12 +179,10 @@ class _ChartCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-        ),
+      decoration: AppPalette.card(
+        context,
+        accent: AppPalette.violet,
+        radius: 16,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,9 +289,16 @@ class _MonthlyBarChart extends StatelessWidget {
                 BarChartRodData(
                   toY: data.months[i].total.toDouble(),
                   width: 18,
-                  color: i == data.months.length - 1
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.primary.withValues(alpha: 0.35),
+                  gradient: LinearGradient(
+                    colors: i == data.months.length - 1
+                        ? <Color>[AppPalette.cyan, AppPalette.violet]
+                        : <Color>[
+                            AppPalette.violet.withValues(alpha: 0.65),
+                            AppPalette.sky.withValues(alpha: 0.35),
+                          ],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(6),
                   ),
@@ -331,7 +334,11 @@ class _CategoryBreakdown extends StatelessWidget {
                   PieChartSectionData(
                     value: slice.amount.toDouble(),
                     color: slice.color,
-                    radius: 26,
+                    radius: 28,
+                    borderSide: BorderSide(
+                      color: AppPalette.background.withValues(alpha: 0.55),
+                      width: 1.5,
+                    ),
                     showTitle: slice.percentOf(total) >= 8,
                     title: '${slice.percentOf(total).round()}%',
                     titleStyle: const TextStyle(
@@ -419,9 +426,7 @@ class _MonthComparison extends StatelessWidget {
             Icon(
               increased ? Icons.trending_up : Icons.trending_down,
               size: 18,
-              color: increased
-                  ? theme.colorScheme.error
-                  : theme.colorScheme.primary,
+              color: increased ? AppPalette.amber : AppPalette.emerald,
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -441,9 +446,7 @@ class _MonthComparison extends StatelessWidget {
                 '${data.momPercent.toStringAsFixed(1)}%',
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: increased
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.primary,
+                  color: increased ? AppPalette.amber : AppPalette.emerald,
                 ),
               ),
           ],
@@ -474,15 +477,16 @@ class _MonthComparison extends StatelessWidget {
                 LineChartBarData(
                   spots: <FlSpot>[
                     for (var i = 0; i < data.currentDaily.length; i++)
-                      FlSpot((i + 1).toDouble(), data.currentDaily[i].toDouble()),
+                      FlSpot(
+                          (i + 1).toDouble(), data.currentDaily[i].toDouble()),
                   ],
                   isCurved: false,
                   barWidth: 2.4,
-                  color: theme.colorScheme.primary,
+                  color: AppPalette.cyan,
                   dotData: const FlDotData(show: false),
                   belowBarData: BarAreaData(
                     show: true,
-                    color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                    color: AppPalette.cyan.withValues(alpha: 0.12),
                   ),
                 ),
                 LineChartBarData(
@@ -495,7 +499,7 @@ class _MonthComparison extends StatelessWidget {
                   ],
                   isCurved: false,
                   barWidth: 1.6,
-                  color: theme.colorScheme.outline,
+                  color: AppPalette.violet.withValues(alpha: 0.7),
                   dashArray: const <int>[4, 4],
                   dotData: const FlDotData(show: false),
                 ),
@@ -506,9 +510,12 @@ class _MonthComparison extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           children: <Widget>[
-            _LegendDot(color: theme.colorScheme.primary, label: '今月'),
+            const _LegendDot(color: AppPalette.cyan, label: '今月'),
             const SizedBox(width: 14),
-            _LegendDot(color: theme.colorScheme.outline, label: '先月'),
+            const _LegendDot(
+              color: AppPalette.violet,
+              label: '先月',
+            ),
             const Spacer(),
             AppText(
               '${data.monthCount}件 / ${data.previousMonthCount}件',

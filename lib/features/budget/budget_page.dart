@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/budget_gradient_bar.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/monthly_budget.dart';
@@ -137,7 +139,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: _cardDecoration(theme),
+            decoration: _cardDecoration(context),
             child: Form(
               key: _formKey,
               child: Column(
@@ -313,7 +315,7 @@ class _SummaryCard extends StatelessWidget {
     if (error != null) {
       return Container(
         padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration(theme),
+        decoration: _cardDecoration(context),
         child: AppText('集計を読み込めませんでした\n$error'),
       );
     }
@@ -326,7 +328,7 @@ class _SummaryCard extends StatelessWidget {
     if (!data.configured) {
       return Container(
         padding: const EdgeInsets.all(16),
-        decoration: _cardDecoration(theme),
+        decoration: _cardDecoration(context),
         child: AppText(
           'この月のプランは未設定です。上のフォームに月収を入力してください。',
           style: theme.textTheme.bodySmall,
@@ -335,15 +337,15 @@ class _SummaryCard extends StatelessWidget {
     }
 
     final statusColor = switch (data.status) {
-      BudgetStatus.onTrack => const Color(0xFF2E7D32),
-      BudgetStatus.warning => const Color(0xFFEF6C00),
-      BudgetStatus.overBudget => theme.colorScheme.error,
-      BudgetStatus.unset => theme.colorScheme.outline,
+      BudgetStatus.onTrack => AppPalette.emerald,
+      BudgetStatus.warning => AppPalette.amber,
+      BudgetStatus.overBudget => AppPalette.danger,
+      BudgetStatus.unset => AppPalette.violet,
     };
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(theme),
+      decoration: _cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -356,11 +358,10 @@ class _SummaryCard extends StatelessWidget {
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: AppPalette.tintedPill(
+                  statusColor,
+                  radius: 8,
                 ),
                 child: AppText(
                   data.statusLabel,
@@ -378,7 +379,8 @@ class _SummaryCard extends StatelessWidget {
             formatYen(data.remaining.abs()),
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
-              color: data.remaining < 0 ? theme.colorScheme.error : null,
+              color:
+                  data.remaining < 0 ? AppPalette.danger : AppPalette.emerald,
             ),
           ),
           AppText(
@@ -387,15 +389,7 @@ class _SummaryCard extends StatelessWidget {
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: data.progress.clamp(0.0, 1.0),
-              minHeight: 10,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              color: statusColor,
-            ),
-          ),
+          BudgetGradientBar(value: data.progress, height: 11),
           const SizedBox(height: 6),
           AppText(
             '支出 ${formatYen(data.spent)} / 自由枠 ${formatYen(data.disposable)} '
@@ -472,18 +466,16 @@ class _Metric extends StatelessWidget {
         const SizedBox(height: 2),
         AppText(
           value,
-          style: theme.textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
+          style:
+              theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
       ],
     );
   }
 }
 
-BoxDecoration _cardDecoration(ThemeData theme) => BoxDecoration(
-      color: theme.colorScheme.surface,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(
-        color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-      ),
+BoxDecoration _cardDecoration(BuildContext context) => AppPalette.card(
+      context,
+      accent: AppPalette.violet,
+      radius: 18,
     );

@@ -13,7 +13,8 @@ Japanese paper receipts and invoices with a **dual scanner**:
   required.
 
 AI returns merchant, purchase date (including Reiwa dates converted to ISO),
-total, subtotal, 8%/10% tax, invoice number (T + 13 digits) and line items. The
+total, subtotal, 8%/10% tax, invoice number (T + 13 digits), line items and a
+suggested category that is auto-selected in the review form. The
 local parser is kept as the fallback and handles **store name, date/time**
 (`2026年10月19日`, `令和8年10月19日`, `R8.10.19`, `2026/10/19`), **total**
 (`合計`, `税込合計`, `¥`), **subtotal** (`小計`) and **consumption tax**
@@ -70,6 +71,8 @@ Required one-time setup in the Firebase console:
    `malashraftulimat.github.io`. `localhost` is already authorized.
 5. **Firebase AI Logic** → Get started (Gemini Developer API backend, Spark plan).
    The app uses the current Flash model documented by Firebase: `gemini-3.8-flash`.
+   Override with `--dart-define=GEMINI_RECEIPT_MODEL=...` only if your project
+   still exposes another Gemini Flash model.
 6. **App Check** → register the web app, create a reCAPTCHA v3 site key, then set
    the `RECAPTCHA_V3_SITE_KEY` build value (or the GitHub Actions repository
    secret of the same name). On web, debug builds use the App Check debug
@@ -176,7 +179,7 @@ lib/
 | `firebase_core` | Firebase app initialization |
 | `firebase_auth` | Email/password auth and persistent sessions |
 | `cloud_firestore` | Per-user receipts, items, categories and budgets |
-| `firebase_ai` | Gemini Developer API via Firebase AI Logic (`gemini-3.8-flash`) |
+| `firebase_ai` | Gemini Developer API via Firebase AI Logic (`gemini-3.8-flash`). This is the official replacement for the discontinued `firebase_vertexai` package. |
 | `firebase_app_check` | App Check protection for AI / Firebase requests |
 | `mobile_scanner` | 1D barcode scanning: ML Kit mobile, WebRTC + ZXing web |
 | `google_mlkit_text_recognition` | On-device OCR (Android/iOS, ja + en) |

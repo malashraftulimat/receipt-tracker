@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
+import 'core/config/ai_config.dart';
 import 'core/config/app_check_config.dart';
 import 'core/config/firebase_config.dart';
 
@@ -20,6 +21,9 @@ Future<void> main() async {
   // Firebase Auth + Cloud Firestore + Firebase AI Logic.
   await Firebase.initializeApp(options: kFirebaseOptions);
   await _initializeAppCheck();
+
+  // Warm the Gemini Developer API backend used for receipt parsing.
+  initializeReceiptAi();
 
   runApp(const ProviderScope(child: ReceiptTrackerApp()));
 }

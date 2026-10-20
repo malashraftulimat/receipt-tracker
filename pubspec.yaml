@@ -28,7 +28,9 @@ dependencies:
   cloud_firestore: ^7.0.0
   firebase_app_check: ^0.5.0
 
-  # Firebase AI Logic (Gemini Developer API) for structured receipt extraction
+  # Firebase AI Logic (Gemini Developer API) for structured receipt extraction.
+  # NOTE: `firebase_vertexai` is discontinued and officially replaced by
+  # `firebase_ai`; this is the current compatible package.
   firebase_ai: ^5.0.0
 
   # Scanning engine

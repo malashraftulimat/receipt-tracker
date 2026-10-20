@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/providers.dart';
 import '../../../core/localization/localization.dart';
@@ -26,22 +27,16 @@ class DueRemindersCard extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-          ),
-        ),
+        decoration: AppPalette.card(context, accent: AppPalette.amber),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
               children: <Widget>[
-                Icon(
+                const Icon(
                   Icons.event_note_outlined,
                   size: 18,
-                  color: theme.colorScheme.primary,
+                  color: AppPalette.amber,
                 ),
                 const SizedBox(width: 8),
                 AppText(
@@ -96,10 +91,10 @@ class _DueRow extends StatelessWidget {
     final days = target.difference(today).inDays;
 
     final color = days < 0 || days <= 3
-        ? theme.colorScheme.error
+        ? AppPalette.danger
         : days <= 7
-            ? const Color(0xFFEF6C00)
-            : theme.colorScheme.primary;
+            ? AppPalette.amber
+            : AppPalette.cyan;
 
     final label = days < 0
         ? '${-days}日超過'
@@ -136,10 +131,7 @@ class _DueRow extends StatelessWidget {
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(8),
-              ),
+              decoration: AppPalette.tintedPill(color, radius: 8),
               child: AppText(
                 label,
                 style: TextStyle(

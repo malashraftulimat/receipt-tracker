@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/press_scale.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/receipt.dart';
@@ -57,22 +59,22 @@ class _SummaryStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final total = receipts.fold<int>(0, (sum, r) => sum + r.totalAmount);
     final average = total ~/ receipts.length;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(14),
-      ),
+      decoration: AppPalette.card(context, accent: AppPalette.cyan),
       child: Row(
         children: <Widget>[
           _SummaryValue(label: '件数', value: '${receipts.length}件'),
           const SizedBox(width: 20),
-          _SummaryValue(label: '合計', value: formatYen(total)),
+          _SummaryValue(
+            label: '合計',
+            value: formatYen(total),
+            accent: AppPalette.emerald,
+          ),
           const SizedBox(width: 20),
           _SummaryValue(label: '平均', value: formatYen(average)),
           const Spacer(),
@@ -80,10 +82,10 @@ class _SummaryStrip extends StatelessWidget {
             tooltip: context.tr('最新の状態に更新'),
             visualDensity: VisualDensity.compact,
             onPressed: onRefresh,
-            icon: Icon(
+            icon: const Icon(
               Icons.refresh,
               size: 18,
-              color: theme.colorScheme.primary,
+              color: AppPalette.cyan,
             ),
           ),
         ],
@@ -93,10 +95,15 @@ class _SummaryStrip extends StatelessWidget {
 }
 
 class _SummaryValue extends StatelessWidget {
-  const _SummaryValue({required this.label, required this.value});
+  const _SummaryValue({
+    required this.label,
+    required this.value,
+    this.accent,
+  });
 
   final String label;
   final String value;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
@@ -111,8 +118,10 @@ class _SummaryValue extends StatelessWidget {
         ),
         AppText(
           value,
-          style: theme.textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: accent,
+          ),
         ),
       ],
     );
@@ -216,7 +225,8 @@ class _HeaderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final base = EdgeInsets.fromLTRB(context.pagePadding, 0, context.pagePadding, 0);
+    final base =
+        EdgeInsets.fromLTRB(context.pagePadding, 0, context.pagePadding, 0);
 
     switch (header.level) {
       case 0:
@@ -236,8 +246,8 @@ class _HeaderTile extends StatelessWidget {
               AppText(
                 header.label,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                  color: AppPalette.violet,
                 ),
               ),
               const Spacer(),
@@ -245,8 +255,8 @@ class _HeaderTile extends StatelessWidget {
                 AppText(
                   formatYen(header.total!),
                   style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600,
+                    color: AppPalette.emerald,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
             ],
@@ -319,10 +329,24 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 56,
-              color: theme.colorScheme.outline,
+            Container(
+              width: 92,
+              height: 92,
+              decoration: BoxDecoration(
+                gradient: AppPalette.accentGradient,
+                shape: BoxShape.circle,
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: AppPalette.violet.withValues(alpha: 0.3),
+                    blurRadius: 28,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.receipt_long_outlined,
+                size: 44,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 16),
             AppText(
@@ -339,10 +363,16 @@ class _EmptyState extends StatelessWidget {
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: () => context.push('/scan'),
-              icon: const Icon(Icons.document_scanner_outlined),
-              label: const AppText('スキャンする'),
+            PressScale(
+              child: FilledButton.icon(
+                onPressed: () => context.push('/scan'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppPalette.cyan,
+                  foregroundColor: AppPalette.backgroundDeep,
+                ),
+                icon: const Icon(Icons.document_scanner_outlined),
+                label: const AppText('スキャンする'),
+              ),
             ),
           ],
         ),

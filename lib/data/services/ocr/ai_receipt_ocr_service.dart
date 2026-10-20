@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:firebase_ai/firebase_ai.dart';
 
+import '../../../core/config/ai_config.dart';
 import '../../../domain/parser/receipt_parser.dart';
 
 /// Firebase AI Logic (Gemini Developer API) receipt extractor.
@@ -11,12 +12,12 @@ import '../../../domain/parser/receipt_parser.dart';
 /// to Firestore, local storage or a file.
 class AiReceiptOcrService {
   AiReceiptOcrService({FirebaseAI? firebaseAi})
-      : _firebaseAi = firebaseAi ?? FirebaseAI.googleAI();
+      : _firebaseAi = firebaseAi ?? initializeReceiptAi();
 
   final FirebaseAI _firebaseAi;
 
   /// Current Gemini Flash model from the Firebase AI Logic docs.
-  static const String modelName = 'gemini-3.8-flash';
+  static const String modelName = kGeminiReceiptModel;
 
   static const String _prompt = '''
 You extract structured data from Japanese printed receipts and invoices.
@@ -43,6 +44,9 @@ Rules:
   total_price is the printed line amount including tax if the receipt shows
   tax-included line prices, otherwise the printed line amount.
   tax_rate must be 8 or 10 when the line identifies the rate, otherwise null.
+- suggested_category must be exactly one of:
+  食費, 外食, 日用品, 光熱費, 交通費, 娯楽, 医療・医薬品, その他.
+  Choose the best category from the store and item names. Use null if unclear.
 - Do not split one printed line into multiple items and do not merge lines.
 ''';
 
@@ -75,6 +79,20 @@ Rules:
       'invoice_number': Schema.string(
         nullable: true,
         description: 'Qualified invoice number: T followed by 13 digits.',
+      ),
+      'suggested_category': Schema.enumString(
+        enumValues: <String>[
+          '食費',
+          '外食',
+          '日用品',
+          '光熱費',
+          '交通費',
+          '娯楽',
+          '医療・医薬品',
+          'その他',
+        ],
+        nullable: true,
+        description: 'Best matching seeded expense category.',
       ),
       'items': Schema.array(
         items: Schema.object(
@@ -124,6 +142,7 @@ Rules:
       'tax_8_amount',
       'tax_10_amount',
       'invoice_number',
+      'suggested_category',
       'items',
     ],
     optionalProperties: <String>[
@@ -134,6 +153,7 @@ Rules:
       'tax_8_amount',
       'tax_10_amount',
       'invoice_number',
+      'suggested_category',
       'items',
     ],
   );
@@ -197,6 +217,7 @@ Rules:
     final tax8 = _amount(json['tax_8_amount']);
     final tax10 = _amount(json['tax_10_amount']);
     final invoice = _invoiceNumber(json['invoice_number']);
+    final suggestedCategory = _suggestedCategory(json['suggested_category']);
     final items = _items(json['items']);
 
     if (merchant == null) warnings.add('店舗名を読み取れませんでした');
@@ -230,6 +251,7 @@ Rules:
       pointBrand: null,
       pointAmount: null,
       barcodeId: invoice,
+      suggestedCategory: suggestedCategory,
       items: items,
       rawText: rawText,
       warnings: warnings,
@@ -238,6 +260,7 @@ Rules:
         if (purchasedAt != null) 'date': 0.9,
         if (total != null) 'total': 0.9,
         if (items.isNotEmpty) 'items': 0.85,
+        if (suggestedCategory != null) 'category': 0.8,
       },
     );
   }
@@ -300,6 +323,21 @@ Rules:
   static int? _taxRate(Object? value) {
     final rate = _amount(value);
     return rate == 8 || rate == 10 ? rate : null;
+  }
+
+  static String? _suggestedCategory(Object? value) {
+    const allowed = <String>{
+      '食費',
+      '外食',
+      '日用品',
+      '光熱費',
+      '交通費',
+      '娯楽',
+      '医療・医薬品',
+      'その他',
+    };
+    final category = _string(value);
+    return category != null && allowed.contains(category) ? category : null;
   }
 
   static String? _invoiceNumber(Object? value) {

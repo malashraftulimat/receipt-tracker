@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/providers.dart';
@@ -56,9 +57,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
     );
 
     if (range != null) {
-      ref
-          .read(receiptFilterProvider.notifier)
-          .setRange(range.start, range.end);
+      ref.read(receiptFilterProvider.notifier).setRange(range.start, range.end);
     }
   }
 
@@ -74,7 +73,8 @@ class _FilterBarState extends ConsumerState<FilterBar> {
     final lastMonth = DateTime(now.year, now.month - 1);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(context.pagePadding, 4, context.pagePadding, 4),
+      padding:
+          EdgeInsets.fromLTRB(context.pagePadding, 4, context.pagePadding, 4),
       child: Column(
         children: <Widget>[
           Row(
@@ -134,13 +134,15 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                 const SizedBox(width: 6),
                 _FilterChip(
                   label: '今月',
-                  selected: filter.month != null && _sameMonth(filter.month!, thisMonth),
+                  selected: filter.month != null &&
+                      _sameMonth(filter.month!, thisMonth),
                   onTap: () => notifier.setMonth(thisMonth),
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
                   label: '先月',
-                  selected: filter.month != null && _sameMonth(filter.month!, lastMonth),
+                  selected: filter.month != null &&
+                      _sameMonth(filter.month!, lastMonth),
                   onTap: () => notifier.setMonth(lastMonth),
                 ),
                 if (filter.from != null)
@@ -149,7 +151,8 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                     child: _FilterChip(
                       label: formatRangeJa(
                         filter.from!,
-                        (filter.to ?? filter.from!).subtract(const Duration(days: 1)),
+                        (filter.to ?? filter.from!)
+                            .subtract(const Duration(days: 1)),
                       ),
                       selected: true,
                       onTap: notifier.clearRange,
@@ -159,7 +162,10 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                   const SizedBox(width: 6),
                   _FilterChip(
                     label: category.name,
-                    accent: category.colorValue,
+                    accent: AppPalette.categoryAccent(
+                      category.name,
+                      fallback: category.colorValue,
+                    ),
                     selected: filter.categoryId == category.id,
                     onTap: () => notifier.toggleCategory(category.id),
                   ),
@@ -215,25 +221,33 @@ class _FilterChip extends StatelessWidget {
     final color = accent ?? theme.colorScheme.primary;
 
     return Material(
-      color: selected ? color.withValues(alpha: 0.14) : theme.colorScheme.surface,
+      color: Colors.transparent,
       shape: StadiumBorder(
         side: BorderSide(
           color: selected
-              ? color.withValues(alpha: 0.6)
+              ? color.withValues(alpha: 0.7)
               : theme.colorScheme.outlineVariant,
         ),
       ),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          child: AppText(
-            label,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? color : theme.colorScheme.onSurfaceVariant,
+      child: Ink(
+        decoration: selected
+            ? AppPalette.tintedPill(color)
+            : BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(999),
+              ),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            child: AppText(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? color : theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ),

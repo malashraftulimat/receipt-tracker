@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/receipt_item.dart';
 import '../../../core/localization/localization.dart';
@@ -13,9 +14,7 @@ class ReceiptItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final taxColor = item.taxRate == 8
-        ? const Color(0xFF2E7D32)
-        : theme.colorScheme.primary;
+    final taxColor = item.taxRate == 8 ? AppPalette.emerald : AppPalette.violet;
 
     final subtitle = <String>[
       '${item.quantity} × ${formatYen(item.effectiveUnitPrice)}',
@@ -49,10 +48,7 @@ class ReceiptItemRow extends StatelessWidget {
             Container(
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: taxColor.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(6),
-              ),
+              decoration: AppPalette.tintedPill(taxColor, radius: 7),
               child: AppText(
                 '${item.taxRate}%',
                 style: TextStyle(
@@ -65,7 +61,8 @@ class ReceiptItemRow extends StatelessWidget {
           AppText(
             formatYen(item.totalPrice),
             style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
+              color: AppPalette.text,
             ),
           ),
         ],

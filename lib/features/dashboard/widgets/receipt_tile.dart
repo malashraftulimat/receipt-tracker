@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/receipt.dart';
 import '../../../core/localization/localization.dart';
@@ -21,10 +22,7 @@ class CategoryPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: AppPalette.tintedPill(color, radius: 8),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -57,24 +55,22 @@ class ReceiptTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final category = receipt.category;
-    final accent = category?.colorValue ?? theme.colorScheme.outline;
+    final accent = AppPalette.categoryAccent(
+      category?.name,
+      fallback: category?.colorValue ?? theme.colorScheme.outline,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       child: Material(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-              ),
-            ),
+            decoration: AppPalette.card(context, accent: accent),
             child: Row(
               children: <Widget>[
                 CircleAvatar(
@@ -130,8 +126,10 @@ class ReceiptTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 AppText(
                   formatYen(receipt.totalAmount),
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppPalette.emerald,
+                  ),
                 ),
               ],
             ),
@@ -156,19 +154,14 @@ class ReceiptGridCard extends StatelessWidget {
     final accent = category?.colorValue ?? theme.colorScheme.outline;
 
     return Material(
-      color: theme.colorScheme.surface,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-            ),
-          ),
+          decoration: AppPalette.card(context, accent: accent),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[

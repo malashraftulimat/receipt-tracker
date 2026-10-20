@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/budget_gradient_bar.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/monthly_budget.dart';
 import '../../../core/localization/localization.dart';
@@ -34,11 +36,12 @@ class BudgetCard extends ConsumerWidget {
         data: (summary) {
           if (!summary.configured) {
             return _Shell(
+              accent: AppPalette.violet,
               child: Row(
                 children: <Widget>[
-                  Icon(
+                  const Icon(
                     Icons.savings_outlined,
-                    color: theme.colorScheme.primary,
+                    color: AppPalette.amber,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -69,13 +72,14 @@ class BudgetCard extends ConsumerWidget {
           }
 
           final statusColor = switch (summary.status) {
-            BudgetStatus.onTrack => const Color(0xFF2E7D32),
-            BudgetStatus.warning => const Color(0xFFEF6C00),
-            BudgetStatus.overBudget => theme.colorScheme.error,
-            BudgetStatus.unset => theme.colorScheme.outline,
+            BudgetStatus.onTrack => AppPalette.emerald,
+            BudgetStatus.warning => AppPalette.amber,
+            BudgetStatus.overBudget => AppPalette.danger,
+            BudgetStatus.unset => AppPalette.violet,
           };
 
           return _Shell(
+            accent: statusColor,
             onTap: () => context.push('/budget'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,10 +98,7 @@ class BudgetCard extends ConsumerWidget {
                         horizontal: 8,
                         vertical: 2,
                       ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      decoration: AppPalette.tintedPill(statusColor, radius: 8),
                       child: AppText(
                         summary.statusLabel,
                         style: TextStyle(
@@ -115,19 +116,14 @@ class BudgetCard extends ConsumerWidget {
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: summary.remaining < 0
-                        ? theme.colorScheme.error
-                        : theme.colorScheme.onSurface,
+                        ? AppPalette.danger
+                        : AppPalette.emerald,
                   ),
                 ),
                 const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: summary.progress.clamp(0.0, 1.0),
-                    minHeight: 8,
-                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                    color: statusColor,
-                  ),
+                BudgetGradientBar(
+                  value: summary.progress,
+                  height: 9,
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -163,29 +159,24 @@ class BudgetCard extends ConsumerWidget {
 }
 
 class _Shell extends StatelessWidget {
-  const _Shell({required this.child, this.onTap});
+  const _Shell({required this.child, this.onTap, this.accent});
 
   final Widget child;
   final VoidCallback? onTap;
+  final Color? accent;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surface,
-      borderRadius: BorderRadius.circular(16),
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-            ),
-          ),
+          padding: const EdgeInsets.all(16),
+          decoration: AppPalette.card(context, accent: accent, glow: true),
           child: child,
         ),
       ),
