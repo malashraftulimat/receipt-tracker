@@ -293,8 +293,8 @@ class _MoneyField extends StatelessWidget {
         FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
       ],
       decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
+        labelText: context.tr(label),
+        hintText: context.tr(hint),
         prefixText: '¥ ',
         prefixIcon: Icon(icon),
       ),

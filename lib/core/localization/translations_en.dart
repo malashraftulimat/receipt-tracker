@@ -197,7 +197,7 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   '1日あたり': 'Per day',
   '今日の支出': 'Today\'s spending',
   '貯蓄ペース': 'Savings pace',
-  '貯蓄目標': 'Savings goal',
+  '貯蓄目標': 'Savings Goal',
   '支払期限が近いもの': 'Upcoming due dates',
   '今日': 'Today',
   '今日が期限です': 'Due today',
@@ -240,10 +240,10 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   // Budget
   '予算と貯蓄': 'Budget and savings',
   '毎月のプラン': 'Monthly plan',
-  '月収（手取り）': 'Monthly income (take-home)',
+  '月収（手取り）': 'Monthly Income (Net)',
   '例: 250,000': 'e.g. 250,000',
   '例: 30,000': 'e.g. 30,000',
-  '固定費（家賃・光熱費・サブスク）': 'Fixed costs (rent, utilities, subscriptions)',
+  '固定費（家賃・光熱費・サブスク）': 'Fixed Expenses (rent, utilities, subscriptions)',
   '例: 80,000': 'e.g. 80,000',
   'プランを保存': 'Save plan',
   '自由に使える金額 = 月収 − 貯蓄目標 − 固定費。\nレシートを登録すると、その月の残り予算から自動で差し引かれます。\n「1日あたり」は残り予算 ÷ 残り日数です。':
@@ -257,6 +257,12 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   '予算を超えています。': 'You are over budget.',
   '予算を保存しました': 'Budget saved',
   '保存に失敗しました': 'Could not save',
+
+  '予算未設定': 'Budget not set',
+  '順調': 'On track',
+  'ペース注意': 'Watch spending pace',
+  '予算オーバー': 'Over budget',
+  'カテゴリを読み込めませんでした\n': 'Could not load categories\n',
 
   // Review / receipt detail
   '内容の確認': 'Review',

@@ -58,9 +58,14 @@ class CategoriesPage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const AppText('カテゴリを削除しますか？'),
-        content: AppText(
-          '「${category.name}」を削除します。'
-          'このカテゴリに紐づくレシートは「未分類」になります。',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            AppText('「${category.name}」を削除します。'),
+            const SizedBox(height: 6),
+            const AppText('このカテゴリに紐づくレシートは「未分類」になります。'),
+          ],
         ),
         actions: <Widget>[
           TextButton(
@@ -185,13 +190,6 @@ class CategoriesPage extends ConsumerWidget {
                         ),
                       ],
                     ],
-                  ),
-                  subtitle: AppText(
-                    category.color,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: accent.withValues(alpha: 0.85),
-                    ),
                   ),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
