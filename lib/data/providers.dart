@@ -43,7 +43,7 @@ final ocrServiceProvider = Provider<OcrService>((ref) {
   return service;
 });
 
-/// Primary extraction engine: Firebase AI Logic (Gemini Developer API).
+/// Primary extraction engine: direct Google AI Studio (Gemini Developer API).
 final aiReceiptOcrServiceProvider = Provider<AiReceiptOcrService>(
   (ref) => AiReceiptOcrService(),
 );

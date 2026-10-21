@@ -80,10 +80,10 @@ cd build/web && python -m http.server 8080
 Deploy the folder to Netlify / Vercel / Firebase Hosting / S3 + CloudFront.
 The web build uses the browser's `getUserMedia` stream for live 1D barcode
 scanning and OCR frame capture; `web/zxing.min.js` is bundled automatically.
-Primary extraction uses Firebase AI Logic / Gemini Flash; when AI is unavailable,
+Primary extraction uses direct Google AI Studio / Gemini Flash; when AI is unavailable,
 OCR runs client-side with Tesseract.js (`web/tesseract.min.js`, WASM/worker/
 language data from CDN, cached by the browser). Firebase provides Auth, Firestore
-and AI Logic. Receipt photos are never stored; the JPEG stays in memory.
+and a direct Gemini API client. Receipt photos are never stored; the JPEG stays in memory.
 Camera permission requires HTTPS (or `localhost`); if access is denied, the
 scanner falls back to photo upload.
 

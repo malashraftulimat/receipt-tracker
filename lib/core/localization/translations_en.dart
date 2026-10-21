@@ -169,8 +169,8 @@ const Map<String, String> kEnglishTranslations = <String, String>{
       'Neither AI nor on-device OCR could read the receipt. Check your connection or enter it manually.',
   'レシートデータはアカウントに紐づけて暗号化保存され、すべての端末で同期されます。写真は保存されません。':
       'Receipt data is stored encrypted with your account and synced across all devices. Photos are never stored.',
-  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nAI抽出: Gemini Flash（Firebase AI Logic）\nフォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）':
-      '1D barcode: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nAI extraction: Gemini Flash (Firebase AI Logic)\nFallback OCR: ML Kit (iOS/Android) / Tesseract.js (web)',
+  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nAI抽出: Gemini Flash（Google AI Studio）\nフォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）':
+      '1D barcode: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nAI extraction: Gemini Flash (Google AI Studio)\nFallback OCR: ML Kit (iOS/Android) / Tesseract.js (web)',
 
   // Dashboard
   '集計': 'Analytics',

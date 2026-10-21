@@ -18,21 +18,21 @@ Future<void> main() async {
   await initializeDateFormatting('en');
   await initializeDateFormatting('ar');
 
-  // Firebase Auth + Cloud Firestore + Firebase AI Logic.
+  // Firebase Auth + Cloud Firestore + direct Google AI Studio.
   await Firebase.initializeApp(options: kFirebaseOptions);
   await _initializeAppCheck();
 
-  // Warm the Gemini Developer API backend used for receipt parsing.
-  initializeReceiptAi();
+  // Validate the API key / project used by the direct Gemini client.
+  verifyGeminiConfiguration();
 
   runApp(const ProviderScope(child: ReceiptTrackerApp()));
 }
 
-/// Enables App Check for Firebase AI Logic and the other Firebase services.
+/// Enables App Check for Firebase services.
 ///
 /// Web debug builds use the App Check debug provider. Release web builds use
 /// reCAPTCHA v3 when `RECAPTCHA_V3_SITE_KEY` is supplied; when it is absent the
-/// app still starts normally (AI requests simply fall back to local OCR).
+/// app still starts normally (Firebase services do not enforce App Check).
 Future<void> _initializeAppCheck() async {
   try {
     if (kIsWeb) {

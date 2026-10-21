@@ -1,23 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../../../core/config/ai_config.dart';
 import '../../../domain/parser/receipt_parser.dart';
 
-/// Firebase AI Logic (Gemini Developer API) receipt extractor.
+/// Direct Google AI Studio / Gemini Developer API receipt extractor.
 ///
-/// The photo is sent only for inference. This service never writes the image
-/// to Firestore, local storage or a file.
+/// Works on Flutter Web through the browser HTTP client. The photo is sent
+/// only for inference and is never written to Firestore or local storage.
 class AiReceiptOcrService {
-  AiReceiptOcrService({FirebaseAI? firebaseAi})
-      : _firebaseAi = firebaseAi ?? initializeReceiptAi();
+  AiReceiptOcrService({String? apiKey}) : _apiKey = apiKey ?? geminiApiKey();
 
-  final FirebaseAI _firebaseAi;
+  final String _apiKey;
 
-  /// Current Gemini Flash model from the Firebase AI Logic docs.
+  /// Current Gemini Flash model from the Google AI Studio model list.
   static const String modelName = kGeminiReceiptModel;
 
   static const String _prompt = '''
@@ -96,12 +95,12 @@ Rules:
         description: 'Best matching seeded expense category.',
       ),
       'items': Schema.array(
+        description: 'Product lines only, in printed order.',
         items: Schema.object(
           properties: <String, Schema>{
             'name': Schema.string(description: 'Printed product name.'),
             'quantity': Schema.integer(
               nullable: true,
-              minimum: 1,
               description: 'Quantity, default 1.',
             ),
             'unit_price': Schema.integer(
@@ -117,25 +116,17 @@ Rules:
               description: 'Line tax rate: 8, 10, or null if unknown.',
             ),
           },
-          propertyOrdering: <String>[
+          requiredProperties: <String>[
             'name',
             'quantity',
             'unit_price',
             'total_price',
             'tax_rate',
           ],
-          optionalProperties: <String>[
-            'quantity',
-            'unit_price',
-            'total_price',
-            'tax_rate',
-          ],
         ),
-        description: 'Product lines only, in printed order.',
-        maxItems: 100,
       ),
     },
-    propertyOrdering: <String>[
+    requiredProperties: <String>[
       'merchant',
       'purchased_at',
       'total',
@@ -146,17 +137,7 @@ Rules:
       'suggested_category',
       'items',
     ],
-    optionalProperties: <String>[
-      'merchant',
-      'purchased_at',
-      'total',
-      'subtotal',
-      'tax_8_amount',
-      'tax_10_amount',
-      'invoice_number',
-      'suggested_category',
-      'items',
-    ],
+    description: 'Structured Japanese receipt extraction.',
   );
 
   /// Sends [jpegBytes] to Gemini and converts the structured response into the
@@ -169,10 +150,10 @@ Rules:
     final response = await _generateContent(
       <Content>[
         Content.multi(<Part>[
-          const TextPart(
+          TextPart(
             'Extract this Japanese receipt. Use null for anything unreadable.',
           ),
-          InlineDataPart('image/jpeg', jpegBytes),
+          DataPart('image/jpeg', jpegBytes),
         ]),
       ],
       generationConfig: GenerationConfig(
@@ -181,7 +162,6 @@ Rules:
         temperature: 0,
       ),
     );
-
     final text = response.text;
     if (text == null || text.trim().isEmpty) {
       throw const AiReceiptOcrException('AIから読み取り結果が返りませんでした。');
@@ -218,8 +198,9 @@ Rules:
     String? lastModelName;
 
     for (final name in modelNames) {
-      final model = _firebaseAi.generativeModel(
+      final model = GenerativeModel(
         model: name,
+        apiKey: _apiKey,
         systemInstruction: Content.system(_prompt),
       );
 
@@ -275,13 +256,11 @@ Rules:
     final text = error.toString().toLowerCase();
     final AiReceiptFailureKind kind;
 
-    if (error is QuotaExceeded ||
-        text.contains('quota') ||
+    if (text.contains('quota') ||
         text.contains('resource_exhausted') ||
         text.contains('429')) {
       kind = AiReceiptFailureKind.quota;
-    } else if (error is ServiceApiNotEnabled ||
-        error is InvalidApiKey ||
+    } else if (error is InvalidApiKey ||
         text.contains('permission_denied') ||
         text.contains('api key') ||
         text.contains('app check') ||

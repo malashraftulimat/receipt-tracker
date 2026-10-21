@@ -38,7 +38,8 @@ jobs:
       - name: Build Flutter web
         run: |
           flutter build web --release --base-href=${{ steps.pages.outputs.base_path }}/ \
-            --dart-define=RECAPTCHA_V3_SITE_KEY=${{ secrets.RECAPTCHA_V3_SITE_KEY }}
+            --dart-define=RECAPTCHA_V3_SITE_KEY=${{ secrets.RECAPTCHA_V3_SITE_KEY }} \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           touch build/web/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

@@ -257,7 +257,7 @@ class SettingsPage extends ConsumerWidget {
                 title: AppText('スキャンエンジン'),
                 subtitle: AppText(
                   '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\n'
-                  'AI抽出: Gemini Flash（Firebase AI Logic）\n'
+                  'AI抽出: Gemini Flash（Google AI Studio）\n'
                   'フォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）',
                 ),
               ),

@@ -20,10 +20,12 @@ In the Firebase console:
 4. **Authentication → Settings → Authorized domains** → add the GitHub Pages
    hostname (for example `malashraftulimat.github.io`). `localhost` is already
    authorized.
-5. **Firebase AI Logic** → Get started with the Gemini Developer API backend.
-   The app defaults to `gemini-3.8-flash` and falls back through
-   `gemini-3.7-flash` / `gemini-3.5-flash` automatically (see
-   `AiReceiptOcrService`). Retired 2.0/1.5 model names are not used.
+5. **Gemini key** → direct requests use the Firebase project API key by default.
+   If needed, pass a Google AI Studio key with
+   `--dart-define=GEMINI_API_KEY=...` and restrict it to your web domains and
+   the Generative Language API. The app defaults to `gemini-3.8-flash` and
+   falls back through `gemini-3.7-flash` / `gemini-3.5-flash` automatically
+   (see `AiReceiptOcrService`). Retired 2.0/1.5 model names are not used.
 6. **App Check** → register the web app and create a reCAPTCHA v3 site key. Pass
    it with `--dart-define=RECAPTCHA_V3_SITE_KEY=...` (or set the GitHub Actions
    secret) to activate App Check in release web builds. Debug web builds use the
@@ -109,7 +111,7 @@ Netlify, etc.) or `localhost`, otherwise `getUserMedia` is unavailable.
 
 - Live barcode detection uses `mobile_scanner`'s HTML5/WebRTC backend.
 - `web/zxing.min.js` is bundled locally (no CDN required).
-- Primary extraction uses **Firebase AI Logic / Gemini Flash** with a JSON
+- Primary extraction uses the **direct Google AI Studio / Gemini Flash API** with a JSON
   response schema. If it fails (offline / quota / error), OCR falls back to
   **Tesseract.js** (`web/tesseract.min.js` + WASM). The first fallback scan
   downloads worker/WASM/Japanese+English language data from the Tesseract.js CDN;

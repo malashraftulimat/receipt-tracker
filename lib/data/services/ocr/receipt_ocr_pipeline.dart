@@ -30,7 +30,7 @@ class ReceiptExtractionResult {
   bool get aiServiceUnavailable => aiFailure?.isTemporaryServiceIssue ?? false;
 }
 
-/// Gemini (Firebase AI Logic) first, ML Kit / Tesseract.js on error, offline
+/// Gemini (direct Google AI Studio) first, ML Kit / Tesseract.js on error, offline
 /// or quota exhaustion. The image is passed by reference and never stored.
 class ReceiptOcrPipeline {
   const ReceiptOcrPipeline({

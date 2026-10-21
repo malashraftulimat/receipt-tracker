@@ -6,8 +6,8 @@ Japanese paper receipts and invoices with a **dual scanner**:
 - **1D barcode engine** — JAN-13 / EAN-8 / UPC-A / Code 128 / Code 39 / ITF via
   `mobile_scanner` (ML Kit on mobile, HTML5/WebRTC + ZXing on Web).
 - **AI extraction engine** — the captured JPEG is sent to **Gemini Flash**
-  through **Firebase AI Logic** (Gemini Developer API, Spark/free tier) with a
-  JSON response schema. **ML Kit** (Android/iOS) and **Tesseract.js (WASM)**
+  through the **direct Google AI Studio / Gemini Developer API** with a JSON
+  response schema. **ML Kit** (Android/iOS) and **Tesseract.js (WASM)**
   (Web) remain automatic fallbacks when AI is offline, unavailable or out of
   quota. No Cloud Functions, Firebase Storage, Blaze plan or credit card are
   required.
@@ -69,7 +69,11 @@ Required one-time setup in the Firebase console:
 
 4. **Authentication → Settings → Authorized domains** → add
    `malashraftulimat.github.io`. `localhost` is already authorized.
-5. **Firebase AI Logic** → Get started (Gemini Developer API backend, Spark plan).
+5. **Gemini API key** → direct requests use the existing Firebase project API key
+   from `FirebaseOptions` by default. If that key is restricted for Gemini,
+   create a Google AI Studio key and pass it with
+   `--dart-define=GEMINI_API_KEY=...`. Restrict the key to your authorised web
+   domains and the Generative Language API.
    The app defaults to `gemini-3.8-flash` and automatically tries
    `gemini-3.7-flash` / `gemini-3.5-flash` when a model is unavailable or not
    exposed. Retired models such as `gemini-2.0-flash` and `gemini-1.5-flash`
@@ -129,7 +133,7 @@ lib/
 ├── main.dart                       # intl + Firebase.initializeApp
 ├── app.dart                        # MaterialApp.router, theme, locale
 ├── core/
-│   ├── config/                     # hard-coded FirebaseOptions + App Check key
+│   ├── config/                     # FirebaseOptions, App Check and Gemini model/key
 │   ├── localization/               # AppLanguage, AppLocalizations, AppText
 │   ├── router/                     # auth redirect + responsive shell
 │   ├── theme/                      # Material 3 light/dark
@@ -144,7 +148,7 @@ lib/
 │   └── services/
 │       ├── image_input.dart        # native camera / photo fallback
 │       ├── camera/                 # web <video> capture, focus constraints, file-capture input
-│       └── ocr/                    # Gemini AI Logic + ML Kit / Tesseract.js fallback
+│       └── ocr/                    # direct Gemini API + ML Kit / Tesseract.js fallback
 └── features/
     ├── auth/ scan/ review/
     ├── dashboard/ receipts/ categories/ budget/
@@ -154,7 +158,7 @@ lib/
 ### Data flow
 
 ```
- camera / image ─► Gemini Flash (Firebase AI Logic) ─┐
+ camera / image ─► Gemini Flash (Google AI Studio) ─┐
                          JSON response schema          │
                          │ error / offline / quota     │
                          ▼                             │
@@ -180,8 +184,8 @@ lib/
 | `firebase_core` | Firebase app initialization |
 | `firebase_auth` | Email/password auth and persistent sessions |
 | `cloud_firestore` | Per-user receipts, items, categories and budgets |
-| `firebase_ai` | Gemini Developer API via Firebase AI Logic (`gemini-3.8-flash` primary, with current model fallbacks). This is the official replacement for the discontinued `firebase_vertexai` package. |
-| `firebase_app_check` | App Check protection for AI / Firebase requests |
+| `google_generative_ai` | Direct Google AI Studio / Gemini Developer API client for Flutter Web (`gemini-3.8-flash` primary, with current model fallbacks). |
+| `firebase_app_check` | App Check protection for Firebase requests |
 | `mobile_scanner` | 1D barcode scanning: ML Kit mobile, WebRTC + ZXing web |
 | `google_mlkit_text_recognition` | On-device OCR (Android/iOS, ja + en) |
 | `image_picker` | Native camera capture / photo fallback |
@@ -207,7 +211,8 @@ Release builds:
 ```bash
 flutter build apk --release --split-per-abi
 flutter build web --release --base-href=/receipt-tracker/ \
-  --dart-define=RECAPTCHA_V3_SITE_KEY=6L...   # optional App Check key
+  --dart-define=RECAPTCHA_V3_SITE_KEY=6L... \
+  --dart-define=GEMINI_API_KEY=...            # optional Google AI Studio key
 flutter build windows --release   # Windows host + VS C++ + Developer Mode
 flutter build ipa --release       # macOS host + Xcode + signing
 ```
@@ -221,8 +226,10 @@ Pushing to `main` runs [`.github/workflows/pages.yml`](.github/workflows/pages.y
 which runs `flutter analyze`, `flutter test`, builds the web app with the
 repository base path and deploys `build/web`. The hard-coded Firebase config is
 included in the build. Add an optional `RECAPTCHA_V3_SITE_KEY` repository
-secret to enable App Check for the deployed site; without it the build succeeds
-and AI falls back to local OCR.
+secret to enable App Check for Firebase services. Add an optional
+`GEMINI_API_KEY` repository secret when the Firebase project key cannot call the
+Generative Language API directly; without it the app uses the Firebase key and
+falls back to local OCR on any AI failure.
 
 Remember to add the Pages hostname to Firebase Auth **Authorized domains**.
 
@@ -246,7 +253,8 @@ line-item extraction.
    stored and the review screen opens with the barcode / invoice number filled.
 2. **AI OCR mode** — a still image is captured from the live web frame, the
    device-camera file input, or `image_picker` on mobile. The JPEG is sent to
-   `AiReceiptOcrService` (Gemini `gemini-3.8-flash` with model fallbacks) with a JSON response
+   `AiReceiptOcrService` (direct Google AI Studio, Gemini `gemini-3.8-flash`
+   with model fallbacks) with a JSON response
    schema, then mapped into `ReceiptDraft` / `ReceiptItem`.
 3. **Automatic fallback** — if Gemini errors, is offline or is out of quota, the
    existing ML Kit (mobile) / Tesseract.js (web) service and `ReceiptParser` run

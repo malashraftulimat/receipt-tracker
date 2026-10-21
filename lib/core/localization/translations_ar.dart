@@ -167,8 +167,8 @@ const Map<String, String> kArabicTranslations = <String, String>{
       'تعذّرت القراءة بالذكاء الاصطناعي وOCR على الجهاز. تحقق من الاتصال أو أدخل الإيصال يدوياً.',
   'レシートデータはアカウントに紐づけて暗号化保存され、すべての端末で同期されます。写真は保存されません。':
       'تُحفظ بيانات الإيصال مشفّرة مع حسابك وتتزامن على جميع الأجهزة. لا تُحفظ الصور أبداً.',
-  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nAI抽出: Gemini Flash（Firebase AI Logic）\nフォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）':
-      'باركود 1D: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nاستخراج AI: Gemini Flash (Firebase AI Logic)\nOCR احتياطي: ML Kit (iOS/Android) / Tesseract.js (web)',
+  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nAI抽出: Gemini Flash（Google AI Studio）\nフォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）':
+      'باركود 1D: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\nاستخراج AI: Gemini Flash (Google AI Studio)\nOCR احتياطي: ML Kit (iOS/Android) / Tesseract.js (web)',
 
   // Dashboard
   '集計': 'التحليلات',
