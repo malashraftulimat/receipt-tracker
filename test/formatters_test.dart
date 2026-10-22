@@ -34,6 +34,22 @@ void main() {
     expect(parseYenInput(''), isNull);
   });
 
+  test('currency-aware decimal formatting', () {
+    expect(formatMoney(1234, currency: 'JPY'), '¥1,234');
+    expect(formatMoney(1234.5, currency: 'USD'), r'$1,234.50');
+    expect(formatMoney(12.5, currency: 'SAR'), '﷼12.50');
+    expect(formatMoney(99, currency: 'XYZ'), 'XYZ 99.00');
+    expect(currencySymbol('eur'), '€');
+  });
+
+  test('parseAmountInput accepts decimals and currency symbols', () {
+    expect(parseAmountInput(r'$1,234.50'), 1234.5);
+    expect(parseAmountInput('1.234,56'), 1234.56);
+    expect(parseAmountInput('12,50'), 12.5);
+    expect(parseAmountInput('¥1,234'), 1234);
+    expect(parseAmountInput(''), isNull);
+  });
+
   test('Japanese date labels', () {
     expect(formatDateJa(DateTime(2026, 10, 19)), '2026年10月19日(月)');
     expect(formatMonthJa(DateTime(2026, 10, 1)), '2026年10月');

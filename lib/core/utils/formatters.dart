@@ -1,17 +1,90 @@
 import 'package:intl/intl.dart';
 
-/// `¥1,234` (JPY is always displayed without decimals).
-String formatYen(num amount, {bool withSymbol = true}) {
-  final value = amount.round();
-  final digits = value.abs().toString();
+/// Currencies that are conventionally printed without a decimal part.
+const Set<String> _zeroDecimalCurrencies = <String>{
+  'JPY',
+  'KRW',
+  'VND',
+  'CLP',
+  'ISK',
+  'HUF',
+};
+
+const Map<String, String> _currencySymbols = <String, String>{
+  'JPY': '¥',
+  'USD': r'$',
+  'EUR': '€',
+  'GBP': '£',
+  'CNY': '¥',
+  'KRW': '₩',
+  'INR': '₹',
+  'SAR': '﷼',
+  'AED': 'د.إ',
+  'EGP': 'E£',
+  'TRY': '₺',
+  'THB': '฿',
+  'VND': '₫',
+  'RUB': '₽',
+  'AUD': r'A$',
+  'CAD': r'C$',
+  'CHF': 'CHF',
+  'TWD': r'NT$',
+  'HKD': r'HK$',
+  'SGD': r'S$',
+  'BRL': r'R$',
+  'MXN': r'MX$',
+  'IDR': 'Rp',
+  'MYR': 'RM',
+  'PHP': '₱',
+  'NZD': r'NZ$',
+};
+
+/// Symbol (or the ISO code itself when no symbol is known) for [currency].
+String currencySymbol(String currency) {
+  final code = currency.trim().toUpperCase();
+  return _currencySymbols[code] ?? code;
+}
+
+String _groupDigits(String digits) {
   final buffer = StringBuffer();
   for (var i = 0; i < digits.length; i++) {
     if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
     buffer.write(digits[i]);
   }
-  final sign = value < 0 ? '-' : '';
-  return withSymbol ? '$sign¥$buffer' : '$sign$buffer';
+  return buffer.toString();
 }
+
+/// Formats [amount] in [currency] (ISO 4217 code) with grouping and decimals.
+///
+/// Zero-decimal currencies (JPY, KRW, ...) omit the fraction when the amount
+/// is whole, but still show it when the receipt carries a decimal value.
+String formatMoney(
+  num amount, {
+  String currency = 'JPY',
+  bool withSymbol = true,
+}) {
+  final code = currency.trim().toUpperCase();
+  final value = amount.toDouble();
+  final hasFraction = (value - value.roundToDouble()).abs() > 1e-9;
+  final fractionDigits =
+      hasFraction ? 2 : (_zeroDecimalCurrencies.contains(code) ? 0 : 2);
+
+  final fixed = value.abs().toStringAsFixed(fractionDigits);
+  final parts = fixed.split('.');
+  final grouped = _groupDigits(parts[0]);
+  final number = parts.length > 1 ? '$grouped.${parts[1]}' : grouped;
+  final sign = value < 0 ? '-' : '';
+  if (!withSymbol) return '$sign$number';
+  final symbol = currencySymbol(code);
+  // Unknown currencies fall back to the ISO code, separated by a space.
+  final separator = symbol == code ? ' ' : '';
+  return '$sign$symbol$separator$number';
+}
+
+/// `¥1,234` (JPY is displayed without decimals unless the value has a
+/// fractional part).
+String formatYen(num amount, {bool withSymbol = true}) =>
+    formatMoney(amount, currency: 'JPY', withSymbol: withSymbol);
 
 /// `1.2万円` style compact label for charts.
 String formatCompactYen(num amount) {
@@ -33,23 +106,77 @@ String formatCompactYen(num amount) {
   return formatYen(value);
 }
 
-/// `1,234` without the currency symbol.
-String formatAmountDigits(num amount) => formatYen(amount, withSymbol: false);
+/// Editable amount text without the currency symbol. Decimals are preserved
+/// only when they are non-zero so whole amounts stay easy to read.
+String formatAmountDigits(num amount) {
+  final value = amount.toDouble();
+  final whole = value == value.roundToDouble();
+  final fixed =
+      whole ? value.abs().round().toString() : value.abs().toStringAsFixed(2);
+  final parts = fixed.split('.');
+  final grouped = _groupDigits(parts[0]);
+  final number = parts.length > 1 ? '$grouped.${parts[1]}' : grouped;
+  final sign = value < 0 ? '-' : '';
+  return '$sign$number';
+}
 
-/// Parses user input such as `¥1,234` or `１２３４` into an integer yen value.
-int? parseYenInput(String input) {
+/// Strips full-width characters, currency symbols and separators from [input]
+/// and normalises either `1,234.56` or `1.234,56` into a decimal string.
+String? _normalizeNumberInput(String input) {
   final normalized = StringBuffer();
   for (final rune in input.runes) {
-    // Full-width digits -> ASCII digits, so IME input works too.
+    // Full-width digits / punctuation -> ASCII so IME input works too.
     if (rune >= 0xFF10 && rune <= 0xFF19) {
       normalized.writeCharCode(rune - 0xFEE0);
+    } else if (rune == 0xFF0E) {
+      normalized.write('.');
+    } else if (rune == 0xFF0C) {
+      normalized.write(',');
     } else {
       normalized.writeCharCode(rune);
     }
   }
-  final digits = normalized.toString().replaceAll(RegExp(r'[^0-9]'), '');
-  if (digits.isEmpty) return null;
-  return int.tryParse(digits);
+
+  var text = normalized.toString().replaceAll(RegExp(r'[^0-9.,\-]'), '').trim();
+  if (text.isEmpty || text == '-' || text == '.' || text == ',') return null;
+
+  final lastComma = text.lastIndexOf(',');
+  final lastDot = text.lastIndexOf('.');
+  if (lastComma >= 0 && lastDot >= 0) {
+    if (lastComma > lastDot) {
+      // European style: 1.234,56 -> 1234.56
+      text = text.replaceAll('.', '').replaceAll(',', '.');
+    } else {
+      // US style: 1,234.56 -> 1234.56
+      text = text.replaceAll(',', '');
+    }
+  } else if (lastComma >= 0) {
+    final digitsAfter = text.length - lastComma - 1;
+    final commaCount = RegExp(',').allMatches(text).length;
+    if (commaCount == 1 && digitsAfter > 0 && digitsAfter <= 2) {
+      text = text.replaceAll(',', '.');
+    } else {
+      text = text.replaceAll(',', '');
+    }
+  }
+  return text;
+}
+
+/// Parses user input such as `¥1,234`, `12.50` or `１２３４` into a decimal
+/// amount. Currency-agnostic and decimal-aware.
+double? parseAmountInput(String input) {
+  final normalized = _normalizeNumberInput(input);
+  if (normalized == null) return null;
+  return double.tryParse(normalized);
+}
+
+/// Parses user input such as `¥1,234` or `１２３４` into an integer value.
+int? parseYenInput(String input) {
+  final normalized = _normalizeNumberInput(input);
+  if (normalized == null) return null;
+  final value = double.tryParse(normalized);
+  if (value == null) return null;
+  return value.round();
 }
 
 // ---------------------------------------------------------------------------
@@ -78,16 +205,13 @@ String formatDateShortJa(DateTime date) {
 }
 
 String formatMonthJa(DateTime date) {
-  final pattern = _isJapanese
-      ? 'yyyy年M月'
-      : (_isArabic ? 'MMMM y' : 'MMMM y');
+  final pattern = _isJapanese ? 'yyyy年M月' : (_isArabic ? 'MMMM y' : 'MMMM y');
   return DateFormat(pattern, _dateLanguage).format(date);
 }
 
 String formatDayJa(DateTime date) {
-  final pattern = _isJapanese
-      ? 'M月d日(E)'
-      : (_isArabic ? 'EEEE، d MMMM' : 'EEE, MMM d');
+  final pattern =
+      _isJapanese ? 'M月d日(E)' : (_isArabic ? 'EEEE، d MMMM' : 'EEE, MMM d');
   return DateFormat(pattern, _dateLanguage).format(date);
 }
 

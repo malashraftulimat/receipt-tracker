@@ -64,6 +64,14 @@ void main() {
       expect(result.totalAmount, 1234);
       expect(result.purchasedAt?.year, 2026);
     });
+
+    test('detects currency and decimal amounts in English receipts', () {
+      final result = parser.parse('Corner Cafe\nCoffee \$3.50\nTotal \$12.99');
+      expect(result.currency, 'USD');
+      expect(result.totalAmount, 12.99);
+      expect(result.items.single.name, 'Coffee');
+      expect(result.items.single.totalPrice, 3.5);
+    });
   });
 
   group('tax detection', () {

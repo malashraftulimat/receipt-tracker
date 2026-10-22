@@ -58,6 +58,7 @@ class DueRemindersCard extends ConsumerWidget {
               _DueRow(
                 title: receipt.displayMerchant,
                 amount: receipt.totalAmount,
+                currency: receipt.currency,
                 dueDate: receipt.dueDate!,
                 today: today,
                 onTap: () => context.push('/receipt/${receipt.id}'),
@@ -75,11 +76,13 @@ class _DueRow extends StatelessWidget {
     required this.amount,
     required this.dueDate,
     required this.today,
+    required this.currency,
     required this.onTap,
   });
 
   final String title;
-  final int amount;
+  final double amount;
+  final String currency;
   final DateTime dueDate;
   final DateTime today;
   final VoidCallback onTap;
@@ -121,7 +124,7 @@ class _DueRow extends StatelessWidget {
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   AppText(
-                    '${formatDateShortJa(dueDate)} ・ ${formatYen(amount)}',
+                    '${formatDateShortJa(dueDate)} ・ ${formatMoney(amount, currency: currency)}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

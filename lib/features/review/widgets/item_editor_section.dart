@@ -36,21 +36,21 @@ class ReceiptItemEditor {
 
   int get quantityValue => int.tryParse(quantity.text.trim()) ?? 1;
 
-  int get totalValue {
-    final direct = parseYenInput(totalPrice.text);
+  double get totalValue {
+    final direct = parseAmountInput(totalPrice.text);
     if (direct != null) return direct;
-    final unit = parseYenInput(unitPrice.text);
+    final unit = parseAmountInput(unitPrice.text);
     if (unit != null) return unit * quantityValue;
     return 0;
   }
 
-  int? get unitValue {
-    final unit = parseYenInput(unitPrice.text);
+  double? get unitValue {
+    final unit = parseAmountInput(unitPrice.text);
     if (unit != null) return unit;
     final total = totalValue;
     if (total == 0) return null;
     final qty = quantityValue <= 0 ? 1 : quantityValue;
-    return (total / qty).round();
+    return total / qty;
   }
 
   ReceiptItem toItem(int index) => ReceiptItem(
@@ -80,6 +80,7 @@ class ItemEditorSection extends StatelessWidget {
     required this.categories,
     required this.totalAmount,
     required this.taxTotal,
+    this.currency = 'JPY',
     required this.onAdd,
     required this.onRemove,
     required this.onChanged,
@@ -88,23 +89,24 @@ class ItemEditorSection extends StatelessWidget {
 
   final List<ReceiptItemEditor> items;
   final List<ExpenseCategory> categories;
-  final int totalAmount;
-  final int taxTotal;
+  final double totalAmount;
+  final double taxTotal;
+  final String currency;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
   final VoidCallback onChanged;
   final VoidCallback onMatchTotal;
 
-  int get itemsTotal =>
-      items.fold<int>(0, (sum, item) => sum + item.totalValue);
+  double get itemsTotal =>
+      items.fold<double>(0, (sum, item) => sum + item.totalValue);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final itemsTotalValue = itemsTotal;
     final withTax = itemsTotalValue + taxTotal;
-    final directMatch = (itemsTotalValue - totalAmount).abs() <= 1;
-    final taxMatch = (withTax - totalAmount).abs() <= 1;
+    final directMatch = (itemsTotalValue - totalAmount).abs() <= 0.011;
+    final taxMatch = (withTax - totalAmount).abs() <= 0.011;
     final hasItems = items.isNotEmpty;
     final ok = hasItems && totalAmount > 0 && (directMatch || taxMatch);
 
@@ -143,6 +145,7 @@ class ItemEditorSection extends StatelessWidget {
               child: _ItemCard(
                 editor: items[i],
                 categories: categories,
+                currency: currency,
                 onChanged: onChanged,
                 onRemove: () => onRemove(i),
               ),
@@ -163,6 +166,7 @@ class ItemEditorSection extends StatelessWidget {
             withTax: withTax,
             totalAmount: totalAmount,
             taxTotal: taxTotal,
+            currency: currency,
             directMatch: directMatch,
             taxMatch: taxMatch,
             onMatchTotal: onMatchTotal,
@@ -177,12 +181,14 @@ class _ItemCard extends StatelessWidget {
   const _ItemCard({
     required this.editor,
     required this.categories,
+    required this.currency,
     required this.onChanged,
     required this.onRemove,
   });
 
   final ReceiptItemEditor editor;
   final List<ExpenseCategory> categories;
+  final String currency;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
 
@@ -241,6 +247,7 @@ class _ItemCard extends StatelessWidget {
                 child: _NumberField(
                   controller: editor.unitPrice,
                   label: '単価',
+                  currency: currency,
                   onChanged: onChanged,
                 ),
               ),
@@ -249,6 +256,7 @@ class _ItemCard extends StatelessWidget {
                 child: _NumberField(
                   controller: editor.totalPrice,
                   label: '金額',
+                  currency: currency,
                   onChanged: onChanged,
                 ),
               ),
@@ -310,11 +318,13 @@ class _NumberField extends StatelessWidget {
   const _NumberField({
     required this.controller,
     required this.label,
+    this.currency,
     required this.onChanged,
   });
 
   final TextEditingController controller;
   final String label;
+  final String? currency;
   final VoidCallback onChanged;
 
   @override
@@ -323,12 +333,15 @@ class _NumberField extends StatelessWidget {
       controller: controller,
       keyboardType: TextInputType.number,
       inputFormatters: <TextInputFormatter>[
-        FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
       ],
       onChanged: (_) => onChanged(),
       decoration: InputDecoration(
         labelText: label,
         isDense: true,
+        prefixText: currency == null || currency!.trim().isEmpty
+            ? null
+            : '${currencySymbol(currency!)} ',
         border: const OutlineInputBorder(),
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       ),
@@ -392,6 +405,7 @@ class _ValidationRow extends StatelessWidget {
     required this.withTax,
     required this.totalAmount,
     required this.taxTotal,
+    required this.currency,
     required this.directMatch,
     required this.taxMatch,
     required this.onMatchTotal,
@@ -399,10 +413,11 @@ class _ValidationRow extends StatelessWidget {
 
   final bool ok;
   final bool hasItems;
-  final int itemsTotal;
-  final int withTax;
-  final int totalAmount;
-  final int taxTotal;
+  final double itemsTotal;
+  final double withTax;
+  final double totalAmount;
+  final double taxTotal;
+  final String currency;
   final bool directMatch;
   final bool taxMatch;
   final VoidCallback onMatchTotal;
@@ -449,8 +464,8 @@ class _ValidationRow extends StatelessWidget {
             Expanded(
               child: AppText(
                 ok
-                    ? '明細合計 ${formatYen(itemsTotal)} は合計と一致しています'
-                    : '明細合計と合計が一致しません（差額 ${formatYen(difference.abs())}）',
+                    ? '明細合計 ${formatMoney(itemsTotal, currency: currency)} は合計と一致しています'
+                    : '明細合計と合計が一致しません（差額 ${formatMoney(difference.abs(), currency: currency)}）',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: color,
@@ -461,9 +476,9 @@ class _ValidationRow extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         AppText(
-          '明細 ${formatYen(itemsTotal)}'
-          '${taxTotal > 0 ? ' + 税 ${formatYen(taxTotal)} = ${formatYen(withTax)}' : ''}'
-          ' / レシート合計 ${formatYen(totalAmount)}',
+          '明細 ${formatMoney(itemsTotal, currency: currency)}'
+          '${taxTotal > 0 ? ' + 税 ${formatMoney(taxTotal, currency: currency)} = ${formatMoney(withTax, currency: currency)}' : ''}'
+          ' / レシート合計 ${formatMoney(totalAmount, currency: currency)}',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

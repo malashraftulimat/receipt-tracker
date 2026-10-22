@@ -12,10 +12,10 @@ class ParsedItem {
 
   final String name;
   final int quantity;
-  final int? unitPrice;
-  final int totalPrice;
+  final double? unitPrice;
+  final double totalPrice;
 
-  /// 8 = reduced rate, 10 = standard rate, null = unknown.
+  /// 8 = reduced rate, 10 = standard rate, null = unknown / not applicable.
   final int? taxRate;
 }
 
@@ -23,6 +23,7 @@ class ParsedItem {
 class ParsedReceipt {
   const ParsedReceipt({
     this.merchant,
+    this.currency,
     this.purchasedAt,
     this.totalAmount,
     this.subtotalAmount,
@@ -44,17 +45,20 @@ class ParsedReceipt {
   });
 
   final String? merchant;
-  final DateTime? purchasedAt;
-  final int? totalAmount;
-  final int? subtotalAmount;
-  final int? tax8Amount;
-  final int? tax10Amount;
-  final int? tax8Base;
-  final int? tax10Base;
 
-  /// Sum of item lines detected as 8% / 10% (estimated).
-  final int? tax8ItemsTotal;
-  final int? tax10ItemsTotal;
+  /// ISO-4217 currency code (e.g. JPY, USD, SAR) when detected.
+  final String? currency;
+  final DateTime? purchasedAt;
+  final double? totalAmount;
+  final double? subtotalAmount;
+  final double? tax8Amount;
+  final double? tax10Amount;
+  final double? tax8Base;
+  final double? tax10Base;
+
+  /// Sum of item lines detected as 8% / 10% (estimated, optional).
+  final double? tax8ItemsTotal;
+  final double? tax10ItemsTotal;
 
   /// 振込用紙 / utility bill payment deadline.
   final DateTime? dueDate;
@@ -109,10 +113,18 @@ class ReceiptParser {
     '総計',
     '現計',
     '計',
+    'Total',
+    'TOTAL',
+    'Grand Total',
+    'Amount Due',
+    'Balance Due',
   ];
 
   static const List<String> _subtotalKeywords = <String>[
     '小計',
+    'Subtotal',
+    'SUBTOTAL',
+    'Sub Total',
     '税抜合計',
     '税抜金額',
     '税抜',
@@ -135,6 +147,11 @@ class ReceiptParser {
     '電子マネー',
     'お支払',
     '支払方法',
+    'Cash',
+    'Change',
+    'Card',
+    'Payment',
+    'Tendered',
   ];
 
   static const List<String> _merchantNoise = <String>[
@@ -181,8 +198,15 @@ class ReceiptParser {
   static final RegExp _phoneMask = RegExp(r'0\d{1,4}[\-ー]\d{1,4}[\-ー]\d{3,4}');
   static final RegExp _percentMask = RegExp(r'\d{1,3}\s*%');
   static final RegExp _invoiceMask = RegExp(r'[TＴ]\d{13}');
-  static final RegExp _amountPattern =
-      RegExp(r'[¥￥]?\s*(\d{1,3}(?:,\d{3})+|\d+)\s*円?');
+  static final RegExp _amountPattern = RegExp(
+    r'[¥￥$€£₩₹﷼]?\s*(\d{1,3}(?:[,\.]\d{3})+|\d+)'
+    r'(?:([.,])(\d{1,2}))?\s*(?:円|元|جنيه|ريال|دينار|درهم)?',
+  );
+
+  static final RegExp _currencyCodeMask = RegExp(
+    r'\b(JPY|USD|EUR|GBP|CNY|KRW|INR|SAR|AED|EGP|TRY|THB|VND|AUD|CAD|CHF|'
+    r'TWD|HKD|SGD|BRL|MXN|RUB|IDR|MYR|PHP|NZD|QAR|KWD)\b',
+  );
 
   /// Main entry point.
   ///
@@ -201,6 +225,7 @@ class ReceiptParser {
 
     final warnings = <String>[];
     final confidence = <String, double>{};
+    final currency = _detectCurrency(normalized);
 
     // --- merchant -----------------------------------------------------------
     final merchant = _detectMerchant(lines);
@@ -246,8 +271,8 @@ class ReceiptParser {
     var base10 = tax.base10;
 
     // Derive missing tax amounts from tax-inclusive taxable bases (内税).
-    tax8 ??= base8 == null ? null : (base8 * 8 / 108).round();
-    tax10 ??= base10 == null ? null : (base10 * 10 / 110).round();
+    tax8 ??= base8 == null ? null : _roundMoney(base8 * 8 / 108);
+    tax10 ??= base10 == null ? null : _roundMoney(base10 * 10 / 110);
 
     // Total is often only printed as "8%対象 / 10%対象" sums.
     if (total == null && (base8 != null || base10 != null)) {
@@ -303,6 +328,7 @@ class ReceiptParser {
 
     return ParsedReceipt(
       merchant: merchant,
+      currency: currency,
       purchasedAt: purchasedAt,
       totalAmount: total,
       subtotalAmount: subtotal,
@@ -349,9 +375,10 @@ class ReceiptParser {
   // Money
   // -------------------------------------------------------------------------
 
-  /// All plausible JPY amounts in [line], with dates / times / phone numbers /
-  /// percentages / long codes masked out first.
-  List<int> amountsIn(String line) {
+  /// All plausible amounts in [line], with dates / times / phone numbers /
+  /// percentages / long codes masked out first. Decimal amounts are supported
+  /// so receipts in other currencies (e.g. 12.99 USD) parse correctly.
+  List<double> amountsIn(String line) {
     var masked = line;
     for (final pattern in <RegExp>[
       _dateMask,
@@ -363,34 +390,75 @@ class ReceiptParser {
       masked = masked.replaceAll(pattern, ' ');
     }
 
-    final result = <int>[];
+    final result = <double>[];
     for (final match in _amountPattern.allMatches(masked)) {
       final token = match.group(0)!;
-      final digits = match.group(1)!.replaceAll(',', '');
-      final value = int.tryParse(digits);
+      final digits = match.group(1)!.replaceAll(RegExp(r'[,\.]'), '');
+      final fraction = match.group(3);
+      final raw = fraction == null ? digits : '$digits.$fraction';
+      final value = double.tryParse(raw);
       if (value == null) continue;
 
-      final hasCurrency =
-          token.contains('¥') || token.contains('￥') || token.contains('円');
+      final hasCurrency = RegExp(r'[¥￥$€£₩₹﷼円元]').hasMatch(token) ||
+          _currencyCodeMask.hasMatch(masked);
       final before = match.start > 0 ? masked[match.start - 1] : ' ';
       final after = match.end < masked.length ? masked[match.end] : ' ';
 
       if (RegExp(r'[0-9]').hasMatch(before)) continue; // inside a longer number
       if (RegExp(r'[0-9A-Za-z]').hasMatch(after)) continue;
-      if (!hasCurrency && value < 100) continue; // rates, counts, item index
+      if (!hasCurrency && value < 1) continue; // rates, counts, item index
       if (value > 10000000) continue;
       result.add(value);
     }
     return result;
   }
 
-  int? _detectByKeywords(
+  static double _maxAmount(List<double> values) =>
+      values.reduce((a, b) => a > b ? a : b);
+
+  static double _roundMoney(double value) =>
+      (value * 100).roundToDouble() / 100;
+
+  /// Best-effort currency detection for the OCR fallback path.
+  String? _detectCurrency(String text) {
+    final upper = text.toUpperCase();
+    final code = _currencyCodeMask.firstMatch(upper);
+    if (code != null) return code.group(1);
+
+    const symbols = <String, String>{
+      '¥': 'JPY',
+      '￥': 'JPY',
+      '円': 'JPY',
+      r'$': 'USD',
+      '€': 'EUR',
+      '£': 'GBP',
+      '₩': 'KRW',
+      '₹': 'INR',
+      '﷼': 'SAR',
+      'د.إ': 'AED',
+      '元': 'CNY',
+      '฿': 'THB',
+      '₫': 'VND',
+      '₽': 'RUB',
+      '₺': 'TRY',
+    };
+    for (final entry in symbols.entries) {
+      if (text.contains(entry.key)) return entry.value;
+    }
+    if (text.contains('ريال')) return 'SAR';
+    if (text.contains('درهم')) return 'AED';
+    if (text.contains('جنيه')) return 'EGP';
+    if (text.contains('دينار')) return 'KWD';
+    return null;
+  }
+
+  double? _detectByKeywords(
     List<String> lines,
     List<String> keywords, {
     bool isTotal = false,
   }) {
     for (final keyword in keywords) {
-      final values = <int>[];
+      final values = <double>[];
       for (final line in lines) {
         if (!line.contains(keyword)) continue;
 
@@ -405,27 +473,29 @@ class ReceiptParser {
         }
         if (isTotal && _isPaymentLine(line)) continue;
 
-        values.addAll(amountsIn(line).where((value) => value >= 100));
+        values.addAll(amountsIn(line).where((value) => value >= 1));
       }
-      if (values.isNotEmpty) return values.reduce(math.max);
+      if (values.isNotEmpty) return _maxAmount(values);
     }
     return null;
   }
 
   /// Largest plausible amount that is not a change / payment / balance line.
-  int? _fallbackTotal(List<String> lines) {
-    final candidates = <int>[];
+  double? _fallbackTotal(List<String> lines) {
+    final candidates = <double>[];
     for (final line in lines) {
       if (_isPaymentLine(line)) continue;
       if (line.contains('対象') || line.contains('税率')) continue;
-      candidates.addAll(amountsIn(line).where((value) => value >= 100));
+      candidates.addAll(amountsIn(line).where((value) => value >= 1));
     }
     if (candidates.isEmpty) return null;
-    return candidates.reduce(math.max);
+    return _maxAmount(candidates);
   }
 
-  bool _isPaymentLine(String line) =>
-      _nonTotalHints.any((hint) => line.contains(hint));
+  bool _isPaymentLine(String line) {
+    final lower = line.toLowerCase();
+    return _nonTotalHints.any((hint) => lower.contains(hint.toLowerCase()));
+  }
 
   // -------------------------------------------------------------------------
   // Tax
@@ -450,12 +520,16 @@ class ReceiptParser {
 
       if (mentionsTax && values.length >= 2) {
         // e.g. "8%対象 ¥1,000 消費税 ¥74"
-        _assignBase(tax, rate, values.reduce(math.max));
-        _assignTax(tax, rate, values.reduce(math.min));
+        _assignBase(tax, rate, _maxAmount(values));
+        _assignTax(
+          tax,
+          rate,
+          values.reduce((a, b) => a < b ? a : b),
+        );
       } else if (mentionsBase) {
-        _assignBase(tax, rate, values.reduce(math.max));
+        _assignBase(tax, rate, _maxAmount(values));
       } else if (mentionsTax) {
-        _assignTax(tax, rate, values.reduce(math.max));
+        _assignTax(tax, rate, _maxAmount(values));
       }
     }
     return tax;
@@ -467,20 +541,20 @@ class ReceiptParser {
     return null;
   }
 
-  void _assignTax(_TaxDetection tax, int? rate, int amount) {
+  void _assignTax(_TaxDetection tax, int? rate, double amount) {
     // A missing rate on a "消費税" line is assumed to be the standard 10%.
     if (rate == 8) {
-      tax.tax8 = math.max(tax.tax8 ?? 0, amount);
+      tax.tax8 = _maxAmount(<double>[tax.tax8 ?? 0, amount]);
     } else {
-      tax.tax10 = math.max(tax.tax10 ?? 0, amount);
+      tax.tax10 = _maxAmount(<double>[tax.tax10 ?? 0, amount]);
     }
   }
 
-  void _assignBase(_TaxDetection tax, int? rate, int amount) {
+  void _assignBase(_TaxDetection tax, int? rate, double amount) {
     if (rate == 8) {
-      tax.base8 = math.max(tax.base8 ?? 0, amount);
+      tax.base8 = _maxAmount(<double>[tax.base8 ?? 0, amount]);
     } else if (rate == 10) {
-      tax.base10 = math.max(tax.base10 ?? 0, amount);
+      tax.base10 = _maxAmount(<double>[tax.base10 ?? 0, amount]);
     }
   }
 
@@ -695,7 +769,9 @@ class ReceiptParser {
   static final RegExp _itemNoise = RegExp(
     r'電話|TEL|住所|登録番号|レジ|担当|領収|レシート|ポイント|お預|お釣|釣銭|'
     r'カード|現金|クレジット|電子マネー|支払|対象|消費税|税率|軽減|割引|値引|'
-    r'No\.|番号|伝票|バーコード|小計|合計|総計|現計|お会計|領収書',
+    r'No\.|番号|伝票|バーコード|小計|合計|総計|現計|お会計|領収書|'
+    r'Total|Subtotal|Tax|VAT|Change|Cash|Card|Payment|Amount Due|Balance',
+    caseSensitive: false,
   );
 
   /// Extracts item rows between the header and the first total line.
@@ -710,27 +786,42 @@ class ReceiptParser {
       'お預',
       'お釣',
       '釣銭',
+      'total',
+      'subtotal',
+      'amount due',
+      'balance due',
     ];
 
     final items = <ParsedItem>[];
 
     for (final line in lines) {
-      if (totalMarkers.any(line.contains)) break;
+      final lower = line.toLowerCase();
+      if (totalMarkers.any((marker) => lower.contains(marker.toLowerCase()))) {
+        break;
+      }
       if (_itemNoise.hasMatch(line)) continue;
       if (_dateMask.hasMatch(line)) continue;
       if (RegExp(r'\d{1,2}\s*[:時]\s*\d{2}').hasMatch(line)) continue;
 
-      final amounts = amountsIn(line).where((value) => value >= 1).toList();
-      if (amounts.isEmpty) continue;
-
       final quantityMatch = _itemQtyTimes.firstMatch(line);
       final pieceMatch = _itemQtyPiece.firstMatch(line);
 
+      // "2×198" prints the quantity before the unit price; ignore that first
+      // number when collecting the line amounts.
+      final amountLine = quantityMatch == null
+          ? line
+          : line.replaceFirst(RegExp(r'(\d{1,3})\s*[×xX]'), ' ');
+      final amounts =
+          amountsIn(amountLine).where((value) => value >= 1).toList();
+      if (amounts.isEmpty) continue;
+
       var quantity = 1;
-      int? unitPrice;
+      double? unitPrice;
       if (quantityMatch != null) {
         quantity = int.tryParse(quantityMatch.group(1)!) ?? 1;
-        unitPrice = int.tryParse(quantityMatch.group(2)!.replaceAll(',', ''));
+        unitPrice = double.tryParse(
+          quantityMatch.group(2)!.replaceAll(RegExp(r'[,\.]'), ''),
+        );
       } else if (pieceMatch != null) {
         quantity = int.tryParse(pieceMatch.group(1)!) ?? 1;
       }
@@ -740,7 +831,7 @@ class ReceiptParser {
         // "2×198" style: the printed price is the unit price.
         totalPrice = unitPrice * quantity;
       }
-      unitPrice ??= quantity > 1 ? (totalPrice / quantity).round() : totalPrice;
+      unitPrice ??= quantity > 1 ? totalPrice / quantity : totalPrice;
 
       var name = line;
       if (quantityMatch != null) {
@@ -764,7 +855,7 @@ class ReceiptParser {
         name = name.replaceAll(marker, ' ');
       }
 
-      name = name.replaceAll(RegExp(r'[¥￥]'), ' ');
+      name = name.replaceAll(RegExp(r'[¥￥$€£₩₹﷼]'), ' ');
       name = name.replaceAll(RegExp(r'\d{1,3}(?:,\d{3})+|\d+'), ' ');
       name = name.replaceAll(RegExp(r'[×xX]'), ' ');
       name = name.replaceAll(RegExp(r'^[\s\-*:：.、|/]+'), '');
@@ -801,8 +892,8 @@ class ReceiptParser {
   // -------------------------------------------------------------------------
 
   /// Sum of item lines explicitly marked as 8% (reduced) or 10% (standard).
-  int? _detectItemTotal(List<String> lines, int rate) {
-    var sum = 0;
+  double? _detectItemTotal(List<String> lines, int rate) {
+    var sum = 0.0;
     var found = false;
 
     for (final line in lines) {
@@ -828,9 +919,9 @@ class ReceiptParser {
       if (rate == 8 && !markedReduced) continue;
       if (rate == 10 && !markedStandard) continue;
 
-      final values = amountsIn(line).where((value) => value >= 10).toList();
+      final values = amountsIn(line).where((value) => value >= 1).toList();
       if (values.isEmpty) continue;
-      sum += values.reduce(math.max);
+      sum += _maxAmount(values);
       found = true;
     }
     return found ? sum : null;
@@ -968,8 +1059,8 @@ class ReceiptParser {
 }
 
 class _TaxDetection {
-  int? tax8;
-  int? tax10;
-  int? base8;
-  int? base10;
+  double? tax8;
+  double? tax10;
+  double? base8;
+  double? base10;
 }

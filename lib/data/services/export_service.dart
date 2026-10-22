@@ -78,7 +78,7 @@ class ExportService {
 
   static String _two(int value) => value.toString().padLeft(2, '0');
 
-  static String _amount(int? value) => value == null ? '' : value.toString();
+  static String _amount(num? value) => value == null ? '' : value.toString();
 
   static String _escape(String value) {
     if (value.contains(',') || value.contains('"') || value.contains('\n')) {

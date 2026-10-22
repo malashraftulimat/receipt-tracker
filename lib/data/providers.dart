@@ -166,9 +166,9 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
 
     final budget = await ref.watch(budgetProvider(first).future);
 
-    var spent = 0;
+    var spent = 0.0;
     var receiptCount = 0;
-    var todaySpent = 0;
+    var todaySpent = 0.0;
 
     if (userId != null) {
       final receipts = await ref

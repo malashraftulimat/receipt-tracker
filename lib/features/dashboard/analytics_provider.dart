@@ -9,7 +9,7 @@ class MonthTotal {
   const MonthTotal({required this.month, required this.total});
 
   final DateTime month;
-  final int total;
+  final double total;
 
   String get label => '${month.month}月';
 }
@@ -23,11 +23,11 @@ class CategorySlice {
   });
 
   final String label;
-  final int amount;
+  final double amount;
   final int count;
   final Color color;
 
-  double percentOf(int total) => total <= 0 ? 0 : amount / total * 100;
+  double percentOf(double total) => total <= 0 ? 0 : amount / total * 100;
 }
 
 class MerchantTotal {
@@ -35,7 +35,7 @@ class MerchantTotal {
       {required this.name, required this.amount, required this.count});
 
   final String name;
-  final int amount;
+  final double amount;
   final int count;
 }
 
@@ -49,35 +49,35 @@ class AnalyticsData {
     required this.topMerchants,
     this.previousMonthTotal = 0,
     this.previousMonthCount = 0,
-    this.currentDaily = const <int>[],
-    this.previousDaily = const <int>[],
+    this.currentDaily = const <double>[],
+    this.previousDaily = const <double>[],
   });
 
   final List<MonthTotal> months;
   final List<CategorySlice> slices;
-  final int monthTotal;
+  final double monthTotal;
   final int monthCount;
-  final int sixMonthTotal;
+  final double sixMonthTotal;
   final List<MerchantTotal> topMerchants;
 
   /// Month-over-month comparison (current vs previous month).
-  final int previousMonthTotal;
+  final double previousMonthTotal;
   final int previousMonthCount;
 
   /// Cumulative spend per day of month (index 0 = day 1).
-  final List<int> currentDaily;
-  final List<int> previousDaily;
+  final List<double> currentDaily;
+  final List<double> previousDaily;
 
-  int get momDelta => monthTotal - previousMonthTotal;
+  double get momDelta => monthTotal - previousMonthTotal;
 
   double get momPercent {
     if (previousMonthTotal <= 0) return 0;
     return (monthTotal - previousMonthTotal) / previousMonthTotal * 100;
   }
 
-  int get average => monthCount == 0 ? 0 : monthTotal ~/ monthCount;
+  double get average => monthCount == 0 ? 0 : monthTotal / monthCount;
 
-  int get maxMonthTotal => months.isEmpty
+  double get maxMonthTotal => months.isEmpty
       ? 0
       : months.map((m) => m.total).reduce((a, b) => a > b ? a : b);
 
@@ -114,7 +114,7 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
     final total = receipts.where((receipt) {
       final date = receipt.purchasedAt;
       return !date.isBefore(monthStart) && date.isBefore(monthEnd);
-    }).fold<int>(0, (sum, receipt) => sum + receipt.totalAmount);
+    }).fold<double>(0, (sum, receipt) => sum + receipt.totalAmount);
     months.add(MonthTotal(month: monthStart, total: total));
   }
 
@@ -183,19 +183,19 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
   }).toList(growable: false);
 
   final previousMonthTotal =
-      previousMonthReceipts.fold<int>(0, (sum, r) => sum + r.totalAmount);
+      previousMonthReceipts.fold<double>(0, (sum, r) => sum + r.totalAmount);
 
-  List<int> dailyCumulative(int year, int month) {
+  List<double> dailyCumulative(int year, int month) {
     final days = DateTime(year, month + 1, 0).day;
-    final daily = List<int>.filled(days, 0);
+    final daily = List<double>.filled(days, 0);
     for (final receipt in receipts) {
       final date = receipt.purchasedAt;
       if (date.year != year || date.month != month) continue;
       final index = date.day - 1;
       if (index >= 0 && index < days) daily[index] += receipt.totalAmount;
     }
-    var running = 0;
-    return <int>[for (final value in daily) running += value];
+    var running = 0.0;
+    return <double>[for (final value in daily) running += value];
   }
 
   return AnalyticsData(
@@ -205,9 +205,9 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
     previousMonthCount: previousMonthReceipts.length,
     currentDaily: dailyCumulative(now.year, now.month),
     previousDaily: dailyCumulative(previousMonth.year, previousMonth.month),
-    monthTotal: currentMonth.fold<int>(0, (sum, r) => sum + r.totalAmount),
+    monthTotal: currentMonth.fold<double>(0, (sum, r) => sum + r.totalAmount),
     monthCount: currentMonth.length,
-    sixMonthTotal: receipts.fold<int>(0, (sum, r) => sum + r.totalAmount),
+    sixMonthTotal: receipts.fold<double>(0, (sum, r) => sum + r.totalAmount),
     topMerchants: topMerchants.take(3).toList(growable: false),
   );
 });
@@ -217,6 +217,6 @@ class _CategoryBucket {
 
   final String label;
   final Color color;
-  int amount = 0;
+  double amount = 0;
   int count = 0;
 }

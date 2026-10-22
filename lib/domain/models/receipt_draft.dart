@@ -8,6 +8,7 @@ class ReceiptDraft {
   ReceiptDraft({
     this.id,
     this.merchant,
+    this.currency = 'JPY',
     DateTime? purchasedAt,
     this.totalAmount = 0,
     this.subtotalAmount,
@@ -31,15 +32,18 @@ class ReceiptDraft {
 
   final String? id;
   final String? merchant;
+
+  /// ISO-4217 currency code (e.g. JPY, USD, SAR).
+  final String currency;
   final DateTime purchasedAt;
-  final int totalAmount;
-  final int? subtotalAmount;
-  final int? tax8Amount;
-  final int? tax10Amount;
-  final int? tax8Base;
-  final int? tax10Base;
-  final int? tax8ItemsTotal;
-  final int? tax10ItemsTotal;
+  final double totalAmount;
+  final double? subtotalAmount;
+  final double? tax8Amount;
+  final double? tax10Amount;
+  final double? tax8Base;
+  final double? tax10Base;
+  final double? tax8ItemsTotal;
+  final double? tax10ItemsTotal;
   final DateTime? dueDate;
   final DateTime? reminderAt;
   final String? pointBrand;
@@ -62,6 +66,7 @@ class ReceiptDraft {
         : parsed.barcodeId;
     return ReceiptDraft(
       merchant: parsed.merchant,
+      currency: (parsed.currency ?? 'JPY').toUpperCase(),
       purchasedAt: parsed.purchasedAt,
       totalAmount: parsed.totalAmount ?? 0,
       subtotalAmount: parsed.subtotalAmount,
@@ -96,6 +101,7 @@ class ReceiptDraft {
     return ReceiptDraft(
       id: receipt.id,
       merchant: receipt.merchant,
+      currency: receipt.currency,
       purchasedAt: receipt.purchasedAt,
       totalAmount: receipt.totalAmount,
       subtotalAmount: receipt.subtotalAmount,
@@ -118,14 +124,16 @@ class ReceiptDraft {
     );
   }
 
-  int get taxTotal => (tax8Amount ?? 0) + (tax10Amount ?? 0);
+  double get taxTotal => (tax8Amount ?? 0) + (tax10Amount ?? 0);
 
-  int get itemsTotal =>
-      items.fold<int>(0, (sum, item) => sum + item.totalPrice);
+  double get itemsTotal =>
+      items.fold<double>(0, (sum, item) => sum + item.totalPrice);
 
   /// Receipt fields for Firestore. Items are embedded in the same document.
   Map<String, dynamic> toRow({bool includeItems = false}) => <String, dynamic>{
         'merchant': (merchant ?? '').trim().isEmpty ? null : merchant!.trim(),
+        'currency':
+            currency.trim().isEmpty ? 'JPY' : currency.trim().toUpperCase(),
         'purchased_at': purchasedAt.toUtc().toIso8601String(),
         'total_amount': totalAmount,
         'subtotal_amount': subtotalAmount,

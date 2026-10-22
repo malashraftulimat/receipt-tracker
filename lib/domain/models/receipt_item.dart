@@ -14,20 +14,23 @@ class ReceiptItem {
 
   final String? id;
   final String? receiptId;
+
+  /// Printed product name, kept in the receipt's original language.
   final String name;
   final int quantity;
-  final int? unitPrice;
-  final int totalPrice;
+  final double? unitPrice;
+  final double totalPrice;
 
-  /// 8 = reduced rate (軽減税率), 10 = standard rate, null = unknown.
+  /// 8 = reduced rate (軽減税率), 10 = standard rate. Optional and only set
+  /// when the receipt actually prints a Japanese consumption-tax rate.
   final int? taxRate;
 
   final String? categoryId;
   final int sortOrder;
 
-  int get effectiveUnitPrice {
+  double get effectiveUnitPrice {
     if (unitPrice != null) return unitPrice!;
-    if (quantity > 0) return (totalPrice / quantity).round();
+    if (quantity > 0) return totalPrice / quantity;
     return totalPrice;
   }
 
@@ -37,8 +40,8 @@ class ReceiptItem {
       receiptId: json['receipt_id'] as String?,
       name: (json['name'] as String?)?.trim() ?? '',
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
-      unitPrice: (json['unit_price'] as num?)?.toInt(),
-      totalPrice: (json['total_price'] as num?)?.toInt() ?? 0,
+      unitPrice: (json['unit_price'] as num?)?.toDouble(),
+      totalPrice: (json['total_price'] as num?)?.toDouble() ?? 0,
       taxRate: (json['tax_rate'] as num?)?.toInt(),
       categoryId: json['category_id'] as String?,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
@@ -72,8 +75,8 @@ class ReceiptItem {
     String? id,
     String? name,
     int? quantity,
-    int? unitPrice,
-    int? totalPrice,
+    double? unitPrice,
+    double? totalPrice,
     int? taxRate,
     String? categoryId,
     int? sortOrder,

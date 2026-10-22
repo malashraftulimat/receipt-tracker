@@ -33,6 +33,7 @@ class Receipt {
     required this.purchasedAt,
     required this.totalAmount,
     this.merchant,
+    this.currency = 'JPY',
     this.subtotalAmount,
     this.tax8Amount,
     this.tax10Amount,
@@ -58,19 +59,23 @@ class Receipt {
   final String id;
   final String userId;
   final String? merchant;
+
+  /// ISO-4217 currency code (e.g. JPY, USD, SAR).
+  final String currency;
   final DateTime purchasedAt;
 
-  /// Stored in JPY (integer yen).
-  final int totalAmount;
-  final int? subtotalAmount;
-  final int? tax8Amount;
-  final int? tax10Amount;
-  final int? tax8Base;
-  final int? tax10Base;
+  /// Amounts in [currency]; decimal values are supported.
+  final double totalAmount;
+  final double? subtotalAmount;
+  final double? tax8Amount;
+  final double? tax10Amount;
+  final double? tax8Base;
+  final double? tax10Base;
 
   /// Sum of item lines detected as 8% (reduced rate) / 10% (standard rate).
-  final int? tax8ItemsTotal;
-  final int? tax10ItemsTotal;
+  /// Only populated when a Japanese consumption tax rate is printed.
+  final double? tax8ItemsTotal;
+  final double? tax10ItemsTotal;
 
   /// 振込用紙 / utility bill deadline (支払期限).
   final DateTime? dueDate;
@@ -96,18 +101,18 @@ class Receipt {
   /// Joined from `categories(*)`.
   final ExpenseCategory? category;
 
-  int get taxTotal => (tax8Amount ?? 0) + (tax10Amount ?? 0);
+  double get taxTotal => (tax8Amount ?? 0) + (tax10Amount ?? 0);
 
-  int get itemsTotal =>
-      items.fold<int>(0, (sum, item) => sum + item.totalPrice);
+  double get itemsTotal =>
+      items.fold<double>(0, (sum, item) => sum + item.totalPrice);
 
-  int get itemsTax8Total => items
+  double get itemsTax8Total => items
       .where((item) => item.taxRate == 8)
-      .fold<int>(0, (sum, item) => sum + item.totalPrice);
+      .fold<double>(0, (sum, item) => sum + item.totalPrice);
 
-  int get itemsTax10Total => items
+  double get itemsTax10Total => items
       .where((item) => item.taxRate == 10)
-      .fold<int>(0, (sum, item) => sum + item.totalPrice);
+      .fold<double>(0, (sum, item) => sum + item.totalPrice);
 
   bool get hasTaxBreakdown => tax8Amount != null || tax10Amount != null;
 
@@ -130,15 +135,18 @@ class Receipt {
       id: json['id'] as String,
       userId: json['user_id'] as String,
       merchant: json['merchant'] as String?,
+      currency: (json['currency'] as String?)?.trim().isNotEmpty == true
+          ? json['currency'].toString().trim().toUpperCase()
+          : 'JPY',
       purchasedAt: _parseDate(json['purchased_at']) ?? DateTime.now(),
-      totalAmount: (json['total_amount'] as num?)?.toInt() ?? 0,
-      subtotalAmount: (json['subtotal_amount'] as num?)?.toInt(),
-      tax8Amount: (json['tax_8_amount'] as num?)?.toInt(),
-      tax10Amount: (json['tax_10_amount'] as num?)?.toInt(),
-      tax8Base: (json['tax_8_base'] as num?)?.toInt(),
-      tax10Base: (json['tax_10_base'] as num?)?.toInt(),
-      tax8ItemsTotal: (json['tax_8_items_total'] as num?)?.toInt(),
-      tax10ItemsTotal: (json['tax_10_items_total'] as num?)?.toInt(),
+      totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+      subtotalAmount: (json['subtotal_amount'] as num?)?.toDouble(),
+      tax8Amount: (json['tax_8_amount'] as num?)?.toDouble(),
+      tax10Amount: (json['tax_10_amount'] as num?)?.toDouble(),
+      tax8Base: (json['tax_8_base'] as num?)?.toDouble(),
+      tax10Base: (json['tax_10_base'] as num?)?.toDouble(),
+      tax8ItemsTotal: (json['tax_8_items_total'] as num?)?.toDouble(),
+      tax10ItemsTotal: (json['tax_10_items_total'] as num?)?.toDouble(),
       dueDate: _parseDate(json['due_date']),
       reminderAt: _parseDate(json['reminder_at']),
       pointBrand: json['point_brand'] as String?,
@@ -169,15 +177,16 @@ class Receipt {
 
   Receipt copyWith({
     String? merchant,
+    String? currency,
     DateTime? dueDate,
     DateTime? reminderAt,
     String? pointBrand,
     int? pointAmount,
     DateTime? purchasedAt,
-    int? totalAmount,
-    int? subtotalAmount,
-    int? tax8Amount,
-    int? tax10Amount,
+    double? totalAmount,
+    double? subtotalAmount,
+    double? tax8Amount,
+    double? tax10Amount,
     String? barcodeId,
     String? categoryId,
     String? note,
@@ -190,6 +199,7 @@ class Receipt {
       id: id,
       userId: userId,
       merchant: merchant ?? this.merchant,
+      currency: currency ?? this.currency,
       purchasedAt: purchasedAt ?? this.purchasedAt,
       totalAmount: totalAmount ?? this.totalAmount,
       subtotalAmount: subtotalAmount ?? this.subtotalAmount,

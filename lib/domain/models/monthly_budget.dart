@@ -96,17 +96,17 @@ class BudgetSummary {
 
   final DateTime month;
   final MonthlyBudget? budget;
-  final int spent;
+  final double spent;
   final int receiptCount;
   final int daysInMonth;
   final int daysElapsed;
-  final int todaySpent;
+  final double todaySpent;
 
   bool get configured => budget?.isConfigured ?? false;
 
-  int get disposable => budget?.disposableIncome ?? 0;
+  double get disposable => (budget?.disposableIncome ?? 0).toDouble();
 
-  int get remaining => disposable - spent;
+  double get remaining => disposable - spent;
 
   /// Days left including today.
   int get daysRemaining {
@@ -127,9 +127,9 @@ class BudgetSummary {
   }
 
   double get savingsProgress {
-    final goal = budget?.savingsGoal ?? 0;
+    final goal = (budget?.savingsGoal ?? 0).toDouble();
     if (goal <= 0) return 0;
-    final saved = (disposable - spent).clamp(0, goal);
+    final saved = (disposable - spent).clamp(0.0, goal);
     return saved / goal;
   }
 
@@ -140,7 +140,7 @@ class BudgetSummary {
   }
 
   /// Positive = spending faster than plan.
-  int get velocityDelta => spent - expectedSpentByToday;
+  double get velocityDelta => spent - expectedSpentByToday;
 
   BudgetStatus get status {
     if (!configured) return BudgetStatus.unset;

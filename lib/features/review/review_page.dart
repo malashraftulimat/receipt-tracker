@@ -58,6 +58,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   late final ReceiptDraft? _initial;
   late final TextEditingController _merchant;
+  late final TextEditingController _currency;
   late final TextEditingController _total;
   late final TextEditingController _subtotal;
   late final TextEditingController _tax8;
@@ -70,10 +71,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   late DateTime _purchasedAt;
   String? _categoryId;
   String? _suggestedCategory;
-  int? _tax8Base;
-  int? _tax10Base;
-  int? _tax8ItemsTotal;
-  int? _tax10ItemsTotal;
+  double? _tax8Base;
+  double? _tax10Base;
+  double? _tax8ItemsTotal;
+  double? _tax10ItemsTotal;
   DateTime? _dueDate;
 
   /// In-memory only. Never written to Firestore or local storage.
@@ -98,6 +99,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final draft = _initial;
 
     _merchant = TextEditingController(text: draft?.merchant ?? '');
+    _currency = TextEditingController(
+      text: (draft?.currency ?? 'JPY').toUpperCase(),
+    );
     _total = TextEditingController(
       text: (draft?.totalAmount ?? 0) > 0
           ? formatAmountDigits(draft!.totalAmount)
@@ -149,6 +153,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   @override
   void dispose() {
     _merchant.dispose();
+    _currency.dispose();
     _total.dispose();
     _subtotal.dispose();
     _tax8.dispose();
@@ -177,7 +182,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   }
 
   void _matchTotalToItems() {
-    final itemsTotal = _items.fold<int>(
+    final itemsTotal = _items.fold<double>(
       0,
       (sum, item) => sum + item.totalValue,
     );
@@ -296,6 +301,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         if ((parsed.merchant ?? '').isNotEmpty) {
           _merchant.text = parsed.merchant!;
         }
+        if ((parsed.currency ?? '').trim().isNotEmpty) {
+          _currency.text = parsed.currency!.trim().toUpperCase();
+        }
         if (parsed.purchasedAt != null) _purchasedAt = parsed.purchasedAt!;
         if (parsed.totalAmount != null) {
           _total.text = formatAmountDigits(parsed.totalAmount!);
@@ -371,18 +379,21 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     ];
     final itemsTax8 = items
         .where((item) => item.taxRate == 8)
-        .fold<int>(0, (sum, item) => sum + item.totalPrice);
+        .fold<double>(0, (sum, item) => sum + item.totalPrice);
     final itemsTax10 = items
         .where((item) => item.taxRate == 10)
-        .fold<int>(0, (sum, item) => sum + item.totalPrice);
+        .fold<double>(0, (sum, item) => sum + item.totalPrice);
 
     final draft = ReceiptDraft(
       merchant: _merchant.text,
+      currency: _currency.text.trim().isEmpty
+          ? 'JPY'
+          : _currency.text.trim().toUpperCase(),
       purchasedAt: _purchasedAt,
-      totalAmount: parseYenInput(_total.text) ?? 0,
-      subtotalAmount: parseYenInput(_subtotal.text),
-      tax8Amount: parseYenInput(_tax8.text),
-      tax10Amount: parseYenInput(_tax10.text),
+      totalAmount: parseAmountInput(_total.text) ?? 0,
+      subtotalAmount: parseAmountInput(_subtotal.text),
+      tax8Amount: parseAmountInput(_tax8.text),
+      tax10Amount: parseAmountInput(_tax10.text),
       tax8Base: _tax8Base,
       tax10Base: _tax10Base,
       tax8ItemsTotal: items.isEmpty ? _tax8ItemsTotal : itemsTax8,
@@ -582,9 +593,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         ItemEditorSection(
           items: _items,
           categories: categories,
-          totalAmount: parseYenInput(_total.text) ?? 0,
-          taxTotal: (parseYenInput(_tax8.text) ?? 0) +
-              (parseYenInput(_tax10.text) ?? 0),
+          totalAmount: parseAmountInput(_total.text) ?? 0,
+          taxTotal: (parseAmountInput(_tax8.text) ?? 0) +
+              (parseAmountInput(_tax10.text) ?? 0),
+          currency: _currency.text.trim().isEmpty
+              ? 'JPY'
+              : _currency.text.trim().toUpperCase(),
           onAdd: _addItem,
           onRemove: _removeItem,
           onChanged: () => setState(() {}),
@@ -756,26 +770,44 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         ),
         const SizedBox(height: 14),
         _Section(
-          title: '金額（税込・円）',
+          title: '金額（税込）',
           children: <Widget>[
             TextFormField(
-              controller: _total,
-              keyboardType: TextInputType.number,
+              controller: _currency,
+              textCapitalization: TextCapitalization.characters,
               inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z]')),
+                LengthLimitingTextInputFormatter(3),
+              ],
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: context.tr('通貨（ISOコード）'),
+                hintText: 'JPY / USD / SAR / EUR',
+                prefixIcon: const Icon(Icons.currency_exchange_outlined),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _total,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: <TextInputFormatter>[
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
               ],
               style: theme.textTheme.headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w700),
               decoration: InputDecoration(
                 labelText: context.tr('合計金額'),
-                prefixText: '¥ ',
+                prefixText:
+                    '${currencySymbol(_currency.text.trim().isEmpty ? 'JPY' : _currency.text)} ',
                 prefixIcon: const Icon(Icons.payments_outlined),
               ),
               validator: (value) {
                 if ((value ?? '').trim().isEmpty) {
                   return context.tr('合計金額を入力してください');
                 }
-                if (parseYenInput(value!) == null) {
+                if (parseAmountInput(value!) == null) {
                   return context.tr('数字で入力してください');
                 }
                 return null;
@@ -788,24 +820,36 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   child: _AmountField(
                     controller: _subtotal,
                     label: '小計（税抜）',
+                    currency: _currency.text,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _AmountField(controller: _tax8, label: '消費税 8%'),
+                  child: _AmountField(
+                    controller: _tax8,
+                    label: '消費税 8%（任意）',
+                    currency: _currency.text,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _AmountField(controller: _tax10, label: '消費税 10%'),
+                  child: _AmountField(
+                    controller: _tax10,
+                    label: '消費税 10%（任意）',
+                    currency: _currency.text,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             _TaxSummary(
-              tax8: parseYenInput(_tax8.text),
-              tax10: parseYenInput(_tax10.text),
-              subtotal: parseYenInput(_subtotal.text),
-              total: parseYenInput(_total.text),
+              tax8: parseAmountInput(_tax8.text),
+              tax10: parseAmountInput(_tax10.text),
+              subtotal: parseAmountInput(_subtotal.text),
+              total: parseAmountInput(_total.text),
+              currency: _currency.text.trim().isEmpty
+                  ? 'JPY'
+                  : _currency.text.trim().toUpperCase(),
             ),
           ],
         ),
@@ -954,23 +998,29 @@ class _Section extends StatelessWidget {
 }
 
 class _AmountField extends StatelessWidget {
-  const _AmountField({required this.controller, required this.label});
+  const _AmountField({
+    required this.controller,
+    required this.label,
+    this.currency = 'JPY',
+  });
 
   final TextEditingController controller;
   final String label;
+  final String currency;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
-      keyboardType: TextInputType.number,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: <TextInputFormatter>[
-        FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
       ],
       decoration: InputDecoration(
         labelText: label,
         isDense: true,
-        prefixText: '¥ ',
+        prefixText:
+            '${currencySymbol(currency.trim().isEmpty ? 'JPY' : currency)} ',
       ),
     );
   }
@@ -982,12 +1032,14 @@ class _TaxSummary extends StatelessWidget {
     required this.tax10,
     required this.subtotal,
     required this.total,
+    this.currency = 'JPY',
   });
 
-  final int? tax8;
-  final int? tax10;
-  final int? subtotal;
-  final int? total;
+  final double? tax8;
+  final double? tax10;
+  final double? subtotal;
+  final double? total;
+  final String currency;
 
   @override
   Widget build(BuildContext context) {
@@ -997,9 +1049,9 @@ class _TaxSummary extends StatelessWidget {
 
     if (total != null && subtotal != null && taxTotal > 0) {
       final expected = subtotal! + taxTotal;
-      if ((expected - total!).abs() > 1) {
+      if ((expected - total!).abs() > 0.011) {
         messages.add(
-          '小計 + 消費税 = ${formatYen(expected)} と合計 ${formatYen(total!)} が一致しません。',
+          '小計 + 消費税 = ${formatMoney(expected, currency: currency)} と合計 ${formatMoney(total!, currency: currency)} が一致しません。',
         );
       }
     }
@@ -1021,7 +1073,7 @@ class _TaxSummary extends StatelessWidget {
         Expanded(
           child: AppText(
             messages.isEmpty
-                ? '税額合計 ${formatYen(taxTotal)}'
+                ? '税額合計 ${formatMoney(taxTotal, currency: currency)}'
                 : messages.join(' / '),
             style: theme.textTheme.bodySmall?.copyWith(
               color: messages.isEmpty

@@ -59,8 +59,8 @@ class _SummaryStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = receipts.fold<int>(0, (sum, r) => sum + r.totalAmount);
-    final average = total ~/ receipts.length;
+    final total = receipts.fold<double>(0, (sum, r) => sum + r.totalAmount);
+    final average = total / receipts.length;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -141,7 +141,7 @@ class _GroupHeader extends _Entry {
 
   final String label;
   final int level;
-  final int? total;
+  final double? total;
 }
 
 class _ReceiptEntry extends _Entry {
@@ -177,7 +177,7 @@ class _GroupedReceiptList extends StatelessWidget {
     final sorted = List<Receipt>.of(source)
       ..sort((a, b) => b.purchasedAt.compareTo(a.purchasedAt));
 
-    final monthTotals = <String, int>{};
+    final monthTotals = <String, double>{};
     for (final receipt in sorted) {
       final key = '${receipt.purchasedAt.year}-${receipt.purchasedAt.month}';
       monthTotals[key] = (monthTotals[key] ?? 0) + receipt.totalAmount;

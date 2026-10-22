@@ -30,7 +30,9 @@ class TesseractOcrService implements OcrService {
     final image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
     try {
       final result = await _Tesseract._(global)
-          .recognize(image.toJS, 'jpn+eng'.toJS)
+          // Japanese + English + Arabic receipts. Tesseract.js loads the
+          // matching language data from its CDN on first use.
+          .recognize(image.toJS, 'jpn+eng+ara'.toJS)
           .toDart;
 
       final text = result.data.text;

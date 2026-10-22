@@ -30,7 +30,7 @@ class ReceiptDetailPage extends ConsumerWidget {
       builder: (context) => AlertDialog(
         title: const AppText('このレシートを削除しますか？'),
         content: AppText(
-          '${receipt.displayMerchant}（${formatYen(receipt.totalAmount)}）を削除します。'
+          '${receipt.displayMerchant}（${formatMoney(receipt.totalAmount, currency: receipt.currency)}）を削除します。'
           'この操作は取り消せません。',
         ),
         actions: <Widget>[
@@ -145,6 +145,7 @@ class _DetailBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final padding = context.pagePadding;
+    String money(num value) => formatMoney(value, currency: receipt.currency);
     final category = receipt.category;
     final accent = AppPalette.categoryAccent(
       category?.name,
@@ -204,7 +205,7 @@ class _DetailBody extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     AppText(
-                      formatYen(receipt.totalAmount),
+                      money(receipt.totalAmount),
                       style: theme.textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: AppPalette.emerald,
@@ -245,41 +246,45 @@ class _DetailBody extends StatelessWidget {
                 title: '金額の内訳',
                 children: <Widget>[
                   _InfoRow(
+                    label: '通貨',
+                    value: receipt.currency,
+                  ),
+                  _InfoRow(
                     label: '合計（税込）',
-                    value: formatYen(receipt.totalAmount),
+                    value: money(receipt.totalAmount),
                     emphasized: true,
                   ),
                   if (receipt.subtotalAmount != null)
                     _InfoRow(
                       label: '小計（税抜）',
-                      value: formatYen(receipt.subtotalAmount!),
+                      value: money(receipt.subtotalAmount!),
                     ),
                   if (receipt.tax8Amount != null)
                     _InfoRow(
                       label:
-                          '消費税 8%${receipt.tax8Base != null ? '（対象 ${formatYen(receipt.tax8Base!)}）' : ''}',
-                      value: formatYen(receipt.tax8Amount!),
+                          '消費税 8%${receipt.tax8Base != null ? '（対象 ${money(receipt.tax8Base!)}）' : ''}',
+                      value: money(receipt.tax8Amount!),
                     ),
                   if (receipt.tax10Amount != null)
                     _InfoRow(
                       label:
-                          '消費税 10%${receipt.tax10Base != null ? '（対象 ${formatYen(receipt.tax10Base!)}）' : ''}',
-                      value: formatYen(receipt.tax10Amount!),
+                          '消費税 10%${receipt.tax10Base != null ? '（対象 ${money(receipt.tax10Base!)}）' : ''}',
+                      value: money(receipt.tax10Amount!),
                     ),
                   if (receipt.hasTaxBreakdown)
                     _InfoRow(
                       label: '消費税合計',
-                      value: formatYen(receipt.taxTotal),
+                      value: money(receipt.taxTotal),
                     ),
                   if (receipt.tax8ItemsTotal != null)
                     _InfoRow(
                       label: '8%対象商品の合計（推定）',
-                      value: formatYen(receipt.tax8ItemsTotal!),
+                      value: money(receipt.tax8ItemsTotal!),
                     ),
                   if (receipt.tax10ItemsTotal != null)
                     _InfoRow(
                       label: '10%対象商品の合計（推定）',
-                      value: formatYen(receipt.tax10ItemsTotal!),
+                      value: money(receipt.tax10ItemsTotal!),
                     ),
                 ],
               ),
@@ -289,7 +294,10 @@ class _DetailBody extends StatelessWidget {
                   title: '明細（商品）',
                   children: <Widget>[
                     for (final item in receipt.items)
-                      ReceiptItemRow(item: item),
+                      ReceiptItemRow(
+                        item: item,
+                        currency: receipt.currency,
+                      ),
                   ],
                 ),
               ],

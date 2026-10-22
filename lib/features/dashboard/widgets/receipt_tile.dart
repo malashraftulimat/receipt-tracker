@@ -125,7 +125,7 @@ class ReceiptTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 AppText(
-                  formatYen(receipt.totalAmount),
+                  formatMoney(receipt.totalAmount, currency: receipt.currency),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: AppPalette.emerald,
@@ -193,7 +193,7 @@ class ReceiptGridCard extends StatelessWidget {
               ),
               const Spacer(),
               AppText(
-                formatYen(receipt.totalAmount),
+                formatMoney(receipt.totalAmount, currency: receipt.currency),
                 style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),

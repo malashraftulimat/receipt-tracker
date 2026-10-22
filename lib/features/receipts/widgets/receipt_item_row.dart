@@ -7,9 +7,10 @@ import '../../../core/localization/localization.dart';
 
 /// Read-only item row used on the receipt detail screen.
 class ReceiptItemRow extends StatelessWidget {
-  const ReceiptItemRow({super.key, required this.item});
+  const ReceiptItemRow({super.key, required this.item, this.currency = 'JPY'});
 
   final ReceiptItem item;
+  final String currency;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +18,7 @@ class ReceiptItemRow extends StatelessWidget {
     final taxColor = item.taxRate == 8 ? AppPalette.emerald : AppPalette.violet;
 
     final subtitle = <String>[
-      '${item.quantity} × ${formatYen(item.effectiveUnitPrice)}',
+      '${item.quantity} × ${formatMoney(item.effectiveUnitPrice, currency: currency)}',
       if (item.taxRate != null) '${item.taxRate}%',
     ].join(' ・ ');
 
@@ -59,7 +60,7 @@ class ReceiptItemRow extends StatelessWidget {
               ),
             ),
           AppText(
-            formatYen(item.totalPrice),
+            formatMoney(item.totalPrice, currency: currency),
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w800,
               color: AppPalette.text,

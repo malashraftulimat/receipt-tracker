@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../../../core/config/ai_config.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../domain/parser/receipt_parser.dart';
 
 /// Direct Google AI Studio / Gemini Developer API receipt extractor.
@@ -12,41 +13,61 @@ import '../../../domain/parser/receipt_parser.dart';
 /// Works on Flutter Web through the browser HTTP client. The photo is sent
 /// only for inference and is never written to Firestore or local storage.
 class AiReceiptOcrService {
-  AiReceiptOcrService({String? apiKey}) : _apiKey = apiKey ?? geminiApiKey();
+  AiReceiptOcrService({String? apiKey})
+      : _apiKey = apiKey?.trim().isNotEmpty == true
+            ? apiKey!.trim()
+            : geminiApiKeyOrNull();
 
-  final String _apiKey;
+  /// Build-time key, bundled key, or the Firebase project key. Null when the
+  /// app has no credential to send.
+  final String? _apiKey;
 
   /// Current Gemini Flash model from the Google AI Studio model list.
   static const String modelName = kGeminiReceiptModel;
 
   static const String _prompt = '''
-You extract structured data from Japanese printed receipts and invoices.
-Return only JSON matching the response schema.
+You extract structured data from printed receipts and invoices in any
+language or country. Return only JSON matching the response schema.
 
 Rules:
 - Read the actual receipt image. Never invent, complete or estimate values.
 - If a value is not printed or is unreadable, return null for that field.
+- The receipt may be written in any language or script (Arabic, English,
+  Japanese, Chinese, Korean, Spanish, Hindi, etc.). Keep merchant and item
+  names exactly as printed, in their original language and script. Do not
+  translate, transliterate, romanise or otherwise rewrite them.
+- currency is the ISO-4217 code actually used on the receipt (JPY, USD, EUR,
+  SAR, AED, EGP, GBP, CNY, KRW, INR, etc.). Infer it from the currency symbol,
+  code, or the store's country. Use null only when it cannot be determined.
 - purchased_at must be an ISO-8601 date-time string (YYYY-MM-DDTHH:mm:ss).
-  Convert Japanese era dates (令和 / 平成 / 昭和, R / H / S) to the Gregorian year.
+  Keep the printed calendar date. Only when the receipt prints a Japanese era
+  date (令和 / 平成 / 昭和, R / H / S) convert it to the Gregorian year.
   If no time is printed, use T00:00:00.
-- Amounts are integer Japanese yen. Remove ¥, commas, spaces and tax labels.
-- total is the final tax-included amount actually payable (税込合計 / 合計).
-  Do not use change (お釣り), deposit (お預り) or point balances as the total.
-- subtotal is the tax-excluded subtotal (小計 / 税抜) when printed.
-- tax_8_amount and tax_10_amount are the printed consumption tax amounts
-  (消費税 8% / 10%, 内消費税). Do not calculate them when not printed.
-- invoice_number is the qualified invoice registration number printed as
-  T followed by 13 digits. Normalise a full-width Ｔ to T. Otherwise null.
-- items are product lines only (商品明細). Exclude subtotal, tax, totals,
-  change, payment method, points, barcode and store address lines.
+- Amounts may contain decimals. Return them as JSON numbers (not strings) and
+  do not round or rescale them. Remove currency symbols, thousands separators,
+  spaces and tax labels from the numeric value.
+- total is the final tax-included amount actually payable, in the receipt's
+  currency. Do not use change, cash tendered, deposit or point balances as the
+  total.
+- subtotal is the tax-excluded subtotal when printed.
+- tax_8_amount and tax_10_amount are optional and Japanese-specific: fill them
+  only when a Japanese receipt prints the 8% / 10% consumption tax amount.
+  For non-Japanese receipts, or when no tax amount is printed, return null.
+  Never calculate them.
+- invoice_number is the Japanese qualified invoice registration number printed
+  as T followed by 13 digits. Normalise a full-width Ｔ to T. Otherwise null.
+- items are product lines only. Exclude subtotal, tax, totals, change, payment
+  method, points, barcode and store address lines.
   quantity defaults to 1 when no quantity is printed.
   unit_price is the per-unit price when printed, otherwise null.
   total_price is the printed line amount including tax if the receipt shows
   tax-included line prices, otherwise the printed line amount.
-  tax_rate must be 8 or 10 when the line identifies the rate, otherwise null.
-- suggested_category must be exactly one of:
+  tax_rate is optional and Japanese-specific: use 8 or 10 only when the line
+  identifies that rate, otherwise null.
+- suggested_category must be exactly one of the Japanese seeded categories:
   食費, 外食, 日用品, 光熱費, 交通費, 娯楽, 医療・医薬品, その他.
-  Choose the best category from the store and item names. Use null if unclear.
+  Choose the best category from the store and item names, regardless of the
+  receipt language. Use null if unclear.
 - Do not split one printed line into multiple items and do not merge lines.
 ''';
 
@@ -54,27 +75,32 @@ Rules:
     properties: <String, Schema>{
       'merchant': Schema.string(
         nullable: true,
-        description: 'Store / vendor name exactly as printed.',
+        description: 'Store / vendor name exactly as printed, any language.',
+      ),
+      'currency': Schema.string(
+        nullable: true,
+        description: 'ISO-4217 currency code such as JPY, USD, SAR or EUR.',
       ),
       'purchased_at': Schema.string(
         nullable: true,
         description: 'ISO-8601 date-time in Gregorian calendar.',
       ),
-      'total': Schema.integer(
+      'total': Schema.number(
         nullable: true,
-        description: 'Final tax-included amount in yen.',
+        description:
+            'Final tax-included amount in the receipt currency (decimals ok).',
       ),
-      'subtotal': Schema.integer(
+      'subtotal': Schema.number(
         nullable: true,
-        description: 'Tax-excluded subtotal in yen.',
+        description: 'Tax-excluded subtotal when printed (decimals ok).',
       ),
-      'tax_8_amount': Schema.integer(
+      'tax_8_amount': Schema.number(
         nullable: true,
-        description: 'Printed 8% consumption tax in yen.',
+        description: 'Optional printed 8% Japanese consumption tax amount.',
       ),
-      'tax_10_amount': Schema.integer(
+      'tax_10_amount': Schema.number(
         nullable: true,
-        description: 'Printed 10% consumption tax in yen.',
+        description: 'Optional printed 10% Japanese consumption tax amount.',
       ),
       'invoice_number': Schema.string(
         nullable: true,
@@ -103,17 +129,18 @@ Rules:
               nullable: true,
               description: 'Quantity, default 1.',
             ),
-            'unit_price': Schema.integer(
+            'unit_price': Schema.number(
               nullable: true,
-              description: 'Per-unit price in yen when printed.',
+              description: 'Per-unit price in the receipt currency.',
             ),
-            'total_price': Schema.integer(
+            'total_price': Schema.number(
               nullable: true,
-              description: 'Printed line amount in yen.',
+              description: 'Printed line amount in the receipt currency.',
             ),
             'tax_rate': Schema.integer(
               nullable: true,
-              description: 'Line tax rate: 8, 10, or null if unknown.',
+              description:
+                  'Optional Japanese rate: 8, 10, or null when not printed.',
             ),
           },
           requiredProperties: <String>[
@@ -128,6 +155,7 @@ Rules:
     },
     requiredProperties: <String>[
       'merchant',
+      'currency',
       'purchased_at',
       'total',
       'subtotal',
@@ -137,7 +165,7 @@ Rules:
       'suggested_category',
       'items',
     ],
-    description: 'Structured Japanese receipt extraction.',
+    description: 'Language- and currency-agnostic receipt extraction.',
   );
 
   /// Sends [jpegBytes] to Gemini and converts the structured response into the
@@ -147,11 +175,20 @@ Rules:
       throw const AiReceiptOcrException('レシート画像が空です。');
     }
 
+    final apiKey = _apiKey;
+    if (apiKey == null || apiKey.isEmpty) {
+      throw const AiReceiptOcrException(
+        'AIの設定を確認してください。',
+        kind: AiReceiptFailureKind.configuration,
+      );
+    }
+
     final response = await _generateContent(
       <Content>[
         Content.multi(<Part>[
           TextPart(
-            'Extract this Japanese receipt. Use null for anything unreadable.',
+            'Extract this receipt in its original language and currency. '
+            'Use null for anything unreadable.',
           ),
           DataPart('image/jpeg', jpegBytes),
         ]),
@@ -194,21 +231,30 @@ Rules:
       kGeminiReceiptModel,
       ...kGeminiReceiptFallbackModels,
     };
+    final apiKey = _apiKey;
+    final stopwatch = Stopwatch()..start();
     Object? lastError;
     String? lastModelName;
 
     for (final name in modelNames) {
+      if (apiKey == null || apiKey.isEmpty) break;
       final model = GenerativeModel(
         model: name,
-        apiKey: _apiKey,
+        apiKey: apiKey,
         systemInstruction: Content.system(_prompt),
       );
 
       for (var attempt = 0; attempt < 2; attempt++) {
+        if (stopwatch.elapsed > kGeminiRequestBudget) {
+          throw _mapAiError(
+            lastError ?? TimeoutException('AI request budget exceeded'),
+            modelName: lastModelName,
+          );
+        }
         try {
           return await model
               .generateContent(content, generationConfig: generationConfig)
-              .timeout(const Duration(seconds: 25));
+              .timeout(kGeminiRequestTimeout);
         } catch (error) {
           lastError = error;
           lastModelName = name;
@@ -303,6 +349,7 @@ Rules:
   ) {
     final warnings = <String>[];
     final merchant = _string(json['merchant']);
+    final currency = _currency(json['currency']);
     final purchasedAt = _dateTime(json['purchased_at']);
     final total = _amount(json['total']);
     final subtotal = _amount(json['subtotal']);
@@ -316,20 +363,24 @@ Rules:
     if (purchasedAt == null) warnings.add('購入日を読み取れませんでした');
     if (total == null) warnings.add('合計金額を読み取れませんでした');
 
-    final itemsTotal = items.fold<int>(0, (sum, item) => sum + item.totalPrice);
-    if (total != null && items.isNotEmpty && (itemsTotal - total).abs() > 1) {
+    final itemsTotal =
+        items.fold<double>(0, (sum, item) => sum + item.totalPrice);
+    if (total != null &&
+        items.isNotEmpty &&
+        (itemsTotal - total).abs() > 0.011) {
       warnings.add('明細の合計がレシートの合計と一致しません。内容を確認してください');
     }
 
     final tax8ItemsTotal = items
         .where((item) => item.taxRate == 8)
-        .fold<int>(0, (sum, item) => sum + item.totalPrice);
+        .fold<double>(0, (sum, item) => sum + item.totalPrice);
     final tax10ItemsTotal = items
         .where((item) => item.taxRate == 10)
-        .fold<int>(0, (sum, item) => sum + item.totalPrice);
+        .fold<double>(0, (sum, item) => sum + item.totalPrice);
 
     return ParsedReceipt(
       merchant: merchant,
+      currency: currency,
       purchasedAt: purchasedAt,
       totalAmount: total,
       subtotalAmount: subtotal,
@@ -377,8 +428,7 @@ Rules:
         ParsedItem(
           name: name,
           quantity: quantity,
-          unitPrice:
-              unitPrice ?? (quantity > 0 ? totalPrice ~/ quantity : null),
+          unitPrice: unitPrice ?? (quantity > 0 ? totalPrice / quantity : null),
           totalPrice: totalPrice,
           taxRate: rate,
         ),
@@ -394,27 +444,32 @@ Rules:
     return text.isEmpty ? null : text;
   }
 
-  static int? _amount(Object? value) {
+  static double? _amount(Object? value) {
     if (value == null) return null;
-    if (value is num) return value.round();
-    final normalized = value
-        .toString()
-        .replaceAll(RegExp(r'[¥￥,\s円]'), '')
-        .replaceAll('−', '-')
-        .replaceAll('ー', '-');
-    if (normalized.isEmpty) return null;
-    return int.tryParse(normalized);
+    if (value is num) return value.toDouble();
+    return parseAmountInput(
+      value.toString().replaceAll('−', '-').replaceAll('ー', '-'),
+    );
   }
 
   static int? _positiveInt(Object? value) {
     final parsed = _amount(value);
     if (parsed == null || parsed < 1) return null;
-    return parsed;
+    return parsed.round();
   }
 
   static int? _taxRate(Object? value) {
     final rate = _amount(value);
-    return rate == 8 || rate == 10 ? rate : null;
+    if (rate == null) return null;
+    final rounded = rate.round();
+    return rounded == 8 || rounded == 10 ? rounded : null;
+  }
+
+  static String? _currency(Object? value) {
+    final text = _string(value)?.toUpperCase();
+    if (text == null) return null;
+    final match = RegExp(r'\b([A-Z]{3})\b').firstMatch(text);
+    return match?.group(1) ?? (text.length == 3 ? text : null);
   }
 
   static String? _suggestedCategory(Object? value) {
@@ -446,6 +501,8 @@ Rules:
     final iso = DateTime.tryParse(text);
     if (iso != null) return iso;
 
+    // Era dates are only converted when the printed date actually contains a
+    // Japanese era marker; otherwise the printed Gregorian date is used as-is.
     final normalized = text.replaceAll('　', ' ');
     final era = RegExp(
       r'(令和|平成|昭和|R|H|S)\s*(\d{1,2}|元)\s*[年./\-]\s*(\d{1,2})\s*[月./\-]\s*(\d{1,2})',
