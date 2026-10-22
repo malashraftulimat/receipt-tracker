@@ -27,7 +27,7 @@ when the user saves or leaves.
 
 ## Live website
 
-**https://malashraftulimat.github.io/receipt-tracker/**
+**https://receipt-tracker-2ec.pages.dev/**
 
 The app opens directly on the **Firebase login / sign-up** screen. There is no
 local-only mode and no connection-setup screen. One account syncs receipts,
@@ -68,15 +68,16 @@ Required one-time setup in the Firebase console:
    ```
 
 4. **Authentication → Settings → Authorized domains** → add
-   `malashraftulimat.github.io`. `localhost` is already authorized.
-5. **Gemini API key** → set the GitHub Actions repository secret
-   `GEMINI_API_KEY` (Pages deploys pass it as
-   `--dart-define=GEMINI_API_KEY=...`). The key is never committed or bundled.
-   Restrict it to your authorised web domains and the Generative Language API.
-   If it is empty, the app shows "AI key missing" and uses on-device OCR.
-   The app defaults to the stable `gemini-3.1-flash-lite` model and tries the
-   stable `gemini-3.5-flash-lite`, `gemini-3.6-flash` and `gemini-3.8-flash`
-   fallbacks. Override with `--dart-define=GEMINI_RECEIPT_MODEL=...` if needed.
+   `receipt-tracker-2ec.pages.dev`. `localhost` is already authorized.
+5. **Gemini API key** → AI scans go through the Cloudflare Worker
+   (`receipt-tracker-backend`) by default, so the key lives in the Worker:
+   `npx wrangler secret put GEMINI_API_KEY`. The key is never committed or
+   bundled into the web app. Restrict it to the Generative Language API.
+   A personal key saved in Settings bypasses the Worker; without either the
+   scanner falls back to on-device OCR. The app defaults to the stable
+   `gemini-3.1-flash-lite` model and tries the stable `gemini-3.5-flash-lite`,
+   `gemini-3.6-flash` and `gemini-3.8-flash` fallbacks. Override with
+   `--dart-define=GEMINI_RECEIPT_MODEL=...` if needed.
 6. **App Check** → register the web app, create a reCAPTCHA v3 site key, then set
    the `RECAPTCHA_V3_SITE_KEY` build value (or the GitHub Actions repository
    secret of the same name). On web, debug builds use the App Check debug
@@ -85,24 +86,24 @@ Required one-time setup in the Firebase console:
    key is supplied, the app still starts and AI automatically falls back to local
    OCR.
 
-### Bring your own Gemini key (GitHub Pages)
+### Bring your own Gemini key (optional)
 
-Because this is a static site with no backend, users can save their own Gemini
-API key from **Settings → AIキー（Gemini）**.
+Users may save their own Gemini API key from **Settings → AIキー（Gemini・任意）**.
+It bypasses the shared backend and its daily limit.
 
 1. Create a key in [Google AI Studio](https://aistudio.google.com/app/apikey).
 2. In Google Cloud / AI Studio key restrictions:
    - **Application restrictions → HTTP referrers**: add
-     `https://malashraftulimat.github.io/*`
+     `https://receipt-tracker-2ec.pages.dev/*`
    - **API restrictions**: allow only the **Generative Language API**
      (Gemini API)
 3. Paste the key in Settings, then use **Save** and optionally **キーをテスト**.
 
 The key is stored only in the browser's `localStorage` for the current origin
 and is sent directly to Google's Gemini API. It is never written to Firestore,
-committed to the repository, or logged. If no saved key exists, the build-time
-`GEMINI_API_KEY` is used next; otherwise the app shows "AI key missing" and
-falls back to on-device OCR.
+committed to the repository, or logged. Without a saved key the app uses the
+Cloudflare Worker (10 scans per user per day); if the Worker is unavailable the
+scanner falls back to on-device OCR.
 
 > Any key used in a frontend web app is visible to the user's browser. Restrict
 > it by HTTP referrer and API, and rotate it if it is exposed.
@@ -240,9 +241,8 @@ Release builds:
 
 ```bash
 flutter build apk --release --split-per-abi
-flutter build web --release --base-href=/receipt-tracker/ \
-  --dart-define=RECAPTCHA_V3_SITE_KEY=6L... \
-  --dart-define=GEMINI_API_KEY=...            # required for AI OCR; omit for on-device OCR
+flutter build web --release \
+  --dart-define=RECAPTCHA_V3_SITE_KEY=6L...
 flutter build windows --release   # Windows host + VS C++ + Developer Mode
 flutter build ipa --release       # macOS host + Xcode + signing
 ```
@@ -250,17 +250,18 @@ flutter build ipa --release       # macOS host + Xcode + signing
 Android requires `minSdk 24` (Firebase) and the `INTERNET` permission, both
 already configured in the project.
 
-### GitHub Pages
+### Cloudflare Pages
 
-Pushing to `main` runs [`.github/workflows/pages.yml`](.github/workflows/pages.yml),
-which runs `flutter analyze`, `flutter test`, builds the web app with the
-repository base path and deploys `build/web`. The hard-coded Firebase config is
-included in the build. Add an optional `RECAPTCHA_V3_SITE_KEY` repository
-secret to enable App Check for Firebase services. Set the `GEMINI_API_KEY`
-repository secret to enable AI extraction; without it the app shows
-"AI key missing" and falls back to on-device OCR.
+Pushing to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml),
+which builds the web app and deploys `build/web` to the Cloudflare Pages project
+`receipt-tracker` (`https://receipt-tracker-2ec.pages.dev`). The hard-coded
+Firebase config is included in the build. Add an optional
+`RECAPTCHA_V3_SITE_KEY` repository secret to enable App Check for Firebase
+services. AI extraction uses the `receipt-tracker-backend` Worker; its
+`GEMINI_API_KEY` is a Worker secret, not a repository secret.
 
-Remember to add the Pages hostname to Firebase Auth **Authorized domains**.
+Remember to add the Cloudflare Pages hostname to Firebase Auth
+**Authorized domains**.
 
 ### Tests
 

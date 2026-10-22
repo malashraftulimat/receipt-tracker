@@ -17,17 +17,17 @@ In the Firebase console:
 1. **Authentication → Sign-in method → Email/Password** → enable.
 2. **Firestore Database** → create the database.
 3. Deploy [`firestore.rules`](../firestore.rules) (`firebase deploy --only firestore:rules`).
-4. **Authentication → Settings → Authorized domains** → add the GitHub Pages
-   hostname (for example `malashraftulimat.github.io`). `localhost` is already
+4. **Authentication → Settings → Authorized domains** → add the Cloudflare
+   Pages hostname (`receipt-tracker-2ec.pages.dev`). `localhost` is already
    authorized.
-5. **Gemini key** → set the `GEMINI_API_KEY` GitHub Actions secret. Pages
-   passes it with `--dart-define=GEMINI_API_KEY=...`; the key is never committed
-   or bundled. Restrict it to your web domains and the Generative Language API.
-   If it is empty, the app shows "AI key missing" and uses on-device OCR. The
-   app defaults to the stable `gemini-3.1-flash-lite` model and falls back
-   through stable `gemini-3.5-flash-lite` / `gemini-3.6-flash` /
-   `gemini-3.8-flash` models (see `AiReceiptOcrService`). Retired 2.0/1.5/2.5
-   model names are not used.
+5. **Gemini key** → set the `GEMINI_API_KEY` secret on the
+   `receipt-tracker-backend` Worker (`npx wrangler secret put GEMINI_API_KEY`);
+   the key is never committed or bundled. Restrict it to the Generative
+   Language API. A personal key saved in Settings bypasses the Worker; if none
+   is configured the app uses on-device OCR. The app defaults to the stable
+   `gemini-3.1-flash-lite` model and falls back through stable
+   `gemini-3.5-flash-lite` / `gemini-3.6-flash` / `gemini-3.8-flash` models
+   (see `AiReceiptOcrService`). Retired 2.0/1.5/2.5 model names are not used.
 6. **App Check** → register the web app and create a reCAPTCHA v3 site key. Pass
    it with `--dart-define=RECAPTCHA_V3_SITE_KEY=...` (or set the GitHub Actions
    secret) to activate App Check in release web builds. Debug web builds use the
@@ -108,7 +108,7 @@ platform :ios, '15.5'   # google_mlkit_text_recognition requires iOS 15.5+
 
 ## Web (`web/index.html`)
 
-Camera access needs a **secure context**: serve over HTTPS (GitHub Pages,
+Camera access needs a **secure context**: serve over HTTPS (Cloudflare Pages,
 Netlify, etc.) or `localhost`, otherwise `getUserMedia` is unavailable.
 
 - Live barcode detection uses `mobile_scanner`'s HTML5/WebRTC backend.
