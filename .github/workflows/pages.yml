@@ -36,10 +36,16 @@ jobs:
           enablement: true
 
       - name: Build Flutter web
+        env:
+          RECAPTCHA_V3_SITE_KEY: ${{ secrets.RECAPTCHA_V3_SITE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          flutter build web --release --base-href=${{ steps.pages.outputs.base_path }}/ \
-            --dart-define=RECAPTCHA_V3_SITE_KEY=${{ secrets.RECAPTCHA_V3_SITE_KEY }} \
-            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::warning::GEMINI_API_KEY is empty; the deployed app will show 'AI key missing' and use on-device OCR."
+          fi
+          flutter build web --release --base-href="${{ steps.pages.outputs.base_path }}/" \
+            --dart-define=RECAPTCHA_V3_SITE_KEY="$RECAPTCHA_V3_SITE_KEY" \
+            --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
           touch build/web/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

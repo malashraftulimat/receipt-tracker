@@ -22,8 +22,11 @@ Future<void> main() async {
   await Firebase.initializeApp(options: kFirebaseOptions);
   await _initializeAppCheck();
 
-  // Validate the API key / project used by the direct Gemini client.
-  verifyGeminiConfiguration();
+  // AI OCR uses only the build-time GEMINI_API_KEY. When it is missing the
+  // app still starts and the scanner falls back to on-device OCR.
+  if (!hasGeminiApiKey()) {
+    debugPrint('[AI] AI key missing; on-device OCR fallback will be used.');
+  }
 
   runApp(const ProviderScope(child: ReceiptTrackerApp()));
 }

@@ -1,29 +1,26 @@
-import 'package:firebase_core/firebase_core.dart';
-
-import 'ai_secrets.dart';
-
-/// Optional Google AI Studio key override supplied at build time.
+/// Gemini API key supplied at build time.
 ///
-/// Takes priority over the bundled key in `ai_secrets.dart`:
-/// `--dart-define=GEMINI_API_KEY=...`.
+/// Web deploys pass it from the `GEMINI_API_KEY` GitHub Actions secret:
+/// `--dart-define=GEMINI_API_KEY=...`. No key is bundled in the repository,
+/// and the Firebase project API key is never used for Gemini calls.
 const String kGeminiApiKeyOverride = String.fromEnvironment('GEMINI_API_KEY');
 
-/// Gemini Flash model for direct Google AI Studio requests.
+/// Gemini Flash model for direct Gemini Developer API requests.
 ///
-/// A Flash **Lite** model is the default because a full receipt extraction
-/// returns in ~2s on Lite, while thinking Flash models need 30-90s per scan.
-/// Retired 1.5 / 2.0 / 2.5 names are intentionally not used. Override with
-/// `--dart-define=GEMINI_RECEIPT_MODEL=...` if your API key exposes a different
-/// model.
+/// A Flash **Lite** model is the default because receipt extraction returns
+/// in a few seconds on Lite, while thinking Flash models need much longer per
+/// scan. `gemini-3.1-flash-lite` is a stable model in the official model list.
+/// Override with `--dart-define=GEMINI_RECEIPT_MODEL=...` if needed.
 const String kGeminiReceiptModel = String.fromEnvironment(
   'GEMINI_RECEIPT_MODEL',
   defaultValue: 'gemini-3.1-flash-lite',
 );
 
-/// Current model fallbacks tried when the primary model is unavailable or not
-/// exposed by the API key.
+/// Stable fallback models tried when the primary model is unavailable or not
+/// exposed by the API key. All names are listed as stable in the Gemini API
+/// model documentation.
 const List<String> kGeminiReceiptFallbackModels = <String>[
-  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
   'gemini-3.8-flash',
 ];
@@ -38,55 +35,25 @@ const Duration kGeminiRequestTimeout = Duration(seconds: 45);
 /// UI falls back to on-device OCR instead of waiting on a long outage.
 const Duration kGeminiRequestBudget = Duration(seconds: 100);
 
-/// Resolves the direct Google AI Studio API key.
+/// Resolves the Gemini API key from the build-time override only.
 ///
-/// Order: build-time override → bundled key → Firebase project API key.
+/// Returns null when `GEMINI_API_KEY` was not supplied at build time. There is
+/// deliberately no Firebase / bundled-key fallback: a missing key must surface
+/// as an "AI key missing" error and let the on-device OCR fallback run.
+String? geminiApiKeyOrNull() {
+  final key = kGeminiApiKeyOverride.trim();
+  return key.isEmpty ? null : key;
+}
+
+/// Throwing variant of [geminiApiKeyOrNull] for callers that require a key.
 String geminiApiKey() {
   final key = geminiApiKeyOrNull();
   if (key == null) {
-    throw StateError('No Gemini API key is configured.');
+    throw StateError(
+        'AI key missing: GEMINI_API_KEY was not set at build time.');
   }
   return key;
 }
 
-/// Non-throwing variant of [geminiApiKey].
-///
-/// Firebase is only consulted when nothing else is configured, so this can be
-/// called before `Firebase.initializeApp`.
-String? geminiApiKeyOrNull() {
-  final override = kGeminiApiKeyOverride.trim();
-  if (override.isNotEmpty) return override;
-
-  final bundled = kBundledGeminiApiKey.trim();
-  if (bundled.isNotEmpty) return bundled;
-
-  final firebaseKey = _firebaseOptionsOrNull()?.apiKey.trim();
-  if (firebaseKey != null && firebaseKey.isNotEmpty) return firebaseKey;
-  return null;
-}
-
-/// True when the app has a key it can send to the Generative Language API.
+/// True when the build supplied a Gemini API key.
 bool hasGeminiApiKey() => geminiApiKeyOrNull() != null;
-
-/// Verifies that Firebase was initialized with the apiKey / projectId used when
-/// the app falls back to the Firebase project key.
-///
-/// The bundled / build-time key does not depend on Firebase, so this is a no-op
-/// in that case.
-void verifyGeminiConfiguration() {
-  if (geminiApiKeyOrNull() != null) return;
-  final options = _firebaseOptionsOrNull();
-  throw StateError(
-    'No Gemini API key is configured and FirebaseOptions is missing '
-    '${options == null ? '(Firebase not initialized)' : '(empty apiKey)'}.',
-  );
-}
-
-FirebaseOptions? _firebaseOptionsOrNull() {
-  try {
-    return Firebase.app().options;
-  } catch (_) {
-    // Firebase not initialized yet (or no default app).
-    return null;
-  }
-}

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../../core/utils/redaction.dart';
 import '../../../domain/parser/receipt_parser.dart';
 import 'ai_receipt_ocr_service.dart';
 import 'ocr_service.dart';
@@ -28,6 +29,9 @@ class ReceiptExtractionResult {
       : null;
 
   bool get aiServiceUnavailable => aiFailure?.isTemporaryServiceIssue ?? false;
+
+  /// True when the deployed build has no GEMINI_API_KEY.
+  bool get aiKeyMissing => aiFailure?.kind == AiReceiptFailureKind.missingKey;
 }
 
 /// Gemini (direct Google AI Studio) first, ML Kit / Tesseract.js on error, offline
@@ -63,6 +67,7 @@ class ReceiptOcrPipeline {
           : AiReceiptOcrException(
               'AIで読み取れませんでした。',
               cause: error,
+              diagnostics: redactSensitiveText(error.toString()),
             );
     }
 

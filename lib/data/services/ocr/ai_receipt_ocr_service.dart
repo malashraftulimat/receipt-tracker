@@ -6,6 +6,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 
 import '../../../core/config/ai_config.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/redaction.dart';
 import '../../../domain/parser/receipt_parser.dart';
 
 /// Direct Google AI Studio / Gemini Developer API receipt extractor.
@@ -18,8 +19,8 @@ class AiReceiptOcrService {
             ? apiKey!.trim()
             : geminiApiKeyOrNull();
 
-  /// Build-time key, bundled key, or the Firebase project key. Null when the
-  /// app has no credential to send.
+  /// Build-time `GEMINI_API_KEY` only. Null when the build did not supply one;
+  /// there is no Firebase / bundled-key fallback.
   final String? _apiKey;
 
   /// Current Gemini Flash model from the Google AI Studio model list.
@@ -178,8 +179,8 @@ Rules:
     final apiKey = _apiKey;
     if (apiKey == null || apiKey.isEmpty) {
       throw const AiReceiptOcrException(
-        'AIの設定を確認してください。',
-        kind: AiReceiptFailureKind.configuration,
+        'AI key missing',
+        kind: AiReceiptFailureKind.missingKey,
       );
     }
 
@@ -262,7 +263,7 @@ Rules:
           debugPrint(
             '[AiReceiptOcrService] model=$name attempt=${attempt + 1} '
             'runtimeType=${error.runtimeType} kind=${mapped.kind.name} '
-            'message=${mapped.message} raw=$error',
+            'message=${mapped.message} raw=${_safeError(error)}',
           );
 
           if (mapped.kind == AiReceiptFailureKind.unavailable && attempt == 0) {
@@ -286,7 +287,7 @@ Rules:
     );
   }
 
-  static AiReceiptOcrException _mapAiError(
+  AiReceiptOcrException _mapAiError(
     Object error, {
     String? modelName,
   }) {
@@ -295,6 +296,7 @@ Rules:
         error.message,
         kind: error.kind,
         cause: error.cause ?? error,
+        diagnostics: error.diagnostics ?? _safeError(error),
         modelName: modelName ?? error.modelName,
       );
     }
@@ -333,15 +335,21 @@ Rules:
       AiReceiptFailureKind.notFound => '選択したAIモデルを利用できません。',
       AiReceiptFailureKind.quota => 'AIの利用上限に達しました。',
       AiReceiptFailureKind.configuration => 'AIの設定を確認してください。',
+      AiReceiptFailureKind.missingKey => 'AI key missing',
       AiReceiptFailureKind.other => 'AIで読み取れませんでした。',
     };
     return AiReceiptOcrException(
       message,
       kind: kind,
       cause: error,
+      diagnostics: _safeError(error),
       modelName: modelName,
     );
   }
+
+  /// Error text that is safe to log or show in the diagnostics box.
+  String _safeError(Object error) =>
+      redactSensitiveText(error.toString(), apiKey: _apiKey);
 
   ParsedReceipt _toParsedReceipt(
     Map<String, dynamic> json,
@@ -561,6 +569,7 @@ enum AiReceiptFailureKind {
   notFound,
   quota,
   configuration,
+  missingKey,
   other,
 }
 
@@ -569,12 +578,16 @@ class AiReceiptOcrException implements Exception {
     this.message, {
     this.kind = AiReceiptFailureKind.other,
     this.cause,
+    this.diagnostics,
     this.modelName,
   });
 
   final String message;
   final AiReceiptFailureKind kind;
   final Object? cause;
+
+  /// Sanitised error text safe for logs and the "AI error details" box.
+  final String? diagnostics;
   final String? modelName;
 
   bool get isTemporaryServiceIssue =>

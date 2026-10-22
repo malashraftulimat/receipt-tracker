@@ -156,8 +156,8 @@ const Map<String, String> kEnglishTranslations = <String, String>{
       'The AI service is getting ready. Please try again in a moment.',
   'AIを利用できないため、端末内OCRで読み取りました。':
       'AI was unavailable, so the receipt was read with on-device OCR.',
-  '撮影した写真はGoogle（Firebase AI）に送信して解析します。写真は保存されません。':
-      'The photo is sent to Google (Firebase AI) for processing and is not stored.',
+  '撮影した写真はGoogleのGemini APIに送信してテキスト抽出を行います。写真は保存されません。':
+      "The photo is sent to Google's Gemini API for text extraction and is not saved.",
   '端末のカメラを使う': 'Use device camera',
   'プレビューするレシート画像はありません': 'No receipt image to preview',
   '店舗名を読み取れませんでした': 'Could not read the store name',

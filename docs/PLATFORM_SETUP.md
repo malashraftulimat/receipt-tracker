@@ -20,12 +20,14 @@ In the Firebase console:
 4. **Authentication → Settings → Authorized domains** → add the GitHub Pages
    hostname (for example `malashraftulimat.github.io`). `localhost` is already
    authorized.
-5. **Gemini key** → direct requests use the Firebase project API key by default.
-   If needed, pass a Google AI Studio key with
-   `--dart-define=GEMINI_API_KEY=...` and restrict it to your web domains and
-   the Generative Language API. The app defaults to `gemini-3.8-flash` and
-   falls back through `gemini-3.7-flash` / `gemini-3.5-flash` automatically
-   (see `AiReceiptOcrService`). Retired 2.0/1.5 model names are not used.
+5. **Gemini key** → set the `GEMINI_API_KEY` GitHub Actions secret. Pages
+   passes it with `--dart-define=GEMINI_API_KEY=...`; the key is never committed
+   or bundled. Restrict it to your web domains and the Generative Language API.
+   If it is empty, the app shows "AI key missing" and uses on-device OCR. The
+   app defaults to the stable `gemini-3.1-flash-lite` model and falls back
+   through stable `gemini-3.5-flash-lite` / `gemini-3.6-flash` /
+   `gemini-3.8-flash` models (see `AiReceiptOcrService`). Retired 2.0/1.5/2.5
+   model names are not used.
 6. **App Check** → register the web app and create a reCAPTCHA v3 site key. Pass
    it with `--dart-define=RECAPTCHA_V3_SITE_KEY=...` (or set the GitHub Actions
    secret) to activate App Check in release web builds. Debug web builds use the

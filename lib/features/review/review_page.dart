@@ -337,13 +337,15 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       if (result.usedFallback) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: result.aiServiceUnavailable
-                ? const AppText(
-                    'AIサービスを準備しています。しばらくしてからお試しください。',
-                  )
-                : const AppText(
-                    'AIを利用できないため、端末内OCRで読み取りました。',
-                  ),
+            content: result.aiKeyMissing
+                ? const AppText('AI key missing — using on-device OCR.')
+                : result.aiServiceUnavailable
+                    ? const AppText(
+                        'AIサービスを準備しています。しばらくしてからお試しください。',
+                      )
+                    : const AppText(
+                        'AIを利用できないため、端末内OCRで読み取りました。',
+                      ),
           ),
         );
       }

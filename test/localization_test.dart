@@ -62,20 +62,18 @@ void main() {
 
   test('Gemini model configuration uses current supported names', () {
     expect(kGeminiReceiptModel, 'gemini-3.1-flash-lite');
-    expect(kGeminiReceiptFallbackModels, contains('gemini-flash-lite-latest'));
+    expect(kGeminiReceiptFallbackModels, contains('gemini-3.5-flash-lite'));
     expect(kGeminiReceiptFallbackModels, contains('gemini-3.6-flash'));
     expect(kGeminiReceiptFallbackModels, isNot(contains('gemini-2.0-flash')));
     expect(kGeminiReceiptFallbackModels, isNot(contains('gemini-1.5-flash')));
     expect(kGeminiReceiptFallbackModels, isNot(contains('gemini-2.5-flash')));
   });
 
-  test('Gemini key resolution works without Firebase being initialized', () {
-    // The key itself is supplied by the build (dart-define) or a bundled
-    // local secret, so it may legitimately be absent in CI.
-    expect(geminiApiKeyOrNull, returnsNormally);
+  test('Gemini key comes only from the GEMINI_API_KEY build define', () {
+    final override = const String.fromEnvironment('GEMINI_API_KEY').trim();
     final key = geminiApiKeyOrNull();
-    expect(key == null || key.isNotEmpty, isTrue);
-    expect(hasGeminiApiKey(), key != null);
+    expect(hasGeminiApiKey(), override.isNotEmpty);
+    expect(key, override.isEmpty ? isNull : override);
   });
 
   test('category screen messages are localized', () {

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/theme/app_palette.dart';
+import '../../core/utils/redaction.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/press_scale.dart';
 import '../../core/utils/barcode_utils.dart';
@@ -343,11 +344,13 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     if (result.usedFallback) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: result.aiServiceUnavailable
-              ? const AppText(
-                  'AIサービスを準備しています。しばらくしてからお試しください。',
-                )
-              : const AppText('AIを利用できないため、端末内OCRで読み取りました。'),
+          content: result.aiKeyMissing
+              ? const AppText('AI key missing — using on-device OCR.')
+              : result.aiServiceUnavailable
+                  ? const AppText(
+                      'AIサービスを準備しています。しばらくしてからお試しください。',
+                    )
+                  : const AppText('AIを利用できないため、端末内OCRで読み取りました。'),
         ),
       );
     }
@@ -592,7 +595,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                   ),
                   const SizedBox(height: 8),
                   const AppText(
-                    '撮影した写真はGoogle（Firebase AI）に送信して解析します。写真は保存されません。',
+                    '撮影した写真はGoogleのGemini APIに送信してテキスト抽出を行います。写真は保存されません。',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppPalette.textFaint,
@@ -893,7 +896,8 @@ class _AiDiagnosticLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final raw = failure.cause?.toString() ?? failure.toString();
+    final raw = failure.diagnostics ??
+        redactSensitiveText(failure.cause?.toString() ?? failure.toString());
     final runtimeType = failure.cause?.runtimeType.toString() ?? '-';
 
     return Container(
@@ -1185,7 +1189,7 @@ class _NoCameraView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const AppText(
-                '撮影した写真はGoogle（Firebase AI）に送信して解析します。写真は保存されません。',
+                '撮影した写真はGoogleのGemini APIに送信してテキスト抽出を行います。写真は保存されません。',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, height: 1.4),
               ),

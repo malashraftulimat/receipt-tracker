@@ -69,15 +69,14 @@ Required one-time setup in the Firebase console:
 
 4. **Authentication → Settings → Authorized domains** → add
    `malashraftulimat.github.io`. `localhost` is already authorized.
-5. **Gemini API key** → direct requests use the existing Firebase project API key
-   from `FirebaseOptions` by default. If that key is restricted for Gemini,
-   create a Google AI Studio key and pass it with
-   `--dart-define=GEMINI_API_KEY=...`. Restrict the key to your authorised web
-   domains and the Generative Language API.
-   The app defaults to `gemini-3.8-flash` and automatically tries
-   `gemini-3.7-flash` / `gemini-3.5-flash` when a model is unavailable or not
-   exposed. Retired models such as `gemini-2.0-flash` and `gemini-1.5-flash`
-   are not used. Override with `--dart-define=GEMINI_RECEIPT_MODEL=...` if needed.
+5. **Gemini API key** → set the GitHub Actions repository secret
+   `GEMINI_API_KEY` (Pages deploys pass it as
+   `--dart-define=GEMINI_API_KEY=...`). The key is never committed or bundled.
+   Restrict it to your authorised web domains and the Generative Language API.
+   If it is empty, the app shows "AI key missing" and uses on-device OCR.
+   The app defaults to the stable `gemini-3.1-flash-lite` model and tries the
+   stable `gemini-3.5-flash-lite`, `gemini-3.6-flash` and `gemini-3.8-flash`
+   fallbacks. Override with `--dart-define=GEMINI_RECEIPT_MODEL=...` if needed.
 6. **App Check** → register the web app, create a reCAPTCHA v3 site key, then set
    the `RECAPTCHA_V3_SITE_KEY` build value (or the GitHub Actions repository
    secret of the same name). On web, debug builds use the App Check debug
@@ -184,7 +183,7 @@ lib/
 | `firebase_core` | Firebase app initialization |
 | `firebase_auth` | Email/password auth and persistent sessions |
 | `cloud_firestore` | Per-user receipts, items, categories and budgets |
-| `google_generative_ai` | Direct Google AI Studio / Gemini Developer API client for Flutter Web (`gemini-3.8-flash` primary, with current model fallbacks). |
+| `google_generative_ai` | Direct Gemini Developer API client for Flutter Web (`gemini-3.1-flash-lite` primary, with stable fallbacks). This package is deprecated upstream; the planned replacement is Firebase AI Logic (`firebase_ai`). |
 | `firebase_app_check` | App Check protection for Firebase requests |
 | `mobile_scanner` | 1D barcode scanning: ML Kit mobile, WebRTC + ZXing web |
 | `google_mlkit_text_recognition` | On-device OCR (Android/iOS, ja + en) |
@@ -212,7 +211,7 @@ Release builds:
 flutter build apk --release --split-per-abi
 flutter build web --release --base-href=/receipt-tracker/ \
   --dart-define=RECAPTCHA_V3_SITE_KEY=6L... \
-  --dart-define=GEMINI_API_KEY=...            # optional Google AI Studio key
+  --dart-define=GEMINI_API_KEY=...            # required for AI OCR; omit for on-device OCR
 flutter build windows --release   # Windows host + VS C++ + Developer Mode
 flutter build ipa --release       # macOS host + Xcode + signing
 ```
@@ -226,10 +225,9 @@ Pushing to `main` runs [`.github/workflows/pages.yml`](.github/workflows/pages.y
 which runs `flutter analyze`, `flutter test`, builds the web app with the
 repository base path and deploys `build/web`. The hard-coded Firebase config is
 included in the build. Add an optional `RECAPTCHA_V3_SITE_KEY` repository
-secret to enable App Check for Firebase services. Add an optional
-`GEMINI_API_KEY` repository secret when the Firebase project key cannot call the
-Generative Language API directly; without it the app uses the Firebase key and
-falls back to local OCR on any AI failure.
+secret to enable App Check for Firebase services. Set the `GEMINI_API_KEY`
+repository secret to enable AI extraction; without it the app shows
+"AI key missing" and falls back to on-device OCR.
 
 Remember to add the Pages hostname to Firebase Auth **Authorized domains**.
 
@@ -253,7 +251,7 @@ line-item extraction.
    stored and the review screen opens with the barcode / invoice number filled.
 2. **AI OCR mode** — a still image is captured from the live web frame, the
    device-camera file input, or `image_picker` on mobile. The JPEG is sent to
-   `AiReceiptOcrService` (direct Google AI Studio, Gemini `gemini-3.8-flash`
+   `AiReceiptOcrService` (direct Google AI Studio, Gemini `gemini-3.1-flash-lite`
    with model fallbacks) with a JSON response
    schema, then mapped into `ReceiptDraft` / `ReceiptItem`.
 3. **Automatic fallback** — if Gemini errors, is offline or is out of quota, the
