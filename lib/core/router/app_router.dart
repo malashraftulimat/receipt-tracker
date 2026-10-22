@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_page.dart';
 import '../../features/budget/budget_page.dart';
 import '../../features/categories/categories_page.dart';
+import '../../features/coupons/coupons_page.dart';
 import '../../features/dashboard/dashboard_page.dart';
 import '../../features/receipts/receipt_detail_page.dart';
 import '../../features/review/review_page.dart';
@@ -52,6 +53,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/dashboard',
             name: 'dashboard',
             builder: (context, state) => const DashboardPage(),
+          ),
+          GoRoute(
+            path: '/coupons',
+            name: 'coupons',
+            builder: (context, state) => const CouponsPage(),
           ),
           GoRoute(
             path: '/categories',

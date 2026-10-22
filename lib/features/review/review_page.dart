@@ -71,6 +71,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   late DateTime _purchasedAt;
   String? _categoryId;
   String? _suggestedCategory;
+
+  /// Coupon printed on the receipt; saved alongside a new receipt.
+  ParsedCoupon? _coupon;
   double? _tax8Base;
   double? _tax10Base;
   double? _tax8ItemsTotal;
@@ -134,6 +137,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     _purchasedAt = draft?.purchasedAt ?? DateTime.now();
     _categoryId = draft?.categoryId;
     _suggestedCategory = widget.args.parsed?.suggestedCategory;
+    _coupon = widget.args.parsed?.coupon;
     _tax8Base = draft?.tax8Base;
     _tax10Base = draft?.tax10Base;
     _tax8ItemsTotal = draft?.tax8ItemsTotal;
@@ -295,6 +299,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         _rawOcrText = parsed.rawText;
         _warnings = parsed.warnings;
         _suggestedCategory = parsed.suggestedCategory;
+        _coupon = parsed.coupon;
         if (parsed.suggestedCategory != null) _categoryId = null;
         _source = barcode == null ? ReceiptSource.ocr : ReceiptSource.barcode;
 
@@ -424,6 +429,21 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         );
       } else {
         saved = await repository.create(draft);
+      }
+
+      // A coupon printed on a newly scanned receipt becomes a tracked coupon.
+      if (_existingId == null && _coupon != null) {
+        try {
+          await ref.read(couponRepositoryProvider).createFromParsed(
+                _coupon!,
+                receiptId: saved.id,
+                merchant: saved.merchant,
+              );
+          ref.invalidate(couponsProvider);
+          await ref.read(couponReminderServiceProvider).sync();
+        } catch (error) {
+          debugPrint('[ReviewPage] coupon save failed: $error');
+        }
       }
 
       if (!mounted) return;

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models/app_user.dart';
 import '../domain/models/category.dart';
+import '../domain/models/coupon.dart';
 import '../domain/models/monthly_budget.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
@@ -10,7 +11,9 @@ import '../domain/parser/receipt_parser.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/budget_repository.dart';
 import 'repositories/category_repository.dart';
+import 'repositories/coupon_repository.dart';
 import 'repositories/receipt_repository.dart';
+import 'services/coupons/coupon_reminder_service.dart';
 import 'services/ocr/ai_receipt_ocr_service.dart';
 import 'services/ocr/ocr_service.dart';
 import 'services/ocr/receipt_ocr_pipeline.dart';
@@ -34,6 +37,30 @@ final categoryRepositoryProvider = Provider<CategoryRepository>(
 final budgetRepositoryProvider = Provider<BudgetRepository>(
   (ref) => BudgetRepository(),
 );
+
+final couponRepositoryProvider = Provider<CouponRepository>(
+  (ref) => CouponRepository(),
+);
+
+/// Coupon persistence + daily local reminders.
+final couponReminderServiceProvider = Provider<CouponReminderService>(
+  (ref) => CouponReminderService(
+    repository: ref.watch(couponRepositoryProvider),
+  ),
+);
+
+/// Active / used / expired coupons for the signed-in user.
+final couponsProvider = FutureProvider<List<Coupon>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <Coupon>[];
+  final repository = ref.watch(couponRepositoryProvider);
+  try {
+    await repository.expireOverdue();
+  } catch (_) {
+    // Offline / permission errors must not hide the coupon list.
+  }
+  return repository.fetchAll();
+});
 
 /// Fallback OCR: ML Kit on Android/iOS, Tesseract.js on Web.
 /// Desktop has no fallback OCR engine (Gemini still runs when online).

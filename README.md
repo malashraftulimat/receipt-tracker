@@ -115,6 +115,11 @@ users/{userId}/receipts/{receiptId}
   tax_8_amount, tax_10_amount, barcode_id (invoice / reference no.),
   items[], raw_ocr_text, source, created_at, updated_at, ...
 
+users/{userId}/coupons/{couponId}
+  name, merchant, valid_from, valid_until,
+  discount_amount_or_percent, status (active/used/expired),
+  receipt_id, created_at, updated_at
+
 users/{userId}/categories/{categoryId}
 users/{userId}/budgets/{yyyy-MM}
 ```
@@ -138,6 +143,7 @@ document, so a receipt + items are written atomically.
 | Scan | Live 1D barcode (duplicate guard), tap-to-focus web camera, device-camera input, AI extraction, auto-detect and long-receipt modes |
 | Parse | Gemini structured JSON (merchant, ISO/Reiwa date, total, subtotal, 8%/10% tax, invoice no., items), with parser fallback |
 | Review | In-memory image preview, editable extracted items directly below it, header, tax, category, due date, notes, warnings and duplicate banner |
+| Coupons | Printed coupons extracted with name / validFrom / validUntil / discount, saved per receipt, daily reminders with **Mark as Used** / **Remind Tomorrow**, automatic expiry |
 | Categorize | 8 seeded categories + custom categories with colour & icon |
 | Dashboard | Month/day grouping, list/grid views, monthly subtotals |
 | Search/Filter | Merchant/note/barcode search, category chips, 今月/先月, custom ranges |
@@ -216,7 +222,10 @@ lib/
 | `path_provider` | Temp file for ML Kit `InputImage` |
 | `fl_chart` | Monthly bars + category donut |
 | `intl` | Locale-aware date formatting (ja/en/ar) |
-| `shared_preferences` | Theme + language preferences |
+| `shared_preferences` | Theme + language preferences, coupon action journal / reminder state |
+| `http` | Worker transport for AI scans without a personal key |
+| `flutter_local_notifications` | Daily coupon reminders + action buttons (Android/iOS/macOS/web) |
+| `timezone` | Absolute scheduling times for reminders |
 
 ---
 
@@ -263,6 +272,33 @@ flutter test
 The parser tests cover Japanese dates (era/full/2-digit), total vs subtotal vs
 change amounts, 8%/10% tax lines, tax-inclusive bases, reference numbers and
 line-item extraction.
+
+---
+
+## Coupons & reminders
+
+Gemini extracts a printed coupon (`name`, `valid_from`, `valid_until`,
+`discount_amount_or_percent`) with the receipt. Saving a new receipt creates a
+`users/{uid}/coupons` document (rescans of the same coupon are deduplicated).
+
+* **Android / iOS / macOS** - `flutter_local_notifications` schedules one
+  notification per active coupon per day at 09:00 local time until
+  `valid_until` (capped at 90 days; coupons without an expiry are scheduled 30
+  days ahead and re-planned on app launch). Android uses inexact alarms, so no
+  exact-alarm permission is required.
+* **Web** - browsers cannot schedule notifications, so today's reminder is
+  shown once per day when the app is opened (Chrome/Edge show the action
+  buttons; Firefox/Safari do not support actions).
+* Actions - **Mark as Used** writes `status: used`; **Remind Tomorrow**
+  suppresses the rest of today and resumes the next day. Actions pressed while
+  the app is terminated are journalled in `SharedPreferences` by a background
+  isolate and applied on the next launch.
+* Expiry - `expireOverdue()` flips active coupons to `expired` after the
+  `valid_until` day on app launch, resume, and whenever the coupon list loads.
+
+Notification permission is requested from the **クーポン** page (web requires a
+user gesture). Use `--dart-define=RECEIPT_BACKEND_URL=...` only for the AI
+backend; reminders are fully local.
 
 ---
 

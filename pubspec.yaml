@@ -48,6 +48,8 @@ dependencies:
   # `any` lets flutter_localizations pin the intl version that matches your SDK.
   intl: any
   shared_preferences: ^2.3.2
+  flutter_local_notifications: ^22.3.2
+  timezone: ^0.11.2
 
 dev_dependencies:
   flutter_test:

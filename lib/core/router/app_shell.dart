@@ -19,13 +19,15 @@ class AppShell extends StatelessWidget {
 
   static const List<String> _routes = <String>[
     '/dashboard',
+    '/coupons',
     '/categories',
     '/settings',
   ];
 
   int get _index {
-    if (location.startsWith('/categories')) return 1;
-    if (location.startsWith('/settings')) return 2;
+    if (location.startsWith('/coupons')) return 1;
+    if (location.startsWith('/categories')) return 2;
+    if (location.startsWith('/settings')) return 3;
     return 0;
   }
 
@@ -60,6 +62,11 @@ class AppShell extends StatelessWidget {
                   label: AppText('ホーム'),
                 ),
                 NavigationRailDestination(
+                  icon: Icon(Icons.confirmation_number_outlined),
+                  selectedIcon: Icon(Icons.confirmation_number),
+                  label: AppText('クーポン'),
+                ),
+                NavigationRailDestination(
                   icon: Icon(Icons.sell_outlined),
                   selectedIcon: Icon(Icons.sell),
                   label: AppText('カテゴリ'),
@@ -88,6 +95,11 @@ class AppShell extends StatelessWidget {
             icon: const Icon(Icons.space_dashboard_outlined),
             selectedIcon: const Icon(Icons.space_dashboard),
             label: context.tr('ホーム'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.confirmation_number_outlined),
+            selectedIcon: const Icon(Icons.confirmation_number),
+            label: context.tr('クーポン'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.sell_outlined),
