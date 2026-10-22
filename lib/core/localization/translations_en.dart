@@ -55,11 +55,15 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   'ライト': 'Light',
   'ダーク': 'Dark',
   '言語 / Language': 'Language / 言語 / اللغة',
+  '言語を切り替え': 'Change language',
   '日本語': 'Japanese',
   'English': 'English',
   'العربية': 'Arabic',
   'アラビア語・英語・日本語を切り替えられます。アラビア語では画面が右から左に表示されます。':
       'Switch between Japanese, English and Arabic. Arabic uses right-to-left layout.',
+  'ブラウザや端末の言語を自動で判定します。ここで選んだ言語は保存され、次回以降も優先されます。':
+      'The browser or device language is detected automatically. '
+          'A language chosen here is saved and used next time.',
   'データ': 'Data',
   '標準カテゴリを再作成': 'Recreate default categories',
   '食費・外食・日用品・光熱費・交通費・娯楽など':

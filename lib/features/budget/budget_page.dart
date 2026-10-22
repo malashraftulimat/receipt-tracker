@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/budget_gradient_bar.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/monthly_budget.dart';
@@ -122,7 +123,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     final summaryAsync = ref.watch(budgetSummaryProvider(_month));
 
     return Scaffold(
-      appBar: AppBar(title: const AppText('予算と貯蓄')),
+      appBar: AppBar(
+        title: const AppText('予算と貯蓄'),
+        actions: headerActions(
+          context,
+          showLanguageLabel: context.isExpanded,
+        ),
+      ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(
           context.pagePadding,

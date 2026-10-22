@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../core/widgets/press_scale.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
@@ -485,7 +486,13 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   Widget build(BuildContext context) {
     if (_initial == null) {
       return Scaffold(
-        appBar: AppBar(title: const AppText('内容の確認')),
+        appBar: AppBar(
+          title: const AppText('内容の確認'),
+          actions: headerActions(
+            context,
+            showLanguageLabel: context.isExpanded,
+          ),
+        ),
         body: const Center(child: AppText('読み取りデータがありません。')),
       );
     }
@@ -495,15 +502,18 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     return Scaffold(
       appBar: AppBar(
         title: AppText(_existingId == null ? '内容の確認' : 'レシートを編集'),
-        actions: <Widget>[
-          if (_imageBytes != null)
-            IconButton(
-              tooltip: context.tr('画像を撮り直す'),
-              onPressed: _recognizing ? null : _recognizeAgain,
-              icon: const Icon(Icons.document_scanner_outlined),
-            ),
-          const SizedBox(width: 4),
-        ],
+        actions: headerActions(
+          context,
+          showLanguageLabel: expanded,
+          actions: <Widget>[
+            if (_imageBytes != null)
+              IconButton(
+                tooltip: context.tr('画像を撮り直す'),
+                onPressed: _recognizing ? null : _recognizeAgain,
+                icon: const Icon(Icons.document_scanner_outlined),
+              ),
+          ],
+        ),
       ),
       body: SafeArea(
         child: Form(

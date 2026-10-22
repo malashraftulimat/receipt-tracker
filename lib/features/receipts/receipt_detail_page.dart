@@ -7,6 +7,7 @@ import '../../core/theme/app_palette.dart';
 import '../../core/utils/barcode_utils.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../domain/models/receipt.dart';
 import '../dashboard/analytics_provider.dart';
@@ -72,42 +73,45 @@ class ReceiptDetailPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const AppText('レシート詳細'),
-        actions: <Widget>[
-          asyncReceipt.maybeWhen(
-            data: (receipt) => PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  context.push(
-                    '/review',
-                    extra: ReviewArgs(existing: receipt),
-                  );
-                } else if (value == 'delete') {
-                  _delete(context, ref, receipt);
-                }
-              },
-              itemBuilder: (context) => const <PopupMenuEntry<String>>[
-                PopupMenuItem<String>(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: AppText('編集'),
-                    contentPadding: EdgeInsets.zero,
+        actions: headerActions(
+          context,
+          showLanguageLabel: context.isExpanded,
+          actions: <Widget>[
+            asyncReceipt.maybeWhen(
+              data: (receipt) => PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    context.push(
+                      '/review',
+                      extra: ReviewArgs(existing: receipt),
+                    );
+                  } else if (value == 'delete') {
+                    _delete(context, ref, receipt);
+                  }
+                },
+                itemBuilder: (context) => const <PopupMenuEntry<String>>[
+                  PopupMenuItem<String>(
+                    value: 'edit',
+                    child: ListTile(
+                      leading: Icon(Icons.edit_outlined),
+                      title: AppText('編集'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline),
-                    title: AppText('削除'),
-                    contentPadding: EdgeInsets.zero,
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_outline),
+                      title: AppText('削除'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              orElse: () => const SizedBox.shrink(),
             ),
-            orElse: () => const SizedBox.shrink(),
-          ),
-          const SizedBox(width: 4),
-        ],
+          ],
+        ),
       ),
       body: asyncReceipt.when(
         loading: () => const Center(child: CircularProgressIndicator()),

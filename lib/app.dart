@@ -34,6 +34,14 @@ class _ReceiptTrackerAppState extends ConsumerState<ReceiptTrackerApp>
   }
 
   @override
+  void didChangeLocales(List<Locale>? locales) {
+    // Follow the browser / OS language unless the user pinned one.
+    ref.read(languageProvider.notifier).syncWithSystemLocales(
+          locales ?? AppLanguage.systemLocales,
+        );
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Expire overdue coupons and refresh reminders when the app comes back.
     if (state == AppLifecycleState.resumed) {

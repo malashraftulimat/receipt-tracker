@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/redaction.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../core/widgets/press_scale.dart';
 import '../../core/utils/barcode_utils.dart';
 import '../../core/utils/responsive.dart';
@@ -475,7 +476,13 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
     if (!_hasLiveCamera || _cameraBlocked) {
       return Scaffold(
-        appBar: AppBar(title: const AppText('スキャン')),
+        appBar: AppBar(
+          title: const AppText('スキャン'),
+          actions: headerActions(
+            context,
+            showLanguageLabel: context.isExpanded,
+          ),
+        ),
         body: _NoCameraView(
           onPickImage: _captureAndRecognize,
           onManual: _openManual,
@@ -495,15 +502,18 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         backgroundColor: AppPalette.backgroundDeep,
         foregroundColor: AppPalette.text,
         title: const AppText('スキャン'),
-        actions: <Widget>[
-          if (!kIsWeb)
-            IconButton(
-              tooltip: context.tr('ライト'),
-              onPressed: _toggleTorch,
-              icon: const Icon(Icons.flashlight_on_outlined),
-            ),
-          const SizedBox(width: 4),
-        ],
+        actions: headerActions(
+          context,
+          showLanguageLabel: context.isExpanded,
+          actions: <Widget>[
+            if (!kIsWeb)
+              IconButton(
+                tooltip: context.tr('ライト'),
+                onPressed: _toggleTorch,
+                icon: const Icon(Icons.flashlight_on_outlined),
+              ),
+          ],
+        ),
       ),
       body: Column(
         children: <Widget>[

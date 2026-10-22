@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/localization/localization.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../data/services/ai_key_store.dart';
 import '../../data/services/export_service.dart';
@@ -94,7 +95,13 @@ class SettingsPage extends ConsumerWidget {
     final language = ref.watch(languageProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const AppText('設定')),
+      appBar: AppBar(
+        title: const AppText('設定'),
+        actions: headerActions(
+          context,
+          showLanguageLabel: context.isExpanded,
+        ),
+      ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(
           context.pagePadding,
@@ -214,8 +221,8 @@ class SettingsPage extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               AppText(
-                'アラビア語・英語・日本語を切り替えられます。'
-                'アラビア語では画面が右から左に表示されます。',
+                'ブラウザや端末の言語を自動で判定します。'
+                'ここで選んだ言語は保存され、次回以降も優先されます。',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -384,9 +391,7 @@ class _AiKeyCardState extends State<_AiKeyCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final source = _saved
-        ? '保存済み（localStorage）'
-        : '未設定（共有バックエンドを使用）';
+    final source = _saved ? '保存済み（localStorage）' : '未設定（共有バックエンドを使用）';
 
     return _Card(
       title: 'AIキー（Gemini・任意）',

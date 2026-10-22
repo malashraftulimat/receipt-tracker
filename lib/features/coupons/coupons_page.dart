@@ -5,6 +5,7 @@ import '../../core/localization/localization.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../domain/models/coupon.dart';
 
@@ -63,14 +64,17 @@ class CouponsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const AppText('クーポン'),
-        actions: <Widget>[
-          IconButton(
-            tooltip: context.tr('通知を有効にする'),
-            onPressed: () => _enableNotifications(context, ref),
-            icon: const Icon(Icons.notifications_active_outlined),
-          ),
-          const SizedBox(width: 4),
-        ],
+        actions: headerActions(
+          context,
+          showLanguageLabel: context.isExpanded,
+          actions: <Widget>[
+            IconButton(
+              tooltip: context.tr('通知を有効にする'),
+              onPressed: () => _enableNotifications(context, ref),
+              icon: const Icon(Icons.notifications_active_outlined),
+            ),
+          ],
+        ),
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),

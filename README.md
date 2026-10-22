@@ -149,7 +149,7 @@ document, so a receipt + items are written atomically.
 | Dashboard | Month/day grouping, list/grid views, monthly subtotals |
 | Search/Filter | Merchant/note/barcode search, category chips, 今月/先月, custom ranges |
 | Analytics | 6-month bars, category donut, top merchants, monthly metrics (`fl_chart`) |
-| Languages | Japanese / English / Arabic (RTL) selector in Settings |
+| Languages | Browser / system language auto-detection, header switcher (visible on login & register too), Japanese / English / Arabic (RTL) |
 | Export | UTF-8 CSV for Excel / Numbers (no images) |
 
 ---
@@ -165,7 +165,8 @@ lib/
 │   ├── localization/               # AppLanguage, AppLocalizations, AppText
 │   ├── router/                     # auth redirect + responsive shell
 │   ├── theme/                      # Material 3 light/dark
-│   └── utils/                      # money/date formatting, barcode checks
+│   ├── utils/                      # money/date formatting, barcode checks
+│   └── widgets/                    # language switcher, press scale, budget bar
 ├── domain/
 │   ├── models/                     # receipt, item, category, budget, filter
 │   └── parser/                     # OCR post-processing heuristics
@@ -330,6 +331,11 @@ backend; reminders are fully local.
 
 ## Languages
 
-Settings → Language offers **日本語 / English / العربية**. The choice is
-persisted per device; Arabic switches the whole UI to RTL and date formatting
-uses the selected locale.
+On startup the app uses the **browser / system language**
+(`navigator.languages` on web, the OS locale elsewhere) when it is one of
+**日本語 / English / العربية**; anything else falls back to Japanese. The
+globe button in every header — including the login (`/login`, `/auth`) and
+register (`/register`) screens — switches the language instantly. A manual
+choice is stored in `SharedPreferences` and overrides the browser default on
+later visits. Arabic switches the whole UI to RTL and date formatting uses the
+selected locale.

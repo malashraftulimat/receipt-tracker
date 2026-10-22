@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/responsive.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../core/localization/localization.dart';
@@ -9,7 +10,10 @@ import '../../core/localization/localization.dart';
 enum _AuthMode { signIn, signUp }
 
 class AuthPage extends ConsumerStatefulWidget {
-  const AuthPage({super.key});
+  const AuthPage({super.key, this.initialSignUp = false});
+
+  /// Opens the register form straight away (used by the `/register` route).
+  final bool initialSignUp;
 
   @override
   ConsumerState<AuthPage> createState() => _AuthPageState();
@@ -24,6 +28,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   bool _obscure = true;
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialSignUp) _mode = _AuthMode.signUp;
+  }
 
   @override
   void dispose() {
@@ -92,6 +102,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     final isSignUp = _mode == _AuthMode.signUp;
 
     return Scaffold(
+      appBar: AppBar(
+        actions: headerActions(
+          context,
+          showLanguageLabel: context.isExpanded,
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: EdgeInsets.all(context.pagePadding * 2),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../core/widgets/press_scale.dart';
 import 'widgets/analytics_panel.dart';
 import 'widgets/budget_card.dart';
@@ -42,15 +43,18 @@ class DashboardPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const AppText('レシート帳'),
-        actions: <Widget>[
-          if (!expanded)
-            IconButton(
-              tooltip: context.tr('集計'),
-              onPressed: () => _showAnalyticsSheet(context),
-              icon: const Icon(Icons.insights_outlined),
-            ),
-          const SizedBox(width: 4),
-        ],
+        actions: headerActions(
+          context,
+          showLanguageLabel: expanded,
+          actions: <Widget>[
+            if (!expanded)
+              IconButton(
+                tooltip: context.tr('集計'),
+                onPressed: () => _showAnalyticsSheet(context),
+                icon: const Icon(Icons.insights_outlined),
+              ),
+          ],
+        ),
       ),
       floatingActionButton: PressScale(
         child: FloatingActionButton.extended(

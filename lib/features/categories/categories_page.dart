@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../domain/models/category.dart';
 import '../dashboard/analytics_provider.dart';
@@ -102,14 +103,17 @@ class CategoriesPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const AppText('カテゴリ'),
-        actions: <Widget>[
-          IconButton(
-            tooltip: context.tr('カテゴリを追加'),
-            onPressed: () => _openEditor(context, ref),
-            icon: const Icon(Icons.add),
-          ),
-          const SizedBox(width: 4),
-        ],
+        actions: headerActions(
+          context,
+          showLanguageLabel: context.isExpanded,
+          actions: <Widget>[
+            IconButton(
+              tooltip: context.tr('カテゴリを追加'),
+              onPressed: () => _openEditor(context, ref),
+              icon: const Icon(Icons.add),
+            ),
+          ],
+        ),
       ),
       body: asyncCategories.when(
         loading: () => const Center(child: CircularProgressIndicator()),

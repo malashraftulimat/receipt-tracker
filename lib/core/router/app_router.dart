@@ -27,12 +27,18 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   bool signedIn() => FirebaseAuth.instance.currentUser != null;
 
+  // Login / register screens (both served by [AuthPage]).
+  bool isAuthLocation(String path) =>
+      path.startsWith('/auth') ||
+      path.startsWith('/login') ||
+      path.startsWith('/register');
+
   return GoRouter(
     initialLocation: '/dashboard',
     refreshListenable: refresh,
     debugLogDiagnostics: false,
     redirect: (context, state) {
-      final onAuthPage = state.matchedLocation.startsWith('/auth');
+      final onAuthPage = isAuthLocation(state.matchedLocation);
       if (!signedIn()) return onAuthPage ? null : '/auth';
       if (onAuthPage) return '/dashboard';
       return null;
@@ -42,6 +48,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth',
         name: 'auth',
         builder: (context, state) => const AuthPage(),
+      ),
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        builder: (context, state) => const AuthPage(),
+      ),
+      GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => const AuthPage(initialSignUp: true),
       ),
       ShellRoute(
         builder: (context, state, child) => AppShell(

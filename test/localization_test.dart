@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:receipt_tracker/core/config/ai_config.dart';
 import 'package:receipt_tracker/core/localization/app_language.dart';
@@ -84,5 +85,49 @@ void main() {
     );
     expect(en.translate('保存に失敗しました: offline'), 'Could not save: offline');
     expect(ar.translate('削除に失敗しました: offline'), 'تعذّر الحذف: offline');
+  });
+
+  test('language switching strings are localized', () {
+    expect(en.translate('言語を切り替え'), 'Change language');
+    expect(ar.translate('言語を切り替え'), 'تغيير اللغة');
+    expect(
+      en.translate(
+        'ブラウザや端末の言語を自動で判定します。'
+        'ここで選んだ言語は保存され、次回以降も優先されます。',
+      ),
+      contains('detected automatically'),
+    );
+  });
+
+  group('AppLanguage detection', () {
+    test('parses plain and region-tagged codes', () {
+      expect(AppLanguage.tryParse('ja'), AppLanguage.ja);
+      expect(AppLanguage.tryParse('en'), AppLanguage.en);
+      expect(AppLanguage.tryParse('AR'), AppLanguage.ar);
+      expect(AppLanguage.tryParse('ja-JP'), AppLanguage.ja);
+      expect(AppLanguage.tryParse('en_US'), AppLanguage.en);
+      expect(AppLanguage.tryParse('ar-EG'), AppLanguage.ar);
+      expect(AppLanguage.tryParse('fr'), isNull);
+      expect(AppLanguage.tryParse(''), isNull);
+      expect(AppLanguage.tryParse(null), isNull);
+    });
+
+    test('unsupported languages fall back to Japanese', () {
+      expect(AppLanguage.fromCode('de-DE'), AppLanguage.ja);
+      expect(AppLanguage.fromCode(null), AppLanguage.ja);
+    });
+
+    test('fromLocales picks the first supported locale', () {
+      expect(
+        AppLanguage.fromLocales(const <Locale>[Locale('fr'), Locale('en', 'US')]),
+        AppLanguage.en,
+      );
+      expect(
+        AppLanguage.fromLocales(const <Locale>[Locale('ar')]),
+        AppLanguage.ar,
+      );
+      expect(AppLanguage.fromLocales(const <Locale>[Locale('de')]), isNull);
+      expect(AppLanguage.fromLocales(const <Locale>[]), isNull);
+    });
   });
 }
