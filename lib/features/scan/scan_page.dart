@@ -342,16 +342,16 @@ class _ScanPageState extends ConsumerState<ScanPage> {
           result.usedFallback ? (result.aiFailure ?? _aiFailure) : null;
     });
     if (result.usedFallback) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: result.aiKeyMissing
-              ? const AppText('AI key missing — using on-device OCR.')
+      final failure = result.aiFailure;
+      final message = result.aiDailyLimitReached
+          ? (failure?.message ?? AiReceiptOcrService.dailyLimitMessage)
+          : result.aiKeyMissing
+              ? 'AI key missing — using on-device OCR.'
               : result.aiServiceUnavailable
-                  ? const AppText(
-                      'AIサービスを準備しています。しばらくしてからお試しください。',
-                    )
-                  : const AppText('AIを利用できないため、端末内OCRで読み取りました。'),
-        ),
+                  ? 'AIサービスを準備しています。しばらくしてからお試しください。'
+                  : 'AIを利用できないため、端末内OCRで読み取りました。';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: AppText(message)),
       );
     }
     await _openReview(draft, bytes, parsed: parsed);
@@ -617,7 +617,22 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                   if (_aiFailure != null) ...<Widget>[
                     const SizedBox(height: 10),
                     if (_aiFailure!.kind == AiReceiptFailureKind.missingKey)
-                      _MissingAiKeyCard(
+                      _AiNoticeCard(
+                        icon: Icons.key_off_outlined,
+                        color: AppPalette.cyan,
+                        title: 'AIキーが未設定です',
+                        message:
+                            '設定で Gemini API キーを保存すると、AI抽出を利用できます。'
+                            '未設定のあいだは端末内OCRで読み取ります。',
+                        onOpenSettings: () => context.push('/settings'),
+                      )
+                    else if (_aiFailure!.kind ==
+                        AiReceiptFailureKind.dailyLimit)
+                      _AiNoticeCard(
+                        icon: Icons.hourglass_bottom_outlined,
+                        color: AppPalette.amber,
+                        title: '本日のAI利用上限に達しました',
+                        message: _aiFailure!.message,
                         onOpenSettings: () => context.push('/settings'),
                       )
                     else
@@ -893,10 +908,20 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-/// Friendly setup prompt shown instead of raw diagnostics when no key exists.
-class _MissingAiKeyCard extends StatelessWidget {
-  const _MissingAiKeyCard({required this.onOpenSettings});
+/// Friendly, actionable card shown instead of raw diagnostics.
+class _AiNoticeCard extends StatelessWidget {
+  const _AiNoticeCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.color,
+    required this.onOpenSettings,
+  });
 
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color color;
   final VoidCallback onOpenSettings;
 
   @override
@@ -906,30 +931,30 @@ class _MissingAiKeyCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppPalette.cyan.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Icon(Icons.key_off_outlined,
-                  size: 18, color: AppPalette.cyan),
+              Icon(icon, size: 18, color: color),
               const SizedBox(width: 6),
-              AppText(
-                'AIキーが未設定です',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: AppText(
+                  title,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
           AppText(
-            '設定で Gemini API キーを保存すると、AI抽出を利用できます。'
-            '未設定のあいだは端末内OCRで読み取ります。',
+            message,
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 8),

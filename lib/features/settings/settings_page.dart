@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/config/ai_config.dart';
 import '../../core/localization/localization.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/responsive.dart';
@@ -262,7 +261,7 @@ class SettingsPage extends ConsumerWidget {
                 title: AppText('スキャンエンジン'),
                 subtitle: AppText(
                   '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\n'
-                  'AI抽出: Gemini Flash（Google AI Studio）\n'
+                  'AI抽出: Gemini Flash（共有バックエンド / 自分のキーでも利用可）\n'
                   'フォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）',
                 ),
               ),
@@ -346,7 +345,7 @@ class _AiKeyCardState extends State<_AiKeyCard> {
       _busy = false;
       _saved = false;
       _controller.clear();
-      _status = hasGeminiApiKey() ? '保存キーを削除しました。ビルドキーを使用します。' : '保存キーを削除しました。';
+      _status = '保存キーを削除しました。共有バックエンドを使用します。';
       _statusOk = true;
     });
   }
@@ -375,6 +374,7 @@ class _AiKeyCardState extends State<_AiKeyCard> {
     return switch (kind) {
       AiReceiptFailureKind.configuration => '無効なキー、または権限がありません',
       AiReceiptFailureKind.quota => '利用上限に達しています',
+      AiReceiptFailureKind.dailyLimit => '本日の利用上限に達しています',
       AiReceiptFailureKind.unavailable => 'ネットワーク / サービスに接続できません',
       AiReceiptFailureKind.missingKey => 'キーが入力されていません',
       _ => 'キーを確認できませんでした',
@@ -386,14 +386,16 @@ class _AiKeyCardState extends State<_AiKeyCard> {
     final theme = Theme.of(context);
     final source = _saved
         ? '保存済み（localStorage）'
-        : (hasGeminiApiKey() ? 'ビルドキーを使用' : '未設定');
+        : '未設定（共有バックエンドを使用）';
 
     return _Card(
-      title: 'AIキー（Gemini）',
+      title: 'AIキー（Gemini・任意）',
       children: <Widget>[
         AppText(
-          '自分の Gemini API キーを保存できます。キーはこのブラウザの '
-          'localStorage にのみ保存され、Google の Gemini API 以外には送信されません。'
+          '任意です。未設定の場合はアプリの共有バックエンド経由で AI 抽出を利用します'
+          '（1日あたりの回数制限あり）。自分のキーを保存すると、このブラウザから '
+          'Google の Gemini API へ直接リクエストします。キーはこのブラウザの '
+          'localStorage にのみ保存され、Google 以外には送信されません。'
           '現在: $source',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -408,8 +410,8 @@ class _AiKeyCardState extends State<_AiKeyCard> {
           enableSuggestions: false,
           textInputAction: TextInputAction.done,
           decoration: InputDecoration(
-            labelText: 'Gemini API キー',
-            hintText: 'Google AI Studio で作成したキー',
+            labelText: 'Gemini API キー（任意）',
+            hintText: 'Google AI Studio で作成したキー（未入力でも利用可）',
             prefixIcon: const Icon(Icons.key_outlined),
             suffixIcon: IconButton(
               tooltip: _obscure ? '表示' : '隠す',

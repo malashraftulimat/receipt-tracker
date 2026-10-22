@@ -30,8 +30,14 @@ class ReceiptExtractionResult {
 
   bool get aiServiceUnavailable => aiFailure?.isTemporaryServiceIssue ?? false;
 
-  /// True when the deployed build has no GEMINI_API_KEY.
+  /// True when the deployed build has no usable identity for the shared
+  /// backend (signed out) and no personal key.
   bool get aiKeyMissing => aiFailure?.kind == AiReceiptFailureKind.missingKey;
+
+  /// True when the shared Worker rejected the scan because the per-user daily
+  /// quota is exhausted.
+  bool get aiDailyLimitReached =>
+      aiFailure?.kind == AiReceiptFailureKind.dailyLimit;
 }
 
 /// Gemini (direct Google AI Studio) first, ML Kit / Tesseract.js on error, offline

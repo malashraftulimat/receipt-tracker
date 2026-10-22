@@ -22,11 +22,13 @@ Future<void> main() async {
   await Firebase.initializeApp(options: kFirebaseOptions);
   await _initializeAppCheck();
 
-  // AI OCR uses only the build-time GEMINI_API_KEY. When it is missing the
-  // app still starts and the scanner falls back to on-device OCR.
+  // AI OCR goes through the shared Worker by default; a personal key saved in
+  // Settings bypasses it. Both are optional: the scanner always falls back to
+  // on-device OCR, so a missing key is not fatal.
   if (!hasGeminiApiKey()) {
     debugPrint(
-      '[AI] No build-time key; a saved browser key or on-device OCR will be used.',
+      '[AI] No build-time key; the shared backend or a saved browser key will '
+      'be used.',
     );
   }
 

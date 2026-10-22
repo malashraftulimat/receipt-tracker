@@ -31,6 +31,9 @@ dependencies:
   # Direct Google AI Studio / Gemini Developer API client (works on Flutter Web).
   google_generative_ai: ^0.4.7
 
+  # Worker transport for the shared Gemini backend (personal keys still go direct).
+  http: ^1.2.2
+
   # Scanning engine
   mobile_scanner: ^5.2.3                     # 1D barcodes: ML Kit (mobile) + ZXing/WebRTC (web)
   google_mlkit_text_recognition: ^0.13.0     # on-device OCR (Android / iOS, ja + en)

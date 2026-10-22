@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 
 import '../../../core/config/ai_config.dart';
 import '../../../core/utils/formatters.dart';
@@ -10,7 +12,14 @@ import '../../../core/utils/redaction.dart';
 import '../../../domain/parser/receipt_parser.dart';
 import '../ai_key_store.dart';
 
-/// Direct Google AI Studio / Gemini Developer API receipt extractor.
+/// Receipt extractor backed by Gemini.
+///
+/// Two transports, chosen per request:
+/// * A personal Gemini key saved in Settings is sent **directly** to Google
+///   (legacy bring-your-own-key behaviour).
+/// * Otherwise the photo is sent to the shared Cloudflare Worker
+///   ([kReceiptBackendUrl]) with the Firebase ID token. The Worker verifies the
+///   token, enforces the daily quota and adds the server-side API key.
 ///
 /// Works on Flutter Web through the browser HTTP client. The photo is sent
 /// only for inference and is never written to Firestore or local storage.
@@ -23,13 +32,15 @@ class AiReceiptOcrService {
   /// the user-saved key first, then the build-time key.
   final String? _explicitApiKey;
 
-  /// User-saved localStorage key, then the build-time `GEMINI_API_KEY`.
-  Future<String?> _resolveApiKey() async {
+  /// User-saved key (explicit argument or browser localStorage).
+  ///
+  /// Null means "use the shared backend", never a build-time key: the Worker
+  /// owns the production key so every client stays inside the daily quota.
+  Future<String?> _resolvePersonalApiKey() async {
     final explicit = _explicitApiKey;
     if (explicit != null && explicit.isNotEmpty) return explicit;
     final stored = await AiKeyStore.read();
-    if (stored != null && stored.isNotEmpty) return stored;
-    return geminiApiKeyOrNull();
+    return stored != null && stored.isNotEmpty ? stored : null;
   }
 
   /// Current Gemini Flash model from the Google AI Studio model list.
@@ -201,32 +212,34 @@ Rules:
       throw const AiReceiptOcrException('レシート画像が空です。');
     }
 
-    final apiKey = await _resolveApiKey();
-    if (apiKey == null || apiKey.isEmpty) {
-      throw const AiReceiptOcrException(
-        'AI key missing',
-        kind: AiReceiptFailureKind.missingKey,
-      );
-    }
-
-    final response = await _generateContent(
-      <Content>[
-        Content.multi(<Part>[
-          TextPart(
-            'Extract this receipt in its original language and currency. '
-            'Use null for anything unreadable.',
-          ),
-          DataPart('image/jpeg', jpegBytes),
-        ]),
-      ],
-      generationConfig: GenerationConfig(
-        responseMimeType: 'application/json',
-        responseSchema: _schema,
-        temperature: 0,
-      ),
-      apiKey: apiKey,
+    final content = <Content>[
+      Content.multi(<Part>[
+        TextPart(
+          'Extract this receipt in its original language and currency. '
+          'Use null for anything unreadable.',
+        ),
+        DataPart('image/jpeg', jpegBytes),
+      ]),
+    ];
+    final generationConfig = GenerationConfig(
+      responseMimeType: 'application/json',
+      responseSchema: _schema,
+      temperature: 0,
     );
-    final text = response.text;
+
+    // Personal key -> Google directly; otherwise the shared Worker.
+    final apiKey = await _resolvePersonalApiKey();
+    final text = apiKey != null
+        ? (await _generateContent(
+            content,
+            generationConfig: generationConfig,
+            apiKey: apiKey,
+          ))
+            .text
+        : await _generateViaWorker(
+            content,
+            generationConfig: generationConfig,
+          );
     if (text == null || text.trim().isEmpty) {
       throw const AiReceiptOcrException('AIから読み取り結果が返りませんでした。');
     }
@@ -285,6 +298,304 @@ Rules:
         kind: mapped.kind,
         message: mapped.message,
       );
+    }
+  }
+
+  /// Message shown when the Worker's daily per-user quota is exhausted.
+  static const String dailyLimitMessage =
+      "You've reached your daily limit. Please add a personal Gemini API key "
+      'in Settings.';
+
+  /// Sends the scan to the shared Cloudflare Worker.
+  ///
+  /// Applies the same retry / model-fallback budget as the direct path: a
+  /// transient 503 is retried once, then the next Flash model is tried.
+  Future<String> _generateViaWorker(
+    List<Content> content, {
+    required GenerationConfig generationConfig,
+  }) async {
+    final idToken = await _firebaseIdToken();
+    final modelNames = <String>{
+      kGeminiReceiptModel,
+      ...kGeminiReceiptFallbackModels,
+    };
+    final stopwatch = Stopwatch()..start();
+    AiReceiptOcrException? lastError;
+
+    for (final name in modelNames) {
+      for (var attempt = 0; attempt < 2; attempt++) {
+        if (stopwatch.elapsed > kGeminiRequestBudget) {
+          throw lastError ??
+              const AiReceiptOcrException(
+                'AIサービスが一時的に利用できません。',
+                kind: AiReceiptFailureKind.unavailable,
+              );
+        }
+        try {
+          return await _postToWorker(
+            model: name,
+            idToken: idToken,
+            content: content,
+            generationConfig: generationConfig,
+            stopwatch: stopwatch,
+          );
+        } on AiReceiptOcrException catch (error) {
+          lastError = error;
+          debugPrint(
+            '[AiReceiptOcrService] backend model=$name '
+            'attempt=${attempt + 1} kind=${error.kind.name} '
+            'message=${error.message} diagnostics=${error.diagnostics}',
+          );
+
+          if (error.kind == AiReceiptFailureKind.unavailable && attempt == 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 800));
+            continue;
+          }
+          if (error.kind == AiReceiptFailureKind.unavailable ||
+              error.kind == AiReceiptFailureKind.notFound) {
+            break; // Try the next Flash model.
+          }
+          rethrow;
+        }
+      }
+    }
+
+    throw lastError ??
+        const AiReceiptOcrException(
+          'AIサービスが一時的に利用できません。',
+          kind: AiReceiptFailureKind.unavailable,
+        );
+  }
+
+  /// One POST to the Worker. Returns the raw JSON text of the first candidate.
+  Future<String> _postToWorker({
+    required String model,
+    required String idToken,
+    required List<Content> content,
+    required GenerationConfig generationConfig,
+    required Stopwatch stopwatch,
+  }) async {
+    final remaining = kGeminiRequestBudget - stopwatch.elapsed;
+    final timeout = remaining < kGeminiRequestTimeout
+        ? remaining
+        : kGeminiRequestTimeout;
+
+    final body = <String, Object?>{
+      'model': model,
+      'contents': content.map((part) => part.toJson()).toList(),
+      'systemInstruction': Content.system(_prompt).toJson(),
+      'generationConfig': generationConfig.toJson(),
+    };
+
+    http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse(kReceiptBackendUrl),
+            headers: <String, String>{
+              'Authorization': 'Bearer $idToken',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(timeout);
+    } on TimeoutException {
+      throw AiReceiptOcrException(
+        'AIサービスが一時的に利用できません。',
+        kind: AiReceiptFailureKind.unavailable,
+        modelName: model,
+        diagnostics: 'backend request timed out after ${timeout.inSeconds}s',
+      );
+    } catch (error) {
+      throw AiReceiptOcrException(
+        'AIサービスが一時的に利用できません。',
+        kind: AiReceiptFailureKind.unavailable,
+        cause: error,
+        modelName: model,
+        diagnostics: redactSensitiveText(error.toString()),
+      );
+    }
+
+    final raw = utf8.decode(response.bodyBytes, allowMalformed: true);
+    if (response.statusCode == 200) {
+      return _textFromWorkerResponse(raw, model);
+    }
+    throw describeWorkerFailure(
+      response.statusCode,
+      raw,
+      modelName: model,
+    );
+  }
+
+  /// Firebase ID token for the signed-in user, used as the Worker's bearer.
+  ///
+  /// Missing auth is surfaced as [AiReceiptFailureKind.missingKey] so the scan
+  /// screen offers the same actionable settings card as before.
+  Future<String> _firebaseIdToken() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw const AiReceiptOcrException(
+          'AI key missing',
+          kind: AiReceiptFailureKind.missingKey,
+        );
+      }
+      final token = await user.getIdToken();
+      if (token == null || token.isEmpty) {
+        throw const AiReceiptOcrException(
+          'AI key missing',
+          kind: AiReceiptFailureKind.missingKey,
+        );
+      }
+      return token;
+    } on AiReceiptOcrException {
+      rethrow;
+    } catch (error) {
+      // No Firebase app / signed-out session / refresh error: the user can
+      // still add a personal key, so point them at Settings.
+      throw AiReceiptOcrException(
+        'AI key missing',
+        kind: AiReceiptFailureKind.missingKey,
+        cause: error,
+        diagnostics: redactSensitiveText(error.toString()),
+      );
+    }
+  }
+
+  String _textFromWorkerResponse(String raw, String model) {
+    Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      throw AiReceiptOcrException(
+        'AIの読み取り結果を解析できませんでした。',
+        kind: AiReceiptFailureKind.other,
+        modelName: model,
+        diagnostics: redactSensitiveText(raw),
+      );
+    }
+
+    final text = _collectText(decoded);
+    if (text == null || text.trim().isEmpty) {
+      throw AiReceiptOcrException(
+        'AIから読み取り結果が返りませんでした。',
+        kind: AiReceiptFailureKind.other,
+        modelName: model,
+        diagnostics: redactSensitiveText(raw),
+      );
+    }
+    return text;
+  }
+
+  static String? _collectText(Object? decoded) {
+    if (decoded is! Map) return null;
+    final candidates = decoded['candidates'];
+    if (candidates is! List || candidates.isEmpty) return null;
+    final first = candidates.first;
+    if (first is! Map) return null;
+    final content = first['content'];
+    if (content is! Map) return null;
+    final parts = content['parts'];
+    if (parts is! List) return null;
+
+    final buffer = StringBuffer();
+    for (final part in parts) {
+      if (part is Map) {
+        final value = part['text'];
+        if (value is String) buffer.write(value);
+      }
+    }
+    final text = buffer.toString();
+    return text.isEmpty ? null : text;
+  }
+
+  /// Maps a Worker HTTP failure to a typed, user-safe exception.
+  ///
+  /// A 429 with the Worker's own `rate_limited` code becomes
+  /// [AiReceiptFailureKind.dailyLimit] with [dailyLimitMessage]; a 429 that was
+  /// passed through from Gemini stays a quota error.
+  @visibleForTesting
+  static AiReceiptOcrException describeWorkerFailure(
+    int status,
+    String body, {
+    String? modelName,
+  }) {
+    final decoded = _tryDecode(body);
+    final errorField = decoded is Map ? decoded['error'] : null;
+    final workerCode = errorField is String ? errorField : null;
+    final serverMessage = _serverErrorMessage(decoded);
+    final diagnostics = redactSensitiveText(
+      'HTTP $status${serverMessage == null ? '' : ' · $serverMessage'}',
+    );
+
+    // The Worker's own quota (`{"error":"rate_limited"}`) is the actionable
+    // daily limit. A 429 carrying a Gemini error object is provider quota.
+    if (status == 429 &&
+        (workerCode == 'rate_limited' || errorField == null)) {
+      return AiReceiptOcrException(
+        dailyLimitMessage,
+        kind: AiReceiptFailureKind.dailyLimit,
+        modelName: modelName,
+        diagnostics: diagnostics,
+      );
+    }
+
+    final AiReceiptFailureKind kind;
+    final String message;
+    switch (status) {
+      case 401:
+      case 403:
+        kind = AiReceiptFailureKind.configuration;
+        message = 'ログインの有効期限が切れました。再度ログインしてください。';
+      case 404:
+        kind = AiReceiptFailureKind.notFound;
+        message = '選択したAIモデルを利用できません。';
+      case 429:
+        kind = AiReceiptFailureKind.quota;
+        message = 'AIの利用上限に達しました。';
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        kind = AiReceiptFailureKind.unavailable;
+        message = 'AIサービスが一時的に利用できません。';
+      default:
+        kind = status >= 500
+            ? AiReceiptFailureKind.unavailable
+            : AiReceiptFailureKind.other;
+        message = 'AIで読み取れませんでした。';
+    }
+
+    return AiReceiptOcrException(
+      message,
+      kind: kind,
+      modelName: modelName,
+      diagnostics: diagnostics,
+    );
+  }
+
+  /// Human readable message from the Worker or a passthrough Gemini error.
+  static String? _serverErrorMessage(Object? decoded) {
+    if (decoded is! Map) return null;
+    final error = decoded['error'];
+    if (error is String) {
+      final message = decoded['message'];
+      return message is String ? message : error;
+    }
+    if (error is Map) {
+      final message = error['message'];
+      if (message is String) return message;
+      final status = error['status'];
+      return status is String ? status : null;
+    }
+    return null;
+  }
+
+  static Object? _tryDecode(String body) {
+    try {
+      return jsonDecode(body);
+    } on FormatException {
+      return null;
     }
   }
 
@@ -405,6 +716,7 @@ Rules:
       AiReceiptFailureKind.unavailable => 'AIサービスが一時的に利用できません。',
       AiReceiptFailureKind.notFound => '選択したAIモデルを利用できません。',
       AiReceiptFailureKind.quota => 'AIの利用上限に達しました。',
+      AiReceiptFailureKind.dailyLimit => dailyLimitMessage,
       AiReceiptFailureKind.configuration => 'AIの設定を確認してください。',
       AiReceiptFailureKind.missingKey => 'AI key missing',
       AiReceiptFailureKind.other => 'AIで読み取れませんでした。',
@@ -655,6 +967,7 @@ enum AiReceiptFailureKind {
   unavailable,
   notFound,
   quota,
+  dailyLimit,
   configuration,
   missingKey,
   other,

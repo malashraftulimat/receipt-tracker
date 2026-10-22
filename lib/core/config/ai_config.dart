@@ -29,6 +29,17 @@ const List<String> kGeminiReceiptFallbackModels = <String>[
   'gemini-3.8-flash',
 ];
 
+/// Shared Cloudflare Worker (`receipt-tracker-backend`) that verifies the
+/// Firebase ID token, enforces the per-user daily quota and forwards the
+/// request to Gemini with the server-side API key.
+///
+/// Used whenever no personal Gemini key is saved in this browser. Override with
+/// `--dart-define=RECEIPT_BACKEND_URL=...` (for example a staging Worker).
+const String kReceiptBackendUrl = String.fromEnvironment(
+  'RECEIPT_BACKEND_URL',
+  defaultValue: 'https://receipt-tracker-backend.aboanwartulimat.workers.dev',
+);
+
 /// Timeout for a single Gemini request attempt.
 ///
 /// Lite models answer in a few seconds, but thinking Flash fallbacks can need
