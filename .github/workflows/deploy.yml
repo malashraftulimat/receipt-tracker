@@ -40,4 +40,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: receipt-tracker
+          # wrangler-action v3 uses the command flag for the Pages project;
+          # keep it in sync with projectName above.
           command: pages deploy build/web --project-name=receipt-tracker
