@@ -19,6 +19,39 @@ class ParsedItem {
   final int? taxRate;
 }
 
+/// Coupon / voucher printed on a receipt for a future visit.
+class ParsedCoupon {
+  const ParsedCoupon({
+    required this.name,
+    this.validFrom,
+    this.validUntil,
+    this.discountAmountOrPercent,
+  });
+
+  /// Coupon title exactly as printed (e.g. 「次回使える500円クーポン」).
+  final String name;
+
+  /// First day the coupon can be used; null when valid immediately.
+  final DateTime? validFrom;
+
+  /// Last day the coupon can be used; null when no expiry is printed.
+  final DateTime? validUntil;
+
+  /// Printed value such as `10%` or `500`, in [ParsedReceipt.currency] for an
+  /// amount. Null when the coupon does not state one.
+  final String? discountAmountOrPercent;
+
+  /// True when [validUntil] is in the past relative to [at] (default: now).
+  bool isExpired({DateTime? at}) {
+    final until = validUntil;
+    if (until == null) return false;
+    final day = at ?? DateTime.now();
+    final endExclusive =
+        DateTime(until.year, until.month, until.day).add(const Duration(days: 1));
+    return !day.isBefore(endExclusive);
+  }
+}
+
 /// Structured output of the OCR post-processor.
 class ParsedReceipt {
   const ParsedReceipt({
@@ -38,6 +71,7 @@ class ParsedReceipt {
     this.pointAmount,
     this.barcodeId,
     this.suggestedCategory,
+    this.coupon,
     this.items = const <ParsedItem>[],
     this.rawText = '',
     this.warnings = const <String>[],
@@ -72,7 +106,11 @@ class ParsedReceipt {
   /// Gemini-suggested seeded category name (e.g. 食費 / 交通費).
   final String? suggestedCategory;
 
-  /// Item rows extracted above the total section.
+  /// Coupon / voucher printed for a future visit, when the receipt has one.
+  final ParsedCoupon? coupon;
+
+  /// Item rows extracted above the total section, including fees and applied
+  /// discounts (the latter as negative amounts).
   final List<ParsedItem> items;
 
   final String rawText;

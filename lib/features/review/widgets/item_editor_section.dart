@@ -248,6 +248,7 @@ class _ItemCard extends StatelessWidget {
                   controller: editor.unitPrice,
                   label: '単価',
                   currency: currency,
+                  signed: true,
                   onChanged: onChanged,
                 ),
               ),
@@ -257,6 +258,7 @@ class _ItemCard extends StatelessWidget {
                   controller: editor.totalPrice,
                   label: '金額',
                   currency: currency,
+                  signed: true,
                   onChanged: onChanged,
                 ),
               ),
@@ -319,21 +321,30 @@ class _NumberField extends StatelessWidget {
     required this.controller,
     required this.label,
     this.currency,
+    this.signed = false,
     required this.onChanged,
   });
 
   final TextEditingController controller;
   final String label;
   final String? currency;
+
+  /// Allows a leading minus so fee/discount lines keep their sign when edited.
+  final bool signed;
   final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      keyboardType: TextInputType.number,
+      keyboardType: TextInputType.numberWithOptions(
+        decimal: true,
+        signed: signed,
+      ),
       inputFormatters: <TextInputFormatter>[
-        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+        FilteringTextInputFormatter.allow(
+          signed ? RegExp(r'[0-9.,-]') : RegExp(r'[0-9.,]'),
+        ),
       ],
       onChanged: (_) => onChanged(),
       decoration: InputDecoration(

@@ -83,14 +83,37 @@ Rules:
   store is the header merchant, not 会計日, a date, or an address.
 - tax_8_base and tax_10_base are the printed tax-excluded taxable subtotals
   for each rate (for example 8%対象税 (税抜)). Never estimate them.
-- items are product lines only. Exclude subtotal, tax, totals, change, payment
-  method, points, barcode and store address lines.
+- items are the printed purchase lines, in printed order. Exclude subtotal,
+  tax summary, totals, change, payment method, points, barcode and store
+  address lines.
+  Additional fees and charges (チャージ料, サービス料, 席料, お通し代, 深夜料金,
+  GW料金, 休日料金, 手数料, 配送料, 包み料, corkage, service charge, cover
+  charge, surcharge) ARE items: one line each, named exactly as printed,
+  quantity 1, and the printed charge as total_price.
+  Discounts already applied to this purchase (割引, 値引き, クーポン割引,
+  お食事券利用) are items too, with a NEGATIVE total_price equal to the
+  printed reduction, so that the sum of item total_price values matches the
+  printed tax-included total.
+  Only fees and discounts that actually appear on this receipt become items;
+  never invent one.
   quantity defaults to 1 when no quantity is printed.
   unit_price is the per-unit price when printed, otherwise null.
   total_price is the printed line amount including tax if the receipt shows
   tax-included line prices, otherwise the printed line amount.
   tax_rate is optional and Japanese-specific: use 8 or 10 only when the line
   identifies that rate, otherwise null.
+- coupon is a coupon, discount ticket or promotional voucher printed on this
+  receipt (クーポン, 割引券, お食事券, 回数券, 特典券, coupon, voucher). Extract
+  the one usable on a future visit; when several are printed prefer the
+  soonest valid_until, then the largest discount.
+  name is the coupon title exactly as printed.
+  valid_from / valid_until are the printed validity dates as YYYY-MM-DD;
+  valid_from is null when the coupon is valid immediately, valid_until is
+  null when no expiry is printed. Convert Japanese era dates to Gregorian.
+  discount_amount_or_percent is the printed value with its unit text, such as
+  "10%" or "500", or null when none is specified. Never calculate it.
+  Return null for coupon when no coupon is printed. A coupon already applied
+  to this purchase belongs in items as a negative line, not in coupon.
 - suggested_category must be exactly one of the Japanese seeded categories:
   食費, 外食, 日用品, 光熱費, 交通費, 娯楽, 医療・医薬品, その他.
   Choose the best category from the store and item names, regardless of the
@@ -155,8 +178,40 @@ Rules:
         nullable: true,
         description: 'Best matching seeded expense category.',
       ),
+      'coupon': Schema.object(
+        nullable: true,
+        description:
+            'Coupon / voucher printed for future use; null when none exists.',
+        properties: <String, Schema>{
+          'name': Schema.string(
+            description: 'Coupon title exactly as printed.',
+          ),
+          'valid_from': Schema.string(
+            nullable: true,
+            description:
+                'Start date YYYY-MM-DD, or null when immediately active.',
+          ),
+          'valid_until': Schema.string(
+            nullable: true,
+            description: 'Expiry date YYYY-MM-DD, or null when not printed.',
+          ),
+          'discount_amount_or_percent': Schema.string(
+            nullable: true,
+            description:
+                'Printed discount value such as "10%" or "500"; null when '
+                'not specified.',
+          ),
+        },
+        requiredProperties: <String>[
+          'name',
+          'valid_from',
+          'valid_until',
+          'discount_amount_or_percent',
+        ],
+      ),
       'items': Schema.array(
-        description: 'Product lines only, in printed order.',
+        description:
+            'Purchase, fee and applied-discount lines, in printed order.',
         items: Schema.object(
           properties: <String, Schema>{
             'name': Schema.string(description: 'Printed product name.'),
@@ -200,6 +255,7 @@ Rules:
       'tax_10_base',
       'invoice_number',
       'suggested_category',
+      'coupon',
       'items',
     ],
     description: 'Language- and currency-agnostic receipt extraction.',
@@ -750,6 +806,7 @@ Rules:
     final tax10Base = _amount(json['tax_10_base']);
     final invoice = _invoiceNumber(json['invoice_number']);
     final suggestedCategory = _suggestedCategory(json['suggested_category']);
+    final coupon = parseCoupon(json['coupon']);
     final items = _items(json['items']);
 
     if (merchant == null) warnings.add('店舗名を読み取れませんでした');
@@ -790,6 +847,7 @@ Rules:
       pointAmount: null,
       barcodeId: invoice,
       suggestedCategory: suggestedCategory,
+      coupon: coupon,
       items: items,
       rawText: rawText,
       warnings: warnings,
@@ -799,7 +857,31 @@ Rules:
         if (total != null) 'total': 0.9,
         if (items.isNotEmpty) 'items': 0.85,
         if (suggestedCategory != null) 'category': 0.8,
+        if (coupon != null) 'coupon': 0.8,
       },
+    );
+  }
+
+  /// Parses the schema's `coupon` object.
+  ///
+  /// Returns null when the model emitted no coupon or no usable name. Dates are
+  /// printed as `YYYY-MM-DD`; era dates are normalised through [_dateTime].
+  @visibleForTesting
+  static ParsedCoupon? parseCoupon(Object? value) {
+    if (value is! Map) return null;
+    final map = Map<String, dynamic>.from(value);
+    final name = _string(map['name']);
+    if (name == null) return null;
+
+    final validFrom = _dateTime(map['valid_from']);
+    final validUntil = _dateTime(map['valid_until']);
+    final discount = _string(map['discount_amount_or_percent']);
+
+    return ParsedCoupon(
+      name: name,
+      validFrom: validFrom,
+      validUntil: validUntil,
+      discountAmountOrPercent: discount,
     );
   }
 
@@ -816,7 +898,8 @@ Rules:
       final unitPrice = _amount(map['unit_price']);
       var totalPrice = _amount(map['total_price']);
       totalPrice ??= unitPrice == null ? 0 : unitPrice * quantity;
-      if (totalPrice < 0) totalPrice = 0;
+      // Fees are positive lines; applied discounts are negative lines, so the
+      // sign is kept and the item sum can match the printed total.
 
       final rate = _taxRate(map['tax_rate']);
       result.add(
