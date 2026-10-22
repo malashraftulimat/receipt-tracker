@@ -616,7 +616,12 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                   ],
                   if (_aiFailure != null) ...<Widget>[
                     const SizedBox(height: 10),
-                    _AiDiagnosticLine(failure: _aiFailure!),
+                    if (_aiFailure!.kind == AiReceiptFailureKind.missingKey)
+                      _MissingAiKeyCard(
+                        onOpenSettings: () => context.push('/settings'),
+                      )
+                    else
+                      _AiDiagnosticLine(failure: _aiFailure!),
                   ],
                   const SizedBox(height: 14),
                   if (session.mode == ScanMode.longReceipt)
@@ -881,6 +886,57 @@ class _ErrorBanner extends StatelessWidget {
                 fontSize: 12,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Friendly setup prompt shown instead of raw diagnostics when no key exists.
+class _MissingAiKeyCard extends StatelessWidget {
+  const _MissingAiKeyCard({required this.onOpenSettings});
+
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppPalette.cyan.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppPalette.cyan.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.key_off_outlined,
+                  size: 18, color: AppPalette.cyan),
+              const SizedBox(width: 6),
+              AppText(
+                'AIキーが未設定です',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          AppText(
+            '設定で Gemini API キーを保存すると、AI抽出を利用できます。'
+            '未設定のあいだは端末内OCRで読み取ります。',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: onOpenSettings,
+            icon: const Icon(Icons.settings_outlined, size: 18),
+            label: const AppText('設定を開く'),
           ),
         ],
       ),

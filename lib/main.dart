@@ -25,7 +25,9 @@ Future<void> main() async {
   // AI OCR uses only the build-time GEMINI_API_KEY. When it is missing the
   // app still starts and the scanner falls back to on-device OCR.
   if (!hasGeminiApiKey()) {
-    debugPrint('[AI] AI key missing; on-device OCR fallback will be used.');
+    debugPrint(
+      '[AI] No build-time key; a saved browser key or on-device OCR will be used.',
+    );
   }
 
   runApp(const ProviderScope(child: ReceiptTrackerApp()));

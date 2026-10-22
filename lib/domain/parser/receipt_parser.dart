@@ -198,6 +198,13 @@ class ReceiptParser {
   static final RegExp _phoneMask = RegExp(r'0\d{1,4}[\-ー]\d{1,4}[\-ー]\d{3,4}');
   static final RegExp _percentMask = RegExp(r'\d{1,3}\s*%');
   static final RegExp _invoiceMask = RegExp(r'[TＴ]\d{13}');
+  static final RegExp _addressMask = RegExp(
+    r'(?:〒\s*\d{3}-?\d{4})|'
+    r'(?:[^\s]{1,10}(?:都|道|府|県))[^\n]{0,40}(?:市|区|町|村)|'
+    r'(?:丁目|番地|号室)',
+  );
+
+  bool _looksLikeAddress(String line) => _addressMask.hasMatch(line);
   static final RegExp _amountPattern = RegExp(
     r'[¥￥$€£₩₹﷼]?\s*(\d{1,3}(?:[,\.]\d{3})+|\d+)'
     r'(?:([.,])(\d{1,2}))?\s*(?:円|元|جنيه|ريال|دينار|درهم)?',
@@ -320,7 +327,18 @@ class ReceiptParser {
 
     // --- line items ---------------------------------------------------------
     final items = _parseItems(lines);
-    if (items.isNotEmpty) confidence['items'] = 0.6;
+    if (items.isNotEmpty) {
+      confidence['items'] = 0.6;
+      if (total != null) {
+        final itemsSum = items.fold<double>(
+          0,
+          (sum, item) => sum + item.totalPrice,
+        );
+        if ((itemsSum - total).abs() > 0.011) {
+          warnings.add('明細の合計がレシートの合計と一致しません。内容を確認してください');
+        }
+      }
+    }
 
     // --- loyalty points ----------------------------------------------------
     final points = _detectPoints(lines);
@@ -368,7 +386,35 @@ class ReceiptParser {
         buffer.writeCharCode(rune);
       }
     }
-    return buffer.toString();
+    // Normalise common simplified / traditional OCR variants to the Japanese
+    // forms used by the keyword lists below (e.g. 对象税 -> 対象税).
+    var normalized = buffer.toString();
+    const variants = <String, String>{
+      '对': '対',
+      '對': '対',
+      '会': '会',
+      '會': '会',
+      '计': '計',
+      '計': '計',
+      '领': '領',
+      '領': '領',
+      '收': '収',
+      '収': '収',
+      '录': '録',
+      '錄': '録',
+      '费': '費',
+      '費': '費',
+      '额': '額',
+      '額': '額',
+      '号': '号',
+      '號': '号',
+      '登录': '登録',
+      '登录番号': '登録番号',
+    };
+    for (final entry in variants.entries) {
+      normalized = normalized.replaceAll(entry.key, entry.value);
+    }
+    return normalized;
   }
 
   // -------------------------------------------------------------------------
@@ -603,6 +649,10 @@ class ReceiptParser {
       return null;
     }
     if (RegExp(r'\d{1,2}\s*[時:]\s*\d{2}').hasMatch(candidate)) return null;
+    if (RegExp(r'(会計日|會計日)').hasMatch(candidate)) return null;
+    if (_looksLikeAddress(candidate)) return null;
+    // Long unseparated numbers are more likely OCR date / reference codes.
+    if (RegExp(r'\d{6,}').hasMatch(candidate)) return null;
     // Known receipt boilerplate.
     if (_merchantNoise.any(candidate.contains)) return null;
     // A line that is only numbers plus latin letters (codes, totals).
@@ -740,6 +790,14 @@ class ReceiptParser {
   // -------------------------------------------------------------------------
 
   String? _detectReferenceNumber(List<String> lines) {
+    // Prefer the qualified invoice registration number (登録番号) over the
+    // 伝票 No. printed on the same receipt.
+    final invoice = RegExp(r'[TＴ]\s*(\d{13})');
+    for (final line in lines) {
+      final match = invoice.firstMatch(line);
+      if (match != null) return 'T${match.group(1)}';
+    }
+
     final labelled = RegExp(
       r'(?:No\.?|NO\.?|番号|伝票)\s*[:#]?\s*([0-9]{4,20})',
       caseSensitive: false,
@@ -747,13 +805,6 @@ class ReceiptParser {
     for (final line in lines) {
       final match = labelled.firstMatch(line);
       if (match != null) return match.group(1);
-    }
-
-    // Qualified invoice registration number: T + 13 digits.
-    final invoice = RegExp(r'[TＴ]\s*(\d{13})');
-    for (final line in lines) {
-      final match = invoice.firstMatch(line);
-      if (match != null) return 'T${match.group(1)}';
     }
     return null;
   }
@@ -770,7 +821,7 @@ class ReceiptParser {
     r'電話|TEL|住所|登録番号|レジ|担当|領収|レシート|ポイント|お預|お釣|釣銭|'
     r'カード|現金|クレジット|電子マネー|支払|対象|消費税|税率|軽減|割引|値引|'
     r'No\.|番号|伝票|バーコード|小計|合計|総計|現計|お会計|領収書|'
-    r'Total|Subtotal|Tax|VAT|Change|Cash|Card|Payment|Amount Due|Balance',
+    r'対象税|〒|お釣り|Total|Subtotal|Tax|VAT|Change|Cash|Card|Payment|Amount Due|Balance',
     caseSensitive: false,
   );
 
@@ -800,6 +851,7 @@ class ReceiptParser {
         break;
       }
       if (_itemNoise.hasMatch(line)) continue;
+      if (_looksLikeAddress(line)) continue;
       if (_dateMask.hasMatch(line)) continue;
       if (RegExp(r'\d{1,2}\s*[:時]\s*\d{2}').hasMatch(line)) continue;
 

@@ -5,6 +5,10 @@
 /// and the Firebase project API key is never used for Gemini calls.
 const String kGeminiApiKeyOverride = String.fromEnvironment('GEMINI_API_KEY');
 
+/// Alternate build-time name used by some web tooling (e.g. Vite).
+const String kGeminiApiKeyViteOverride =
+    String.fromEnvironment('VITE_GEMINI_API_KEY');
+
 /// Gemini Flash model for direct Gemini Developer API requests.
 ///
 /// A Flash **Lite** model is the default because receipt extraction returns
@@ -42,7 +46,9 @@ const Duration kGeminiRequestBudget = Duration(seconds: 100);
 /// as an "AI key missing" error and let the on-device OCR fallback run.
 String? geminiApiKeyOrNull() {
   final key = kGeminiApiKeyOverride.trim();
-  return key.isEmpty ? null : key;
+  if (key.isNotEmpty) return key;
+  final viteKey = kGeminiApiKeyViteOverride.trim();
+  return viteKey.isEmpty ? null : viteKey;
 }
 
 /// Throwing variant of [geminiApiKeyOrNull] for callers that require a key.

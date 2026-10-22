@@ -85,6 +85,28 @@ Required one-time setup in the Firebase console:
    key is supplied, the app still starts and AI automatically falls back to local
    OCR.
 
+### Bring your own Gemini key (GitHub Pages)
+
+Because this is a static site with no backend, users can save their own Gemini
+API key from **Settings → AIキー（Gemini）**.
+
+1. Create a key in [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. In Google Cloud / AI Studio key restrictions:
+   - **Application restrictions → HTTP referrers**: add
+     `https://malashraftulimat.github.io/*`
+   - **API restrictions**: allow only the **Generative Language API**
+     (Gemini API)
+3. Paste the key in Settings, then use **Save** and optionally **キーをテスト**.
+
+The key is stored only in the browser's `localStorage` for the current origin
+and is sent directly to Google's Gemini API. It is never written to Firestore,
+committed to the repository, or logged. If no saved key exists, the build-time
+`GEMINI_API_KEY` is used next; otherwise the app shows "AI key missing" and
+falls back to on-device OCR.
+
+> Any key used in a frontend web app is visible to the user's browser. Restrict
+> it by HTTP referrer and API, and rotate it if it is exposed.
+
 ### Firestore layout
 
 ```

@@ -8,6 +8,7 @@ import '../../../core/config/ai_config.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/redaction.dart';
 import '../../../domain/parser/receipt_parser.dart';
+import '../ai_key_store.dart';
 
 /// Direct Google AI Studio / Gemini Developer API receipt extractor.
 ///
@@ -15,13 +16,21 @@ import '../../../domain/parser/receipt_parser.dart';
 /// only for inference and is never written to Firestore or local storage.
 class AiReceiptOcrService {
   AiReceiptOcrService({String? apiKey})
-      : _apiKey = apiKey?.trim().isNotEmpty == true
-            ? apiKey!.trim()
-            : geminiApiKeyOrNull();
+      : _explicitApiKey =
+            apiKey?.trim().isNotEmpty == true ? apiKey!.trim() : null;
 
-  /// Build-time `GEMINI_API_KEY` only. Null when the build did not supply one;
-  /// there is no Firebase / bundled-key fallback.
-  final String? _apiKey;
+  /// Optional explicit key (tests / custom callers). Normal app use resolves
+  /// the user-saved key first, then the build-time key.
+  final String? _explicitApiKey;
+
+  /// User-saved localStorage key, then the build-time `GEMINI_API_KEY`.
+  Future<String?> _resolveApiKey() async {
+    final explicit = _explicitApiKey;
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    final stored = await AiKeyStore.read();
+    if (stored != null && stored.isNotEmpty) return stored;
+    return geminiApiKeyOrNull();
+  }
 
   /// Current Gemini Flash model from the Google AI Studio model list.
   static const String modelName = kGeminiReceiptModel;
@@ -56,7 +65,13 @@ Rules:
   For non-Japanese receipts, or when no tax amount is printed, return null.
   Never calculate them.
 - invoice_number is the Japanese qualified invoice registration number printed
-  as T followed by 13 digits. Normalise a full-width Ｔ to T. Otherwise null.
+  as 登録番号 / T followed by 13 digits. Never use 伝票 No. for this field.
+  Normalise a full-width Ｔ to T. Otherwise null.
+- For Japanese receipts, do not treat address, phone (TEL / 〒), tax lines
+  (消費税 / 対象税), subtotal, total, payment or change lines as items. The
+  store is the header merchant, not 会計日, a date, or an address.
+- tax_8_base and tax_10_base are the printed tax-excluded taxable subtotals
+  for each rate (for example 8%対象税 (税抜)). Never estimate them.
 - items are product lines only. Exclude subtotal, tax, totals, change, payment
   method, points, barcode and store address lines.
   quantity defaults to 1 when no quantity is printed.
@@ -102,6 +117,14 @@ Rules:
       'tax_10_amount': Schema.number(
         nullable: true,
         description: 'Optional printed 10% Japanese consumption tax amount.',
+      ),
+      'tax_8_base': Schema.number(
+        nullable: true,
+        description: 'Optional printed tax-excluded 8% taxable subtotal.',
+      ),
+      'tax_10_base': Schema.number(
+        nullable: true,
+        description: 'Optional printed tax-excluded 10% taxable subtotal.',
       ),
       'invoice_number': Schema.string(
         nullable: true,
@@ -162,6 +185,8 @@ Rules:
       'subtotal',
       'tax_8_amount',
       'tax_10_amount',
+      'tax_8_base',
+      'tax_10_base',
       'invoice_number',
       'suggested_category',
       'items',
@@ -176,7 +201,7 @@ Rules:
       throw const AiReceiptOcrException('レシート画像が空です。');
     }
 
-    final apiKey = _apiKey;
+    final apiKey = await _resolveApiKey();
     if (apiKey == null || apiKey.isEmpty) {
       throw const AiReceiptOcrException(
         'AI key missing',
@@ -199,6 +224,7 @@ Rules:
         responseSchema: _schema,
         temperature: 0,
       ),
+      apiKey: apiKey,
     );
     final text = response.text;
     if (text == null || text.trim().isEmpty) {
@@ -219,6 +245,49 @@ Rules:
     return _toParsedReceipt(json, text);
   }
 
+  /// Sends a tiny request to verify that [apiKey] can call the Gemini API.
+  ///
+  /// The key is not stored or logged. The returned message is safe to show.
+  Future<AiKeyTestResult> testKey(String apiKey) async {
+    final key = apiKey.trim();
+    if (key.isEmpty) {
+      return const AiKeyTestResult(
+        ok: false,
+        kind: AiReceiptFailureKind.missingKey,
+        message: 'AI key missing',
+      );
+    }
+
+    try {
+      final model = GenerativeModel(
+        model: kGeminiReceiptModel,
+        apiKey: key,
+      );
+      final response = await model.generateContent(<Content>[
+        Content.text('Reply with OK only.')
+      ]).timeout(const Duration(seconds: 20));
+      if ((response.text ?? '').trim().isEmpty) {
+        return const AiKeyTestResult(
+          ok: false,
+          kind: AiReceiptFailureKind.other,
+          message: 'AI returned an empty response',
+        );
+      }
+      return const AiKeyTestResult(ok: true, message: 'AI key works');
+    } catch (error) {
+      final mapped = _mapAiError(
+        error,
+        modelName: kGeminiReceiptModel,
+        apiKey: key,
+      );
+      return AiKeyTestResult(
+        ok: false,
+        kind: mapped.kind,
+        message: mapped.message,
+      );
+    }
+  }
+
   /// Sends the request with retry and model fallback.
   ///
   /// Transient 503/unavailable responses are retried once, then the next
@@ -227,18 +296,17 @@ Rules:
   Future<GenerateContentResponse> _generateContent(
     List<Content> content, {
     required GenerationConfig generationConfig,
+    required String apiKey,
   }) async {
     final modelNames = <String>{
       kGeminiReceiptModel,
       ...kGeminiReceiptFallbackModels,
     };
-    final apiKey = _apiKey;
     final stopwatch = Stopwatch()..start();
     Object? lastError;
     String? lastModelName;
 
     for (final name in modelNames) {
-      if (apiKey == null || apiKey.isEmpty) break;
       final model = GenerativeModel(
         model: name,
         apiKey: apiKey,
@@ -250,6 +318,7 @@ Rules:
           throw _mapAiError(
             lastError ?? TimeoutException('AI request budget exceeded'),
             modelName: lastModelName,
+            apiKey: apiKey,
           );
         }
         try {
@@ -259,11 +328,11 @@ Rules:
         } catch (error) {
           lastError = error;
           lastModelName = name;
-          final mapped = _mapAiError(error, modelName: name);
+          final mapped = _mapAiError(error, modelName: name, apiKey: apiKey);
           debugPrint(
             '[AiReceiptOcrService] model=$name attempt=${attempt + 1} '
             'runtimeType=${error.runtimeType} kind=${mapped.kind.name} '
-            'message=${mapped.message} raw=${_safeError(error)}',
+            'message=${mapped.message} raw=${_safeError(error, apiKey)}',
           );
 
           if (mapped.kind == AiReceiptFailureKind.unavailable && attempt == 0) {
@@ -284,19 +353,21 @@ Rules:
     throw _mapAiError(
       lastError ?? Exception('AI service unavailable'),
       modelName: lastModelName,
+      apiKey: apiKey,
     );
   }
 
   AiReceiptOcrException _mapAiError(
     Object error, {
     String? modelName,
+    String? apiKey,
   }) {
     if (error is AiReceiptOcrException) {
       return AiReceiptOcrException(
         error.message,
         kind: error.kind,
         cause: error.cause ?? error,
-        diagnostics: error.diagnostics ?? _safeError(error),
+        diagnostics: error.diagnostics ?? _safeError(error, apiKey),
         modelName: modelName ?? error.modelName,
       );
     }
@@ -342,14 +413,14 @@ Rules:
       message,
       kind: kind,
       cause: error,
-      diagnostics: _safeError(error),
+      diagnostics: _safeError(error, apiKey),
       modelName: modelName,
     );
   }
 
   /// Error text that is safe to log or show in the diagnostics box.
-  String _safeError(Object error) =>
-      redactSensitiveText(error.toString(), apiKey: _apiKey);
+  String _safeError(Object error, [String? apiKey]) =>
+      redactSensitiveText(error.toString(), apiKey: apiKey);
 
   ParsedReceipt _toParsedReceipt(
     Map<String, dynamic> json,
@@ -363,6 +434,8 @@ Rules:
     final subtotal = _amount(json['subtotal']);
     final tax8 = _amount(json['tax_8_amount']);
     final tax10 = _amount(json['tax_10_amount']);
+    final tax8Base = _amount(json['tax_8_base']);
+    final tax10Base = _amount(json['tax_10_base']);
     final invoice = _invoiceNumber(json['invoice_number']);
     final suggestedCategory = _suggestedCategory(json['suggested_category']);
     final items = _items(json['items']);
@@ -394,6 +467,8 @@ Rules:
       subtotalAmount: subtotal,
       tax8Amount: tax8,
       tax10Amount: tax10,
+      tax8Base: tax8Base,
+      tax10Base: tax10Base,
       tax8ItemsTotal:
           items.any((item) => item.taxRate == 8) ? tax8ItemsTotal : null,
       tax10ItemsTotal:
@@ -562,6 +637,18 @@ Rules:
     if (hour > 23 || minute > 59) return date;
     return DateTime(year, month, day, hour, minute);
   }
+}
+
+class AiKeyTestResult {
+  const AiKeyTestResult({
+    required this.ok,
+    this.kind,
+    this.message = '',
+  });
+
+  final bool ok;
+  final AiReceiptFailureKind? kind;
+  final String message;
 }
 
 enum AiReceiptFailureKind {

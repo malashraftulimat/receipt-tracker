@@ -205,6 +205,47 @@ void main() {
 void itemTests() {
   const parser = ReceiptParser();
 
+  group('Japanese 領収書 fixture', () {
+    const receipt = '''
+ソニックストア株式会社東京店
+會計日 202552088268 (A)
+会計日 2025年08月26日
+伝票 No.0100000001
+登録番号 T5010001238914
+(8%対象税 (税抜)) ¥1,000
+(消費税等 8%) ¥80
+支払 ¥1,080
+〒150-0002 東京都渋谷区南5条東1丁目3-5-1
+TEL 03-1234-5678
+''';
+
+    test('reads store, date, invoice, totals and tax without item noise', () {
+      final parsed = parser.parse(receipt);
+      expect(parsed.merchant, 'ソニックストア株式会社東京店');
+      expect(parsed.purchasedAt, DateTime(2025, 8, 26));
+      expect(parsed.barcodeId, 'T5010001238914');
+      expect(parsed.totalAmount, 1080);
+      expect(parsed.subtotalAmount, 1000);
+      expect(parsed.tax8Amount, 80);
+      expect(parsed.tax8Base, 1000);
+      expect(parsed.items, isEmpty);
+    });
+
+    test('normalises simplified Chinese tax labels from OCR', () {
+      final parsed = parser.parse('''
+店
+会計日 2025年08月26日
+(8%对象税 (税抜)) ¥1,000
+(消费税等 8%) ¥80
+支払 ¥1,080
+''');
+      expect(parsed.tax8Base, 1000);
+      expect(parsed.tax8Amount, 80);
+      expect(parsed.totalAmount, 1080);
+      expect(parsed.items, isEmpty);
+    });
+  });
+
   group('line items', () {
     test('extracts item name, quantity and tax markers', () {
       final parsed = parser.parse('''

@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/ai_config.dart';
 import '../../core/localization/localization.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
+import '../../data/services/ai_key_store.dart';
 import '../../data/services/export_service.dart';
+import '../../data/services/ocr/ai_receipt_ocr_service.dart';
 import '../../domain/models/receipt_filter.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -147,6 +150,8 @@ class SettingsPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 14),
+          const _AiKeyCard(),
+          const SizedBox(height: 14),
           _Card(
             title: '表示',
             children: <Widget>[
@@ -272,6 +277,191 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Bring-your-own Gemini key. Stored only in this browser's localStorage.
+class _AiKeyCard extends StatefulWidget {
+  const _AiKeyCard();
+
+  @override
+  State<_AiKeyCard> createState() => _AiKeyCardState();
+}
+
+class _AiKeyCardState extends State<_AiKeyCard> {
+  final TextEditingController _controller = TextEditingController();
+  bool _obscure = true;
+  bool _busy = false;
+  bool _saved = false;
+  bool _statusOk = false;
+  String? _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final saved = await AiKeyStore.read();
+    if (!mounted) return;
+    setState(() {
+      _saved = saved != null;
+      if (saved != null) _controller.text = saved;
+    });
+  }
+
+  Future<void> _save() async {
+    final key = _controller.text.trim();
+    if (key.isEmpty) {
+      setState(() {
+        _status = 'キーを入力してください';
+        _statusOk = false;
+      });
+      return;
+    }
+    setState(() => _busy = true);
+    await AiKeyStore.save(key);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _saved = true;
+      _status = 'AIキーを保存しました（このブラウザのみ）';
+      _statusOk = true;
+    });
+  }
+
+  Future<void> _clear() async {
+    setState(() => _busy = true);
+    await AiKeyStore.clear();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _saved = false;
+      _controller.clear();
+      _status = hasGeminiApiKey() ? '保存キーを削除しました。ビルドキーを使用します。' : '保存キーを削除しました。';
+      _statusOk = true;
+    });
+  }
+
+  Future<void> _test() async {
+    final key = _controller.text.trim();
+    if (key.isEmpty) {
+      setState(() {
+        _status = 'テストするキーを入力してください';
+        _statusOk = false;
+      });
+      return;
+    }
+    setState(() => _busy = true);
+    final result = await AiReceiptOcrService().testKey(key);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _statusOk = result.ok;
+      _status =
+          result.ok ? 'キーは有効です。AI抽出を利用できます。' : _testFailureLabel(result.kind);
+    });
+  }
+
+  String _testFailureLabel(AiReceiptFailureKind? kind) {
+    return switch (kind) {
+      AiReceiptFailureKind.configuration => '無効なキー、または権限がありません',
+      AiReceiptFailureKind.quota => '利用上限に達しています',
+      AiReceiptFailureKind.unavailable => 'ネットワーク / サービスに接続できません',
+      AiReceiptFailureKind.missingKey => 'キーが入力されていません',
+      _ => 'キーを確認できませんでした',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final source = _saved
+        ? '保存済み（localStorage）'
+        : (hasGeminiApiKey() ? 'ビルドキーを使用' : '未設定');
+
+    return _Card(
+      title: 'AIキー（Gemini）',
+      children: <Widget>[
+        AppText(
+          '自分の Gemini API キーを保存できます。キーはこのブラウザの '
+          'localStorage にのみ保存され、Google の Gemini API 以外には送信されません。'
+          '現在: $source',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _controller,
+          obscureText: _obscure,
+          enabled: !_busy,
+          autocorrect: false,
+          enableSuggestions: false,
+          textInputAction: TextInputAction.done,
+          decoration: InputDecoration(
+            labelText: 'Gemini API キー',
+            hintText: 'Google AI Studio で作成したキー',
+            prefixIcon: const Icon(Icons.key_outlined),
+            suffixIcon: IconButton(
+              tooltip: _obscure ? '表示' : '隠す',
+              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(
+                _obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            FilledButton.icon(
+              onPressed: _busy ? null : _save,
+              icon: const Icon(Icons.save_outlined, size: 18),
+              label: const AppText('保存'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _test,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.network_check, size: 18),
+              label: const AppText('キーをテスト'),
+            ),
+            TextButton.icon(
+              onPressed: _busy ? null : _clear,
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const AppText('クリア'),
+            ),
+          ],
+        ),
+        if (_status != null) ...<Widget>[
+          const SizedBox(height: 8),
+          AppText(
+            _status!,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: _statusOk
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.error,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
