@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -20,6 +21,21 @@ Future<void> main() async {
 
   // Firebase Auth + Cloud Firestore + direct Google AI Studio.
   await Firebase.initializeApp(options: kFirebaseOptions);
+
+  // Force Firestore's WebChannel transport onto long polling on the web.
+  //
+  // Flutter Web initializes the Firestore JS SDK through cloud_firestore_web,
+  // so this is the equivalent of the JS
+  // `initializeFirestore(app, { experimentalForceLongPolling: true })` call:
+  // cloud_firestore_web passes these settings to `initializeFirestore` on the
+  // first Firestore operation. It avoids buffering issues behind some proxies
+  // and antivirus software. Must run before any Firestore access.
+  if (kIsWeb) {
+    FirebaseFirestore.instance.settings = const Settings(
+      webExperimentalForceLongPolling: true,
+    );
+  }
+
   await _initializeAppCheck();
 
   // AI OCR goes through the shared Worker by default; a personal key saved in
