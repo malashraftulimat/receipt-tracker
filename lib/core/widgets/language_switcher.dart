@@ -26,7 +26,7 @@ class LanguageSwitcherButton extends ConsumerWidget {
     }
 
     return PopupMenuButton<AppLanguage>(
-      tooltip: context.tr('言語を切り替え'),
+      tooltip: context.tr('change_language'),
       initialValue: language,
       onSelected: select,
       icon: showLabel
@@ -50,7 +50,7 @@ class LanguageSwitcherButton extends ConsumerWidget {
           enabled: false,
           height: 36,
           child: AppText(
-            '言語を切り替え',
+            'change_language',
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

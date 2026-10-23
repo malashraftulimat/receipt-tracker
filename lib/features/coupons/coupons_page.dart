@@ -21,7 +21,7 @@ class CouponsPage extends ConsumerWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: AppText(
-          granted ? 'クーポンの通知を有効にしました' : '通知の許可が必要です',
+          granted ? 'coupon.notifications_enabled' : 'coupon.permission_required',
         ),
       ),
     );
@@ -53,7 +53,7 @@ class CouponsPage extends ConsumerWidget {
     if (!context.mounted) return;
     ref.invalidate(couponsProvider);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: AppText('明日またお知らせします')),
+      const SnackBar(content: AppText('coupon.remind_tomorrow_done')),
     );
   }
 
@@ -63,13 +63,13 @@ class CouponsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppText('クーポン'),
+        title: const AppText('coupon.title'),
         actions: headerActions(
           context,
           showLanguageLabel: context.isExpanded,
           actions: <Widget>[
             IconButton(
-              tooltip: context.tr('通知を有効にする'),
+              tooltip: context.tr('coupon.enable_notifications'),
               onPressed: () => _enableNotifications(context, ref),
               icon: const Icon(Icons.notifications_active_outlined),
             ),
@@ -110,7 +110,7 @@ class CouponsPage extends ConsumerWidget {
                   const _EmptyCoupons()
                 else ...<Widget>[
                   if (usable.isEmpty)
-                    const AppText('有効なクーポンはありません')
+                    const AppText('coupon.none_active')
                   else
                     ...usable.map(
                       (coupon) => Padding(
@@ -127,7 +127,7 @@ class CouponsPage extends ConsumerWidget {
                   if (finished.isNotEmpty) ...<Widget>[
                     const SizedBox(height: 16),
                     const AppText(
-                      '期限切れ・使用済み',
+                      'coupon.expired_used_section',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: AppPalette.textMuted,
@@ -171,13 +171,13 @@ class _EmptyCoupons extends StatelessWidget {
               size: 40, color: AppPalette.cyan),
           const SizedBox(height: 10),
           AppText(
-            'レシートにクーポンが印刷されていると、ここに自動で保存されます。',
+            'coupon.auto_save_help',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: 6),
           AppText(
-            '有効なクーポンは毎日お知らせします（通知の許可が必要です）。',
+            'coupon.daily_help',
             textAlign: TextAlign.center,
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -277,13 +277,13 @@ class _CouponCard extends StatelessWidget {
                     FilledButton.tonalIcon(
                       onPressed: onUsed,
                       icon: const Icon(Icons.check, size: 16),
-                      label: const AppText('使用済み'),
+                      label: const AppText('coupon.status_used'),
                     ),
                   if (onRemind != null)
                     OutlinedButton.icon(
                       onPressed: onRemind,
                       icon: const Icon(Icons.alarm_add_outlined, size: 16),
-                      label: const AppText('明日通知'),
+                      label: const AppText('coupon.remind_tomorrow'),
                     ),
                 ],
               ),
@@ -300,10 +300,10 @@ class _CouponCard extends StatelessWidget {
         coupon.merchant!,
     ];
     if (coupon.status == CouponStatus.used) {
-      parts.add('使用済み');
+      parts.add('coupon.status_used');
     } else if (coupon.status == CouponStatus.expired ||
         coupon.isExpiredAt(now)) {
-      parts.add('期限切れ');
+      parts.add('coupon.status_expired');
     }
     final until = coupon.validUntil;
     if (until != null) {
@@ -317,8 +317,8 @@ class _CouponCard extends StatelessWidget {
     } else if (coupon.validFrom != null) {
       parts.add('${formatDateShortJa(coupon.validFrom!)} から');
     } else {
-      parts.add('有効期限なし');
+      parts.add('coupon.no_expiry');
     }
-    return parts.join(' ・ ');
+    return parts.join('coupon.separator');
   }
 }

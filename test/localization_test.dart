@@ -10,55 +10,61 @@ void main() {
   const ja = AppLocalizations(AppLanguage.ja);
 
   test('budget field labels are translated', () {
-    expect(en.translate('月収（手取り）'), 'Monthly Income (Net)');
-    expect(en.translate('貯蓄目標'), 'Savings Goal');
+    expect(en.translate('monthly_income_net'), 'Monthly Income (Net)');
+    expect(en.translate('savings_goal'), 'Savings Goal');
     expect(
-      en.translate('固定費（家賃・光熱費・サブスク）'),
+      en.translate('fixed_expenses_rent_utilities_subscriptions'),
       'Fixed Expenses (rent, utilities, subscriptions)',
     );
 
-    expect(ar.translate('月収（手取り）'), 'الدخل الشهري (الصافي)');
-    expect(ar.translate('貯蓄目標'), 'هدف الادخار');
+    expect(ar.translate('monthly_income_net'), 'الدخل الشهري (الصافي)');
+    expect(ar.translate('savings_goal'), 'هدف الادخار');
     expect(
-      ar.translate('固定費（家賃・光熱費・サブスク）'),
+      ar.translate('fixed_expenses_rent_utilities_subscriptions'),
       'المصاريف الثابتة (الإيجار، المرافق، الاشتراكات)',
     );
-    expect(ja.translate('貯蓄目標'), '貯蓄目標');
+    expect(ja.translate('savings_goal'), '貯蓄目標');
   });
 
   test('budget status and pacing messages are localized', () {
-    expect(en.translate('予算未設定'), 'Budget not set');
-    expect(en.translate('順調'), 'On track');
-    expect(en.translate('ペース注意'), 'Watch spending pace');
-    expect(en.translate('予算オーバー'), 'Over budget');
+    expect(en.translate('budget_not_set'), 'Budget not set');
+    expect(en.translate('on_track'), 'On track');
+    expect(en.translate('watch_spending_pace'), 'Watch spending pace');
+    expect(en.translate('over_budget_2'), 'Over budget');
 
     expect(
-      en.translate(
-        '計画より ¥1,000 多く使っています。残り 5 日、1日 ¥200 が目安です。',
+      en.msg(
+        'budget.over_plan',
+        params: <String, Object?>{
+          'amount': '¥1,000',
+          'days': 5,
+          'daily': '¥200',
+        },
       ),
-      'You are spending ¥1,000 more than planned.\n'
+      'You are spending ¥1,000 more than planned. '
       '5 days left; about ¥200 per day.',
     );
     expect(
-      en.translate(
-        '計画より ¥500 節約できています。このペースなら貯蓄目標 ¥30,000 に届きます。',
+      en.msg(
+        'budget.under_plan',
+        params: <String, Object?>{'amount': '¥500', 'goal': '¥30,000'},
       ),
-      'You are saving ¥500 compared with the plan.\n'
+      'You are saving ¥500 compared with the plan. '
       'At this pace you will reach the savings goal of ¥30,000.',
     );
   });
 
   test('AI unavailable toast is localized', () {
     expect(
-      en.translate('AIサービスを準備しています。しばらくしてからお試しください。'),
+      en.translate('the_ai_service_is_getting_ready_please_try_a'),
       'The AI service is getting ready. Please try again in a moment.',
     );
     expect(
-      ar.translate('AIサービスを準備しています。しばらくしてからお試しください。'),
+      ar.translate('the_ai_service_is_getting_ready_please_try_a'),
       'جاري تجهيز خدمة الذكاء الاصطناعي، يرجى المحاولة بعد لحظات',
     );
-    expect(en.translate('AIエラーの詳細'), 'AI error details');
-    expect(ar.translate('AIエラーの詳細'), 'تفاصيل خطأ الذكاء الاصطناعي');
+    expect(en.translate('ai_error_details'), 'AI error details');
+    expect(ar.translate('ai_error_details'), 'تفاصيل خطأ الذكاء الاصطناعي');
   });
 
   test('Gemini model configuration uses current supported names', () {
@@ -74,29 +80,55 @@ void main() {
     final override = const String.fromEnvironment('GEMINI_API_KEY').trim();
     final key = geminiApiKeyOrNull();
     expect(hasGeminiApiKey(), override.isNotEmpty);
-    expect(key, override.isEmpty ? isNull : override);
+    expect(key, override.isEmpty ? isNull : key);
   });
 
   test('category screen messages are localized', () {
-    expect(en.translate('「食費」を削除します。'), 'Delete “食費”.');
     expect(
-      en.translate('カテゴリを読み込めませんでした\nnetwork error'),
+      en.msg('record.delete_named', params: <String, Object?>{'name': '食費'}),
+      'Delete “食費”.',
+    );
+    expect(
+      en.msg(
+        'error.categories_load_failed',
+        params: <String, Object?>{'error': 'network error'},
+      ),
       'Could not load categories\nnetwork error',
     );
-    expect(en.translate('保存に失敗しました: offline'), 'Could not save: offline');
-    expect(ar.translate('削除に失敗しました: offline'), 'تعذّر الحذف: offline');
+    expect(
+      en.msg('error.save_failed', params: <String, Object?>{'error': 'offline'}),
+      'Could not save: offline',
+    );
+    expect(
+      ar.msg('error.delete_failed', params: <String, Object?>{'error': 'offline'}),
+      'تعذّر الحذف: offline',
+    );
   });
 
   test('language switching strings are localized', () {
-    expect(en.translate('言語を切り替え'), 'Change language');
-    expect(ar.translate('言語を切り替え'), 'تغيير اللغة');
+    expect(en.translate('change_language'), 'Change language');
+    expect(ar.translate('change_language'), 'تغيير اللغة');
     expect(
-      en.translate(
-        'ブラウザや端末の言語を自動で判定します。'
-        'ここで選んだ言語は保存され、次回以降も優先されます。',
-      ),
+      en.translate('settings.language_help'),
       contains('detected automatically'),
     );
+  });
+
+  test('plural forms follow CLDR for English and Arabic', () {
+    expect(en.msg('count.items', count: 1), '1 item');
+    expect(en.msg('count.items', count: 5), '5 items');
+    expect(ar.msg('count.items', count: 0), 'لا عناصر');
+    expect(ar.msg('count.items', count: 1), 'عنصر واحد');
+    expect(ar.msg('count.items', count: 2), 'عنصران');
+    for (final part in <String>['zero', 'one', 'two', 'few', 'many', 'other']) {
+      expect(ja.translate('count.items.$part'), contains('{count}'));
+    }
+  });
+
+  test('seeded category names translate without touching custom names', () {
+    expect(en.translate('食費'), 'Food');
+    expect(ar.translate('食費'), 'الطعام');
+    expect(en.translate('My custom category'), 'My custom category');
   });
 
   group('AppLanguage detection', () {

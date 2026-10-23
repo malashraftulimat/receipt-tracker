@@ -12,6 +12,8 @@ class AppText extends StatelessWidget {
   const AppText(
     this.data, {
     super.key,
+    this.params = const <String, Object?>{},
+    this.count,
     this.style,
     this.strutStyle,
     this.textAlign,
@@ -28,7 +30,14 @@ class AppText extends StatelessWidget {
     this.translate = true,
   });
 
+  /// Message id understood by [AppLocalizations].
   final String data;
+
+  /// `{name}` placeholders interpolated into the message.
+  final MessageParams params;
+
+  /// When set, selects the CLDR plural form (`one`, `few`, `many`, ...).
+  final num? count;
 
   /// Set to false for language names that should stay in their native script.
   final bool translate;
@@ -49,7 +58,9 @@ class AppText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      translate ? context.tr(data) : data,
+      translate
+          ? context.l10n.msg(data, params: params, count: count)
+          : data,
       style: style,
       strutStyle: strutStyle,
       textAlign: textAlign,

@@ -6,26 +6,26 @@ extension ScanModeLabels on ScanMode {
   String get label {
     switch (this) {
       case ScanMode.barcode:
-        return 'バーコード';
+        return 'barcode';
       case ScanMode.ocr:
-        return 'レシートOCR';
+        return 'receipt_ocr';
       case ScanMode.auto:
-        return '自動';
+        return 'auto';
       case ScanMode.longReceipt:
-        return '長レシート';
+        return 'long_receipt';
     }
   }
 
   String get hint {
     switch (this) {
       case ScanMode.barcode:
-        return 'JAN-13 / Code 128 を枠内に合わせてください';
+        return 'scan.hint_barcode';
       case ScanMode.ocr:
-        return 'レシート全体が入るように撮影してください';
+        return 'scan.hint_receipt';
       case ScanMode.auto:
-        return 'バーコードを検出し、続けてレシート文字も読み取ります';
+        return 'scan.hint_auto';
       case ScanMode.longReceipt:
-        return '上から順に分割撮影。つなぎ目の重複は自動で除去します';
+        return 'scan.hint_long';
     }
   }
 }

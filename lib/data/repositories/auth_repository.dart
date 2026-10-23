@@ -40,28 +40,28 @@ class AuthRepository {
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'invalid-email':
-          return 'メールアドレスの形式が正しくありません。';
+          return 'auth.invalid_email';
         case 'user-disabled':
-          return 'このアカウントは無効化されています。';
+          return 'auth.account_disabled';
         case 'user-not-found':
         case 'wrong-password':
         case 'invalid-credential':
-          return 'メールアドレスまたはパスワードが違います。';
+          return 'auth.wrong_credentials';
         case 'email-already-in-use':
-          return 'このメールアドレスは既に登録されています。';
+          return 'auth.email_in_use';
         case 'weak-password':
-          return 'パスワードは6文字以上で入力してください。';
+          return 'auth.weak_password_repo';
         case 'too-many-requests':
-          return '試行回数が多すぎます。しばらく待ってから再試行してください。';
+          return 'auth.too_many_requests';
         case 'operation-not-allowed':
-          return 'メール/パスワード認証が Firebase で有効になっていません。';
+          return 'auth.provider_disabled';
         case 'network-request-failed':
-          return '通信に失敗しました。ネットワークを確認してください。';
+          return 'auth.network_error';
         case 'requires-recent-login':
-          return '再度ログインしてから操作してください。';
+          return 'auth.require_recent_login';
       }
-      return error.message ?? '認証に失敗しました。';
+      return error.message ?? 'auth.failed_repo';
     }
-    return '通信に失敗しました。ネットワークを確認してください。';
+    return 'auth.network_error';
   }
 }

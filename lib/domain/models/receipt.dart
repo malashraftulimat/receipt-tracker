@@ -19,11 +19,11 @@ ReceiptSource receiptSourceFromString(String? value) {
 String receiptSourceLabel(ReceiptSource source) {
   switch (source) {
     case ReceiptSource.barcode:
-      return 'バーコード';
+      return 'barcode';
     case ReceiptSource.ocr:
       return 'OCR';
     case ReceiptSource.manual:
-      return '手入力';
+      return 'manual_entry';
   }
 }
 
@@ -125,7 +125,7 @@ class Receipt {
   bool get hasTaxBreakdown => tax8Amount != null || tax10Amount != null;
 
   String get displayMerchant => (merchant == null || merchant!.trim().isEmpty)
-      ? '店舗名なし'
+      ? 'no_store_name'
       : merchant!.trim();
 
   /// Merchant for receipts, otherwise the note (used by quick payments that
@@ -135,10 +135,10 @@ class Receipt {
     if (name.isNotEmpty) return name;
     final memo = (note ?? '').trim();
     if (memo.isNotEmpty) return memo;
-    return '店舗名なし';
+    return 'no_store_name';
   }
 
-  String get displayCategory => category?.name ?? '未分類';
+  String get displayCategory => category?.name ?? 'uncategorised';
 
   String get displayPaymentMethod => PaymentMethod.labelOf(paymentMethod);
 

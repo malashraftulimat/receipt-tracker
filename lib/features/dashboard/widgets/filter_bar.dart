@@ -49,11 +49,11 @@ class _FilterBarState extends ConsumerState<FilterBar> {
       firstDate: DateTime(now.year - 10),
       lastDate: now,
       initialDateRange: initialRange,
-      helpText: context.tr('期間を選択'),
-      saveText: context.tr('決定'),
-      cancelText: context.tr('キャンセル'),
-      fieldStartLabelText: context.tr('開始日'),
-      fieldEndLabelText: context.tr('終了日'),
+      helpText: context.tr('select_a_date_range'),
+      saveText: context.tr('ok'),
+      cancelText: context.tr('cancel'),
+      fieldStartLabelText: context.tr('start_date'),
+      fieldEndLabelText: context.tr('end_date'),
       locale: Localizations.localeOf(context),
     );
 
@@ -86,13 +86,13 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                   textInputAction: TextInputAction.search,
                   onChanged: notifier.setSearch,
                   decoration: InputDecoration(
-                    hintText: context.tr('店舗名・メモ・バーコードで検索'),
+                    hintText: context.tr('search_store_note_or_barcode'),
                     isDense: true,
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: filter.searchTerm.isEmpty
                         ? null
                         : IconButton(
-                            tooltip: context.tr('クリア'),
+                            tooltip: context.tr('clear'),
                             onPressed: () {
                               _searchController.clear();
                               notifier.setSearch('');
@@ -113,7 +113,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
               ),
               const SizedBox(width: 4),
               IconButton.filledTonal(
-                tooltip: context.tr('期間指定'),
+                tooltip: context.tr('date_range'),
                 onPressed: _pickRange,
                 icon: const Icon(Icons.date_range_outlined),
               ),
@@ -131,7 +131,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
               scrollDirection: Axis.horizontal,
               children: <Widget>[
                 _FilterChip(
-                  label: 'すべて',
+                  label: 'all',
                   selected: filter.categoryId == null &&
                       filter.paymentMethod == null &&
                       filter.month == null &&
@@ -140,14 +140,14 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
-                  label: '今月',
+                  label: 'paycycle.this_month',
                   selected: filter.month != null &&
                       _sameMonth(filter.month!, thisMonth),
                   onTap: () => notifier.setMonth(thisMonth),
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
-                  label: '先月',
+                  label: 'last_month',
                   selected: filter.month != null &&
                       _sameMonth(filter.month!, lastMonth),
                   onTap: () => notifier.setMonth(lastMonth),
@@ -207,7 +207,7 @@ class _PaymentMethodFilter extends StatelessWidget {
         : theme.colorScheme.onSurfaceVariant;
 
     return PopupMenuButton<String>(
-      tooltip: context.tr('支払い方法で絞り込み'),
+      tooltip: context.tr('filter_by_payment_method'),
       initialValue: method?.wireName ?? _all,
       onSelected: (value) =>
           onChanged(value == _all ? null : PaymentMethod.tryParse(value)),
@@ -218,7 +218,7 @@ class _PaymentMethodFilter extends StatelessWidget {
             children: <Widget>[
               Icon(Icons.clear_all, size: 18),
               SizedBox(width: 8),
-              AppText('すべて'),
+              AppText('all'),
             ],
           ),
         ),
@@ -290,7 +290,7 @@ class _ViewToggleButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton.filledTonal(
       tooltip: context.tr(
-        view == ReceiptViewMode.list ? 'グリッド表示' : 'リスト表示',
+        view == ReceiptViewMode.list ? 'grid_view' : 'list_view',
       ),
       onPressed: onPressed,
       icon: Icon(

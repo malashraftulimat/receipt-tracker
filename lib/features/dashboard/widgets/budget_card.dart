@@ -29,7 +29,7 @@ class BudgetCard extends ConsumerWidget {
         ),
         error: (error, _) => _Shell(
           child: AppText(
-            '予算を読み込めませんでした',
+            'could_not_load_the_budget',
             style: theme.textTheme.bodySmall,
           ),
         ),
@@ -49,12 +49,12 @@ class BudgetCard extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         AppText(
-                          '今月の予算を設定',
+                          'set_this_month_s_budget',
                           style: theme.textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         AppText(
-                          '月収・貯蓄目標・固定費から、1日に使える金額を計算します',
+                          'calculate_a_daily_allowance_from_income_savi',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -64,7 +64,7 @@ class BudgetCard extends ConsumerWidget {
                   ),
                   FilledButton.tonal(
                     onPressed: () => context.push('/budget'),
-                    child: const AppText('設定'),
+                    child: const AppText('settings'),
                   ),
                 ],
               ),
@@ -78,7 +78,7 @@ class BudgetCard extends ConsumerWidget {
             BudgetStatus.unset => AppPalette.violet,
           };
           final remainingLabel = summary.periodStart == null
-              ? '今月の残り予算'
+              ? 'remaining_budget_this_month'
               : summary.periodRemainingLabel;
 
           return _Shell(

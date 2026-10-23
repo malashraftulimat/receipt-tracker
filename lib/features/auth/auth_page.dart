@@ -76,13 +76,13 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   Future<void> _resetPassword() async {
     final email = _emailController.text.trim();
     if (!email.contains('@')) {
-      setState(() => _error = 'パスワード再設定にはメールアドレスを入力してください。');
+      setState(() => _error = 'enter_your_email_address_to_reset_your_passw');
       return;
     }
     try {
       await ref.read(authRepositoryProvider).sendPasswordReset(email);
       if (!mounted) return;
-      _showMessage('パスワード再設定メールを送信しました。');
+      _showMessage('password_reset_email_sent');
     } catch (error) {
       if (mounted) {
         setState(() => _error = AuthRepository.describeError(error));
@@ -123,14 +123,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 ),
                 const SizedBox(height: 12),
                 AppText(
-                  'レシート帳',
+                  'receipt_tracker',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.headlineMedium
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
                 AppText(
-                  '紙のレシートをスキャンして、支出をかしこく管理',
+                  'scan_paper_receipts_and_manage_your_spending',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -140,11 +140,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   segments: const <ButtonSegment<_AuthMode>>[
                     ButtonSegment<_AuthMode>(
                       value: _AuthMode.signIn,
-                      label: AppText('ログイン'),
+                      label: AppText('sign_in'),
                     ),
                     ButtonSegment<_AuthMode>(
                       value: _AuthMode.signUp,
-                      label: AppText('新規登録'),
+                      label: AppText('sign_up'),
                     ),
                   ],
                   selected: <_AuthMode>{_mode},
@@ -166,17 +166,17 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           autocorrect: false,
                           autofillHints: const <String>[AutofillHints.email],
                           decoration: InputDecoration(
-                            labelText: context.tr('メールアドレス'),
+                            labelText: context.tr('email_address'),
                             prefixIcon: const Icon(Icons.mail_outline),
                           ),
                           validator: (value) {
                             final text = (value ?? '').trim();
                             if (text.isEmpty) {
-                              return context.tr('メールアドレスを入力してください');
+                              return context.tr('please_enter_your_email_address');
                             }
                             if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
                                 .hasMatch(text)) {
-                              return context.tr('メールアドレスの形式が正しくありません');
+                              return context.tr('invalid_email_address_format');
                             }
                             return null;
                           },
@@ -193,7 +193,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           ],
                           onFieldSubmitted: (_) => _submit(),
                           decoration: InputDecoration(
-                            labelText: context.tr('パスワード'),
+                            labelText: context.tr('password'),
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
                               onPressed: () =>
@@ -207,7 +207,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           ),
                           validator: (value) {
                             if ((value ?? '').length < 6) {
-                              return context.tr('パスワードは6文字以上で入力してください');
+                              return context.tr('password_must_be_at_least_6_characters');
                             }
                             return null;
                           },
@@ -254,17 +254,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : AppText(isSignUp ? 'アカウントを作成' : 'ログイン'),
+                      : AppText(isSignUp ? 'create_account' : 'sign_in'),
                 ),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: _loading ? null : _resetPassword,
-                  child: const AppText('パスワードを忘れた場合'),
+                  child: const AppText('forgot_password'),
                 ),
                 const SizedBox(height: 8),
                 AppText(
-                  'レシートデータはアカウントに紐づけて暗号化保存され、'
-                  'すべての端末で同期されます。写真は保存されません。',
+                  'receipt_data_is_stored_encrypted_with_your_a',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),

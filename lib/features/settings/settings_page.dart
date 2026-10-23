@@ -24,7 +24,7 @@ class SettingsPage extends ConsumerWidget {
       if (!context.mounted) return;
       ref.invalidate(categoriesProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: AppText('標準カテゴリを確認しました')),
+        const SnackBar(content: AppText('settings.standard_categories_ok')),
       );
     } catch (error) {
       if (!context.mounted) return;
@@ -48,7 +48,7 @@ class SettingsPage extends ConsumerWidget {
       final receipts = await ref.read(receiptRepositoryProvider).fetch(filter);
       if (receipts.isEmpty) {
         messenger
-            .showSnackBar(const SnackBar(content: AppText('対象のレシートがありません')));
+            .showSnackBar(const SnackBar(content: AppText('settings.no_receipts_for_export')));
         return;
       }
 
@@ -70,18 +70,18 @@ class SettingsPage extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const AppText('ログアウトしますか？'),
+        title: const AppText('sign_out_2'),
         content: const AppText(
-          'データは Firebase に保存されています。次回ログインで復元されます。',
+          'your_data_is_stored_in_firebase_and_will_be',
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const AppText('キャンセル'),
+            child: const AppText('cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const AppText('ログアウト'),
+            child: const AppText('sign_out'),
           ),
         ],
       ),
@@ -99,7 +99,7 @@ class SettingsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppText('設定'),
+        title: const AppText('settings'),
         actions: headerActions(
           context,
           showLanguageLabel: context.isExpanded,
@@ -114,7 +114,7 @@ class SettingsPage extends ConsumerWidget {
         ),
         children: <Widget>[
           _Card(
-            title: 'アカウント',
+            title: 'account',
             children: <Widget>[
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -126,13 +126,13 @@ class SettingsPage extends ConsumerWidget {
                     color: theme.colorScheme.primary,
                   ),
                 ),
-                title: AppText(user?.email ?? '未ログイン'),
+                title: AppText(user?.email ?? 'settings.not_signed_in'),
                 subtitle: AppText(
-                  'Firebase アカウント（レシート・明細・予算はすべての端末で同期されます）',
+                  'firebase_account_receipts_items_and_budgets',
                   style: theme.textTheme.labelSmall,
                 ),
                 trailing: IconButton(
-                  tooltip: context.tr('ユーザーIDをコピー'),
+                  tooltip: context.tr('copy_user_id'),
                   onPressed: user == null
                       ? null
                       : () async {
@@ -141,7 +141,7 @@ class SettingsPage extends ConsumerWidget {
                           );
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: AppText('ユーザーIDをコピーしました')),
+                            const SnackBar(content: AppText('settings.user_id_copied')),
                           );
                         },
                   icon: const Icon(Icons.copy_all_outlined, size: 18),
@@ -153,7 +153,7 @@ class SettingsPage extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   onPressed: () => _signOut(context, ref),
                   icon: const Icon(Icons.logout),
-                  label: const AppText('ログアウト'),
+                  label: const AppText('sign_out'),
                 ),
               ),
             ],
@@ -164,7 +164,7 @@ class SettingsPage extends ConsumerWidget {
           const _PayCycleCard(),
           const SizedBox(height: 14),
           _Card(
-            title: '表示',
+            title: 'appearance',
             children: <Widget>[
               const SizedBox(height: 4),
               SingleChildScrollView(
@@ -173,17 +173,17 @@ class SettingsPage extends ConsumerWidget {
                   segments: const <ButtonSegment<ThemeMode>>[
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.system,
-                      label: AppText('自動'),
+                      label: AppText('auto'),
                       icon: Icon(Icons.brightness_auto_outlined, size: 18),
                     ),
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.light,
-                      label: AppText('ライト'),
+                      label: AppText('light'),
                       icon: Icon(Icons.light_mode_outlined, size: 18),
                     ),
                     ButtonSegment<ThemeMode>(
                       value: ThemeMode.dark,
-                      label: AppText('ダーク'),
+                      label: AppText('dark'),
                       icon: Icon(Icons.dark_mode_outlined, size: 18),
                     ),
                   ],
@@ -198,7 +198,7 @@ class SettingsPage extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
           _Card(
-            title: context.tr('言語 / Language'),
+            title: context.tr('language'),
             children: <Widget>[
               const SizedBox(height: 4),
               SingleChildScrollView(
@@ -226,8 +226,7 @@ class SettingsPage extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               AppText(
-                'ブラウザや端末の言語を自動で判定します。'
-                'ここで選んだ言語は保存され、次回以降も優先されます。',
+                'settings.language_help',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -236,52 +235,50 @@ class SettingsPage extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
           _Card(
-            title: 'データ',
+            title: 'data',
             children: <Widget>[
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.sell_outlined),
-                title: const AppText('標準カテゴリを再作成'),
-                subtitle: const AppText('食費・外食・日用品・光熱費・交通費・娯楽など'),
+                title: const AppText('recreate_default_categories'),
+                subtitle: const AppText('food_dining_daily_goods_utilities_transport'),
                 onTap: () => _seedDefaults(context, ref),
               ),
               const Divider(height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.file_download_outlined),
-                title: const AppText('CSVエクスポート（今月）'),
-                subtitle: const AppText('Excel / Numbers で開ける UTF-8 CSV'),
+                title: const AppText('settings.export_month_csv'),
+                subtitle: const AppText('utf_8_csv_for_excel_numbers'),
                 onTap: () => _exportCsv(context, ref, currentMonthOnly: true),
               ),
               const Divider(height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.table_view_outlined),
-                title: const AppText('CSVエクスポート（全期間）'),
-                subtitle: const AppText('すべてのレシートを1ファイルにまとめます'),
+                title: const AppText('settings.export_all_csv'),
+                subtitle: const AppText('combine_all_receipts_into_one_file'),
                 onTap: () => _exportCsv(context, ref, currentMonthOnly: false),
               ),
             ],
           ),
           const SizedBox(height: 14),
           const _Card(
-            title: 'このアプリについて',
+            title: 'about_this_app',
             children: <Widget>[
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.document_scanner_outlined),
-                title: AppText('スキャンエンジン'),
+                title: AppText('scanning_engine'),
                 subtitle: AppText(
-                  '1Dバーコード: JAN-13 / EAN-8 / Code 128 / Code 39 / ITF\n'
-                  'AI抽出: Gemini Flash（共有バックエンド / 自分のキーでも利用可）\n'
-                  'フォールバックOCR: ML Kit（iOS・Android）/ Tesseract.js（Web）',
+                  'settings.scan_engine_value',
                 ),
               ),
               Divider(height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.info_outline),
-                title: AppText('バージョン'),
+                title: AppText('version'),
                 subtitle: AppText('1.0.0 (Flutter / Riverpod / Firebase)'),
               ),
             ],
@@ -308,11 +305,10 @@ class _PayCycleCard extends ConsumerWidget {
     );
 
     return _Card(
-      title: '給与の受け取り方',
+      title: 'how_you_get_paid',
       children: <Widget>[
         AppText(
-          '給与が入るタイミングを選ぶと、ダッシュボードと予算ページが'
-          '「次の支給日まであといくら使えるか」で表示されます。',
+          'settings.pay_cycle_help',
           style: labelStyle,
         ),
         const SizedBox(height: 10),
@@ -322,17 +318,17 @@ class _PayCycleCard extends ConsumerWidget {
             segments: const <ButtonSegment<PayCycle>>[
               ButtonSegment<PayCycle>(
                 value: PayCycle.daily,
-                label: AppText('日払い'),
+                label: AppText('daily'),
                 icon: Icon(Icons.today_outlined, size: 18),
               ),
               ButtonSegment<PayCycle>(
                 value: PayCycle.weekly,
-                label: AppText('週払い'),
+                label: AppText('weekly'),
                 icon: Icon(Icons.view_week_outlined, size: 18),
               ),
               ButtonSegment<PayCycle>(
                 value: PayCycle.monthly,
-                label: AppText('月払い'),
+                label: AppText('monthly'),
                 icon: Icon(Icons.calendar_month_outlined, size: 18),
               ),
             ],
@@ -347,7 +343,7 @@ class _PayCycleCard extends ConsumerWidget {
           DropdownButtonFormField<int>(
             initialValue: config.weeklyStartWeekday,
             decoration: InputDecoration(
-              labelText: context.tr('支給曜日'),
+              labelText: context.tr('payday_weekday'),
               prefixIcon: const Icon(Icons.event_repeat_outlined),
             ),
             items: <DropdownMenuItem<int>>[
@@ -367,7 +363,7 @@ class _PayCycleCard extends ConsumerWidget {
           DropdownButtonFormField<int>(
             initialValue: config.monthlyPayDay,
             decoration: InputDecoration(
-              labelText: context.tr('支給日'),
+              labelText: context.tr('payday'),
               prefixIcon: const Icon(Icons.pin_outlined),
             ),
             items: <DropdownMenuItem<int>>[
@@ -378,7 +374,7 @@ class _PayCycleCard extends ConsumerWidget {
                 ),
               const DropdownMenuItem<int>(
                 value: PayCycleConfig.endOfMonthPayDay,
-                child: AppText('月末'),
+                child: AppText('end_of_month'),
               ),
             ],
             onChanged: (value) {
@@ -402,8 +398,7 @@ class _PayCycleCard extends ConsumerWidget {
         ],
         const SizedBox(height: 2),
         AppText(
-          '貯蓄目標と固定費は月額のまま保存されます。'
-          '日払い・週払いでも金額の入力を月に換算する必要はありません。',
+          'settings.salary_monthly_help',
           style: labelStyle,
         ),
       ],
@@ -452,7 +447,7 @@ class _AiKeyCardState extends State<_AiKeyCard> {
     final key = _controller.text.trim();
     if (key.isEmpty) {
       setState(() {
-        _status = 'キーを入力してください';
+        _status = 'settings.ai_key_enter';
         _statusOk = false;
       });
       return;
@@ -463,7 +458,7 @@ class _AiKeyCardState extends State<_AiKeyCard> {
     setState(() {
       _busy = false;
       _saved = true;
-      _status = 'AIキーを保存しました（このブラウザのみ）';
+      _status = 'settings.ai_key_saved';
       _statusOk = true;
     });
   }
@@ -476,7 +471,7 @@ class _AiKeyCardState extends State<_AiKeyCard> {
       _busy = false;
       _saved = false;
       _controller.clear();
-      _status = '保存キーを削除しました。共有バックエンドを使用します。';
+      _status = 'settings.ai_key_cleared';
       _statusOk = true;
     });
   }
@@ -485,7 +480,7 @@ class _AiKeyCardState extends State<_AiKeyCard> {
     final key = _controller.text.trim();
     if (key.isEmpty) {
       setState(() {
-        _status = 'テストするキーを入力してください';
+        _status = 'settings.ai_key_test_enter';
         _statusOk = false;
       });
       return;
@@ -497,28 +492,28 @@ class _AiKeyCardState extends State<_AiKeyCard> {
       _busy = false;
       _statusOk = result.ok;
       _status =
-          result.ok ? 'キーは有効です。AI抽出を利用できます。' : _testFailureLabel(result.kind);
+          result.ok ? 'settings.ai_key_valid' : _testFailureLabel(result.kind);
     });
   }
 
   String _testFailureLabel(AiReceiptFailureKind? kind) {
     return switch (kind) {
-      AiReceiptFailureKind.configuration => '無効なキー、または権限がありません',
-      AiReceiptFailureKind.quota => '利用上限に達しています',
-      AiReceiptFailureKind.dailyLimit => '本日の利用上限に達しています',
-      AiReceiptFailureKind.unavailable => 'ネットワーク / サービスに接続できません',
-      AiReceiptFailureKind.missingKey => 'キーが入力されていません',
-      _ => 'キーを確認できませんでした',
+      AiReceiptFailureKind.configuration => 'settings.ai_status_invalid',
+      AiReceiptFailureKind.quota => 'settings.ai_status_quota',
+      AiReceiptFailureKind.dailyLimit => 'settings.ai_status_daily',
+      AiReceiptFailureKind.unavailable => 'settings.ai_status_network',
+      AiReceiptFailureKind.missingKey => 'settings.ai_status_missing',
+      _ => 'settings.ai_status_unknown',
     };
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final source = _saved ? '保存済み（localStorage）' : '未設定（共有バックエンドを使用）';
+    final source = _saved ? 'settings.ai_source_saved' : 'settings.ai_source_unset';
 
     return _Card(
-      title: 'AIキー（Gemini・任意）',
+      title: 'settings.ai_key_optional_title',
       children: <Widget>[
         AppText(
           '任意です。未設定の場合はアプリの共有バックエンド経由で AI 抽出を利用します'
@@ -539,11 +534,11 @@ class _AiKeyCardState extends State<_AiKeyCard> {
           enableSuggestions: false,
           textInputAction: TextInputAction.done,
           decoration: InputDecoration(
-            labelText: 'Gemini API キー（任意）',
-            hintText: 'Google AI Studio で作成したキー（未入力でも利用可）',
+            labelText: 'settings.ai_key_label',
+            hintText: 'settings.ai_key_hint',
             prefixIcon: const Icon(Icons.key_outlined),
             suffixIcon: IconButton(
-              tooltip: _obscure ? '表示' : '隠す',
+              tooltip: _obscure ? 'appearance' : 'settings.hide',
               onPressed: () => setState(() => _obscure = !_obscure),
               icon: Icon(
                 _obscure
@@ -561,7 +556,7 @@ class _AiKeyCardState extends State<_AiKeyCard> {
             FilledButton.icon(
               onPressed: _busy ? null : _save,
               icon: const Icon(Icons.save_outlined, size: 18),
-              label: const AppText('保存'),
+              label: const AppText('save'),
             ),
             OutlinedButton.icon(
               onPressed: _busy ? null : _test,
@@ -572,12 +567,12 @@ class _AiKeyCardState extends State<_AiKeyCard> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.network_check, size: 18),
-              label: const AppText('キーをテスト'),
+              label: const AppText('settings.test_key'),
             ),
             TextButton.icon(
               onPressed: _busy ? null : _clear,
               icon: const Icon(Icons.delete_outline, size: 18),
-              label: const AppText('クリア'),
+              label: const AppText('clear'),
             ),
           ],
         ),

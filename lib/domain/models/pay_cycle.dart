@@ -70,10 +70,10 @@ class PayCycleConfig {
 
   /// Human readable payday summary used in Settings.
   String get anchorLabel => switch (cycle) {
-        PayCycle.daily => '毎日',
-        PayCycle.weekly => '毎週',
+        PayCycle.daily => 'paycycle.every_day',
+        PayCycle.weekly => 'paycycle.every_week',
         PayCycle.monthly =>
-          monthlyPayDay >= endOfMonthPayDay ? '毎月末' : '毎月$monthlyPayDay日',
+          monthlyPayDay >= endOfMonthPayDay ? 'paycycle.every_month_end' : '毎月$monthlyPayDay日',
       };
 
   /// Number of pay periods in [month] (fractional for weekly pay).
@@ -181,9 +181,9 @@ class PayPeriod {
 
   /// '今日' / '今週' / '今月' — translated by `AppText`.
   String get label => switch (cycle) {
-        PayCycle.daily => '今日',
-        PayCycle.weekly => '今週',
-        PayCycle.monthly => '今月',
+        PayCycle.daily => 'paycycle.today',
+        PayCycle.weekly => 'paycycle.this_week',
+        PayCycle.monthly => 'paycycle.this_month',
       };
 }
 

@@ -91,15 +91,15 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       (value == null || value == 0) ? '' : formatAmountDigits(value);
 
   String _incomeLabel(PayCycle cycle) => switch (cycle) {
-        PayCycle.daily => '日収（手取り）',
-        PayCycle.weekly => '週収（手取り）',
-        PayCycle.monthly => '月収（手取り）',
+        PayCycle.daily => 'daily_income_net',
+        PayCycle.weekly => 'weekly_income_net',
+        PayCycle.monthly => 'monthly_income_net',
       };
 
   String _incomeHint(PayCycle cycle) => switch (cycle) {
-        PayCycle.daily => '例: 10,000',
-        PayCycle.weekly => '例: 50,000',
-        PayCycle.monthly => '例: 250,000',
+        PayCycle.daily => 'e_g_10_000',
+        PayCycle.weekly => 'e_g_50_000',
+        PayCycle.monthly => 'e_g_250_000',
       };
 
   void _changeMonth(int delta) {
@@ -139,7 +139,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       ref.invalidate(budgetProvider(_month));
       ref.invalidate(budgetSummaryProvider(_month));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: AppText('予算を保存しました')),
+        const SnackBar(content: AppText('budget_saved')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -163,7 +163,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppText('予算と貯蓄'),
+        title: const AppText('budget_and_savings'),
         actions: headerActions(
           context,
           showLanguageLabel: context.isExpanded,
@@ -192,7 +192,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   AppText(
-                    config.isMonthly ? '毎月のプラン' : '給与プラン',
+                    config.isMonthly ? 'monthly_plan' : 'pay_plan',
                     style: theme.textTheme.labelLarge
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
@@ -207,7 +207,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: AppText(
-                          '給与サイクルは設定から変更できます。',
+                          'you_can_change_the_salary_cycle_in_settings',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -243,20 +243,20 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                   const SizedBox(height: 12),
                   _MoneyField(
                     controller: _savings,
-                    label: '貯蓄目標',
-                    hint: '例: 30,000',
+                    label: 'savings_goal',
+                    hint: 'e_g_30_000',
                     icon: Icons.savings_outlined,
                   ),
                   const SizedBox(height: 12),
                   _MoneyField(
                     controller: _fixed,
-                    label: '固定費（家賃・光熱費・サブスク）',
-                    hint: '例: 80,000',
+                    label: 'fixed_expenses_rent_utilities_subscriptions',
+                    hint: 'e_g_80_000',
                     icon: Icons.home_outlined,
                   ),
                   const SizedBox(height: 6),
                   AppText(
-                    '貯蓄目標と固定費は月額で入力してください。',
+                    'enter_the_savings_goal_and_fixed_costs_as_mo',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -281,7 +281,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.check),
-                    label: const AppText('プランを保存'),
+                    label: const AppText('save_plan'),
                   ),
                 ],
               ),
@@ -307,9 +307,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: AppText(
-              '自由に使える金額 = 収入 − 貯蓄目標 − 固定費。\n'
-              'レシートを登録すると、その月の残り予算から自動で差し引かれます。\n'
-              '「1日あたり」は、給与サイクルの残り予算 ÷ 次の支給日までの日数です。',
+              'budget.help',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.6,
@@ -339,7 +337,7 @@ class _MonthSelector extends StatelessWidget {
     return Row(
       children: <Widget>[
         IconButton(
-          tooltip: context.tr('前の月'),
+          tooltip: context.tr('previous_month'),
           onPressed: onPrevious,
           icon: const Icon(Icons.chevron_left),
         ),
@@ -352,7 +350,7 @@ class _MonthSelector extends StatelessWidget {
           ),
         ),
         IconButton(
-          tooltip: context.tr('次の月'),
+          tooltip: context.tr('next_month'),
           onPressed: onNext,
           icon: const Icon(Icons.chevron_right),
         ),
@@ -420,7 +418,7 @@ class _SummaryCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: _cardDecoration(context),
         child: AppText(
-          'この月のプランは未設定です。上のフォームに月収を入力してください。',
+          'no_plan_for_this_month_enter_your_income_in',
           style: theme.textTheme.bodySmall,
         ),
       );
@@ -440,11 +438,11 @@ class _SummaryCard extends StatelessWidget {
         !(data.periodStart!.isAtSameMomentAs(monthStart) &&
             data.periodEnd!.isAtSameMomentAs(monthEnd));
     final periodLabel = !activePeriod
-        ? '今月の状況'
+        ? 'this_month_s_status'
         : switch (data.payCycle) {
-            PayCycle.daily => '今日の状況',
-            PayCycle.weekly => '今週の状況',
-            PayCycle.monthly => '今月の状況',
+            PayCycle.daily => 'today_s_status',
+            PayCycle.weekly => 'this_week_s_status',
+            PayCycle.monthly => 'this_month_s_status',
           };
 
     return Container(
@@ -490,9 +488,9 @@ class _SummaryCard extends StatelessWidget {
           ),
           AppText(
             data.periodRemaining < 0
-                ? '予算オーバー額'
+                ? 'over_budget'
                 : (!activePeriod
-                    ? '今月の残り予算'
+                    ? 'remaining_budget_this_month'
                     : data.periodRemainingLabel),
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -522,19 +520,19 @@ class _SummaryCard extends StatelessWidget {
             children: <Widget>[
               Expanded(
                 child: _Metric(
-                  label: '1日あたり',
+                  label: 'per_day',
                   value: formatYen(data.dailyAllowance),
                 ),
               ),
               Expanded(
                 child: _Metric(
-                  label: '今日の支出',
+                  label: 'today_s_spending',
                   value: formatYen(data.todaySpent),
                 ),
               ),
               Expanded(
                 child: _Metric(
-                  label: '貯蓄ペース',
+                  label: 'savings_pace',
                   value: '${(data.savingsProgress * 100).round()}%',
                 ),
               ),

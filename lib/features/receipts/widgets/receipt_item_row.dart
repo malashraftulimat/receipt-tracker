@@ -20,7 +20,7 @@ class ReceiptItemRow extends StatelessWidget {
     final subtitle = <String>[
       '${item.quantity} × ${formatMoney(item.effectiveUnitPrice, currency: currency)}',
       if (item.taxRate != null) '${item.taxRate}%',
-    ].join(' ・ ');
+    ].join('coupon.separator');
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),

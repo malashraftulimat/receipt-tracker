@@ -42,19 +42,19 @@ class DashboardPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppText('レシート帳'),
+        title: const AppText('receipt_tracker'),
         actions: headerActions(
           context,
           showLanguageLabel: expanded,
           actions: <Widget>[
             IconButton(
-              tooltip: context.tr('支払いを追加'),
+              tooltip: context.tr('add_payment'),
               onPressed: () => context.push('/payment/new'),
               icon: const Icon(Icons.add_card_outlined),
             ),
             if (!expanded)
               IconButton(
-                tooltip: context.tr('集計'),
+                tooltip: context.tr('analytics'),
                 onPressed: () => _showAnalyticsSheet(context),
                 icon: const Icon(Icons.insights_outlined),
               ),
@@ -67,7 +67,7 @@ class DashboardPage extends ConsumerWidget {
           backgroundColor: AppPalette.cyan,
           foregroundColor: AppPalette.backgroundDeep,
           icon: const Icon(Icons.document_scanner_outlined),
-          label: const AppText('スキャン'),
+          label: const AppText('scan'),
         ),
       ),
       body: SafeArea(

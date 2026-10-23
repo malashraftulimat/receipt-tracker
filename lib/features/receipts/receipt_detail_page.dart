@@ -29,7 +29,7 @@ class ReceiptDetailPage extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const AppText('このレシートを削除しますか？'),
+        title: const AppText('delete_this_receipt'),
         content: AppText(
           '${receipt.displayMerchant}（${formatMoney(receipt.totalAmount, currency: receipt.currency)}）を削除します。'
           'この操作は取り消せません。',
@@ -37,11 +37,11 @@ class ReceiptDetailPage extends ConsumerWidget {
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const AppText('キャンセル'),
+            child: const AppText('cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const AppText('削除'),
+            child: const AppText('a11y.delete'),
           ),
         ],
       ),
@@ -55,7 +55,7 @@ class ReceiptDetailPage extends ConsumerWidget {
       ref.invalidate(analyticsProvider);
       ref.invalidate(receiptByIdProvider(receipt.id));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: AppText('削除しました')),
+        const SnackBar(content: AppText('deleted')),
       );
       if (context.canPop()) context.pop();
     } catch (error) {
@@ -72,7 +72,7 @@ class ReceiptDetailPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppText('レシート詳細'),
+        title: const AppText('receipt_details'),
         actions: headerActions(
           context,
           showLanguageLabel: context.isExpanded,
@@ -94,7 +94,7 @@ class ReceiptDetailPage extends ConsumerWidget {
                     value: 'edit',
                     child: ListTile(
                       leading: Icon(Icons.edit_outlined),
-                      title: AppText('編集'),
+                      title: AppText('edit'),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -102,7 +102,7 @@ class ReceiptDetailPage extends ConsumerWidget {
                     value: 'delete',
                     child: ListTile(
                       leading: Icon(Icons.delete_outline),
-                      title: AppText('削除'),
+                      title: AppText('a11y.delete'),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -128,7 +128,7 @@ class ReceiptDetailPage extends ConsumerWidget {
                 OutlinedButton(
                   onPressed: () =>
                       ref.invalidate(receiptByIdProvider(receiptId)),
-                  child: const AppText('再試行'),
+                  child: const AppText('retry'),
                 ),
               ],
             ),
@@ -259,20 +259,20 @@ class _DetailBody extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               _InfoCard(
-                title: '金額の内訳',
+                title: 'amount_breakdown',
                 children: <Widget>[
                   _InfoRow(
-                    label: '通貨',
+                    label: 'csv.currency',
                     value: receipt.currency,
                   ),
                   _InfoRow(
-                    label: '合計（税込）',
+                    label: 'total_tax_included',
                     value: money(receipt.totalAmount),
                     emphasized: true,
                   ),
                   if (receipt.subtotalAmount != null)
                     _InfoRow(
-                      label: '小計（税抜）',
+                      label: 'subtotal_tax_excluded',
                       value: money(receipt.subtotalAmount!),
                     ),
                   if (receipt.tax8Amount != null)
@@ -289,17 +289,17 @@ class _DetailBody extends StatelessWidget {
                     ),
                   if (receipt.hasTaxBreakdown)
                     _InfoRow(
-                      label: '消費税合計',
+                      label: 'total_consumption_tax',
                       value: money(receipt.taxTotal),
                     ),
                   if (receipt.tax8ItemsTotal != null)
                     _InfoRow(
-                      label: '8%対象商品の合計（推定）',
+                      label: '8_taxable_subtotal_estimated',
                       value: money(receipt.tax8ItemsTotal!),
                     ),
                   if (receipt.tax10ItemsTotal != null)
                     _InfoRow(
-                      label: '10%対象商品の合計（推定）',
+                      label: '10_taxable_subtotal_estimated',
                       value: money(receipt.tax10ItemsTotal!),
                     ),
                 ],
@@ -307,7 +307,7 @@ class _DetailBody extends StatelessWidget {
               if (receipt.items.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 14),
                 _InfoCard(
-                  title: '明細（商品）',
+                  title: 'items',
                   children: <Widget>[
                     for (final item in receipt.items)
                       ReceiptItemRow(
@@ -320,7 +320,7 @@ class _DetailBody extends StatelessWidget {
               if (receipt.dueDate != null) ...<Widget>[
                 const SizedBox(height: 14),
                 _InfoCard(
-                  title: '支払期限',
+                  title: 'due_date',
                   children: <Widget>[
                     _DueDateRow(dueDate: receipt.dueDate!),
                     if (receipt.reminderAt != null)
@@ -339,10 +339,10 @@ class _DetailBody extends StatelessWidget {
               if (receipt.pointAmount != null) ...<Widget>[
                 const SizedBox(height: 14),
                 _InfoCard(
-                  title: 'ポイント',
+                  title: 'points_2',
                   children: <Widget>[
                     _InfoRow(
-                      label: receipt.pointBrand ?? 'ポイント',
+                      label: receipt.pointBrand ?? 'points_2',
                       value: '${receipt.pointAmount} pt',
                       emphasized: true,
                     ),
@@ -352,7 +352,7 @@ class _DetailBody extends StatelessWidget {
               if (receipt.barcodeId != null) ...<Widget>[
                 const SizedBox(height: 14),
                 _InfoCard(
-                  title: 'バーコード / 請求番号',
+                  title: 'barcode_invoice_number',
                   children: <Widget>[
                     Row(
                       children: <Widget>[
@@ -366,14 +366,14 @@ class _DetailBody extends StatelessWidget {
                           ),
                         ),
                         IconButton(
-                          tooltip: context.tr('コピー'),
+                          tooltip: context.tr('copy'),
                           onPressed: () async {
                             await Clipboard.setData(
                               ClipboardData(text: receipt.barcodeId!),
                             );
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: AppText('コピーしました')),
+                              const SnackBar(content: AppText('copied')),
                             );
                           },
                           icon: const Icon(Icons.copy_all_outlined, size: 18),
@@ -383,7 +383,7 @@ class _DetailBody extends StatelessWidget {
                     if (BarcodeUtils.looksLikeJan(receipt.barcodeId!) &&
                         !BarcodeUtils.isValidEan13(receipt.barcodeId!))
                       AppText(
-                        'JAN-13 のチェックディジットが一致しません。読み取り値を確認してください。',
+                        'jan_13_check_digit_does_not_match_please_ver',
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: theme.colorScheme.error),
                       ),
@@ -393,7 +393,7 @@ class _DetailBody extends StatelessWidget {
               if ((receipt.note ?? '').trim().isNotEmpty) ...<Widget>[
                 const SizedBox(height: 14),
                 _InfoCard(
-                  title: 'メモ',
+                  title: 'note',
                   children: <Widget>[
                     AppText(
                       receipt.note!.trim(),
@@ -405,13 +405,13 @@ class _DetailBody extends StatelessWidget {
               if ((receipt.rawOcrText ?? '').trim().isNotEmpty) ...<Widget>[
                 const SizedBox(height: 14),
                 _InfoCard(
-                  title: 'OCRテキスト',
+                  title: 'ocr_text',
                   children: <Widget>[
                     ExpansionTile(
                       tilePadding: EdgeInsets.zero,
                       childrenPadding: EdgeInsets.zero,
                       title: AppText(
-                        '原本を表示',
+                        'show_original',
                         style: theme.textTheme.bodySmall,
                       ),
                       children: <Widget>[
@@ -472,7 +472,7 @@ class _DueDateRow extends StatelessWidget {
       label = '${-days} 日過ぎています';
     } else if (days == 0) {
       color = AppPalette.danger;
-      label = '今日が期限です';
+      label = 'due_today';
     } else if (days <= 3) {
       color = AppPalette.amber;
       label = 'あと$days日';

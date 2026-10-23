@@ -76,7 +76,7 @@ class _ReceiptTrackerAppState extends ConsumerState<ReceiptTrackerApp>
       locale: language.locale,
       supportedLocales: kSupportedAppLocales,
       localizationsDelegates: delegates,
-      onGenerateTitle: (context) => context.tr('レシート帳'),
+      onGenerateTitle: (context) => context.tr('receipt_tracker'),
     );
   }
 }

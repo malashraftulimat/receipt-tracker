@@ -40,7 +40,7 @@ class DueRemindersCard extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 AppText(
-                  '支払期限が近いもの',
+                  'upcoming_due_dates',
                   style: theme.textTheme.labelLarge
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
@@ -102,7 +102,7 @@ class _DueRow extends StatelessWidget {
     final label = days < 0
         ? '${-days}日超過'
         : days == 0
-            ? '今日'
+            ? 'paycycle.today'
             : 'あと$days日';
 
     return InkWell(

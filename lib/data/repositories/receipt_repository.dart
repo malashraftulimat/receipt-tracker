@@ -92,7 +92,7 @@ class ReceiptRepository {
 
   Future<Receipt> getById(String id) async {
     final doc = await _receipts.doc(id).get();
-    if (!doc.exists) throw StateError('レシートが見つかりません');
+    if (!doc.exists) throw StateError('error.receipt_not_found');
     return _fromDoc(doc, await _categoryMap());
   }
 

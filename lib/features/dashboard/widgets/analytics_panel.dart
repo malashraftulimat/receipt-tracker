@@ -24,7 +24,7 @@ class AnalyticsPanel extends ConsumerWidget {
         child: Center(child: CircularProgressIndicator()),
       ),
       error: (error, _) => _ChartCard(
-        title: '集計',
+        title: 'analytics',
         child: AppText(
           '集計を読み込めませんでした\n$error',
           style: theme.textTheme.bodySmall,
@@ -35,7 +35,7 @@ class AnalyticsPanel extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             AppText(
-              '支出の集計',
+              'spending_analytics',
               style: theme.textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
@@ -45,20 +45,20 @@ class AnalyticsPanel extends ConsumerWidget {
               runSpacing: 10,
               children: <Widget>[
                 _Metric(
-                  label: '今月の支出',
+                  label: 'this_month_s_spending',
                   value: formatYen(data.monthTotal),
                   emphasized: true,
                 ),
-                _Metric(label: '件数', value: '${data.monthCount}件'),
-                _Metric(label: '平均', value: formatYen(data.average)),
+                _Metric(label: 'count', value: '${data.monthCount}件'),
+                _Metric(label: 'average', value: formatYen(data.average)),
                 _Metric(
-                    label: '6か月合計',
+                    label: '6_month_total',
                     value: formatCompactYen(data.sixMonthTotal)),
               ],
             ),
             const SizedBox(height: 14),
             _ChartCard(
-              title: '直近6か月の推移',
+              title: 'last_6_months',
               child: SizedBox(
                 height: 168,
                 child: _MonthlyBarChart(data: data),
@@ -66,28 +66,28 @@ class AnalyticsPanel extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             _ChartCard(
-              title: 'カテゴリ別（今月）',
+              title: 'by_category_this_month',
               child: data.slices.isEmpty
-                  ? const _EmptyChart(message: '今月のデータがありません')
+                  ? const _EmptyChart(message: 'no_data_for_this_month')
                   : _CategoryBreakdown(data: data),
             ),
             const SizedBox(height: 14),
             _ChartCard(
-              title: '支払い方法別（今月）',
+              title: 'by_payment_method_this_month',
               child: data.paymentMethods.isEmpty
-                  ? const _EmptyChart(message: '今月のデータがありません')
+                  ? const _EmptyChart(message: 'no_data_for_this_month')
                   : _PaymentMethodBreakdown(data: data),
             ),
             const SizedBox(height: 14),
             _ChartCard(
-              title: '前月比（累計支出）',
+              title: 'vs_last_month_cumulative',
               child: _MonthComparison(data: data),
             ),
             const SizedBox(height: 14),
             _ChartCard(
-              title: 'よく使う店舗',
+              title: 'frequent_stores',
               child: data.topMerchants.isEmpty
-                  ? const _EmptyChart(message: 'データがありません')
+                  ? const _EmptyChart(message: 'no_data')
                   : Column(
                       children: <Widget>[
                         for (final merchant in data.topMerchants)
@@ -500,7 +500,7 @@ class _MonthComparison extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (data.currentDaily.isEmpty) {
-      return const _EmptyChart(message: 'データがありません');
+      return const _EmptyChart(message: 'no_data');
     }
 
     final maxValue = math.max(
@@ -525,7 +525,7 @@ class _MonthComparison extends StatelessWidget {
             Expanded(
               child: AppText(
                 data.previousMonthTotal == 0
-                    ? '先月のデータがありません'
+                    ? 'no_data_for_last_month'
                     : '先月より ${formatYen(data.momDelta.abs())} '
                         '${increased ? '多い' : '少ない'}',
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -603,11 +603,11 @@ class _MonthComparison extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           children: <Widget>[
-            const _LegendDot(color: AppPalette.cyan, label: '今月'),
+            const _LegendDot(color: AppPalette.cyan, label: 'paycycle.this_month'),
             const SizedBox(width: 14),
             const _LegendDot(
               color: AppPalette.violet,
-              label: '先月',
+              label: 'last_month',
             ),
             const Spacer(),
             AppText(

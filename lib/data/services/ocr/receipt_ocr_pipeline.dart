@@ -71,7 +71,7 @@ class ReceiptOcrPipeline {
       aiError = error is AiReceiptOcrException
           ? error
           : AiReceiptOcrException(
-              'AIで読み取れませんでした。',
+              'parse.ai_failed',
               cause: error,
               diagnostics: redactSensitiveText(error.toString()),
             );
@@ -91,8 +91,7 @@ class ReceiptOcrPipeline {
       );
     } catch (fallbackError) {
       throw ReceiptScanException(
-        'AIと端末内OCRの両方で読み取れませんでした。'
-        '通信環境を確認するか、手入力で登録してください。',
+        'neither_ai_nor_on_device_ocr_could_read_the',
         aiError: aiError,
         fallbackError: fallbackError,
       );

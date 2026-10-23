@@ -6,23 +6,23 @@ import 'package:flutter/material.dart';
 /// never corrupts existing documents. [label] is the Japanese source string
 /// that `AppText` translates into English / Arabic.
 enum PaymentMethod {
-  cash('cash', '現金', Icons.payments_outlined),
-  creditCard('credit_card', 'クレジットカード', Icons.credit_card),
-  debitCard('debit_card', 'デビットカード', Icons.credit_score_outlined),
-  bankTransfer('bank_transfer', '銀行振込', Icons.account_balance_outlined),
+  cash('cash', 'cash', Icons.payments_outlined),
+  creditCard('credit_card', 'credit_card', Icons.credit_card),
+  debitCard('debit_card', 'debit_card', Icons.credit_score_outlined),
+  bankTransfer('bank_transfer', 'bank_transfer', Icons.account_balance_outlined),
   directDebit(
     'direct_debit',
-    '口座振替・公共料金',
+    'direct_debit_utility_bills',
     Icons.receipt_long_outlined,
   ),
-  qrEmoney('qr_emoney', 'QR・電子マネー', Icons.qr_code_2),
-  icCard('ic_card', 'ICカード（Suica / PASMO）', Icons.contactless_outlined),
+  qrEmoney('qr_emoney', 'qr_e_money', Icons.qr_code_2),
+  icCard('ic_card', 'ic_card_suica_pasmo', Icons.contactless_outlined),
   convenienceStore(
     'convenience_store',
-    'コンビニ払い',
+    'convenience_store_payment',
     Icons.storefront_outlined,
   ),
-  other('other', 'その他', Icons.more_horiz);
+  other('other', 'other', Icons.more_horiz);
 
   const PaymentMethod(this.wireName, this.label, this.icon);
 
@@ -35,7 +35,7 @@ enum PaymentMethod {
   final IconData icon;
 
   /// Label for a possibly unset method ('未設定' / 'Not set').
-  static String labelOf(PaymentMethod? method) => method?.label ?? '未設定';
+  static String labelOf(PaymentMethod? method) => method?.label ?? 'not_set';
 
   /// Parses a stored / legacy value ('credit_card', 'creditCard', ...).
   static PaymentMethod? tryParse(Object? value) {

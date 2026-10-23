@@ -47,7 +47,7 @@ class AppShell extends StatelessWidget {
                 child: PressScale(
                   child: FloatingActionButton(
                     heroTag: 'scan-rail',
-                    tooltip: context.tr('レシートをスキャン'),
+                    tooltip: context.tr('scan_a_receipt'),
                     backgroundColor: AppPalette.cyan,
                     foregroundColor: AppPalette.backgroundDeep,
                     onPressed: () => context.push('/scan'),
@@ -59,22 +59,22 @@ class AppShell extends StatelessWidget {
                 NavigationRailDestination(
                   icon: Icon(Icons.space_dashboard_outlined),
                   selectedIcon: Icon(Icons.space_dashboard),
-                  label: AppText('ホーム'),
+                  label: AppText('home'),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.confirmation_number_outlined),
                   selectedIcon: Icon(Icons.confirmation_number),
-                  label: AppText('クーポン'),
+                  label: AppText('coupon.title'),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.sell_outlined),
                   selectedIcon: Icon(Icons.sell),
-                  label: AppText('カテゴリ'),
+                  label: AppText('categories'),
                 ),
                 NavigationRailDestination(
                   icon: Icon(Icons.settings_outlined),
                   selectedIcon: Icon(Icons.settings),
-                  label: AppText('設定'),
+                  label: AppText('settings'),
                 ),
               ],
             ),
@@ -94,22 +94,22 @@ class AppShell extends StatelessWidget {
           NavigationDestination(
             icon: const Icon(Icons.space_dashboard_outlined),
             selectedIcon: const Icon(Icons.space_dashboard),
-            label: context.tr('ホーム'),
+            label: context.tr('home'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.confirmation_number_outlined),
             selectedIcon: const Icon(Icons.confirmation_number),
-            label: context.tr('クーポン'),
+            label: context.tr('coupon.title'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.sell_outlined),
             selectedIcon: const Icon(Icons.sell),
-            label: context.tr('カテゴリ'),
+            label: context.tr('categories'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.settings_outlined),
             selectedIcon: const Icon(Icons.settings),
-            label: context.tr('設定'),
+            label: context.tr('settings'),
           ),
         ],
       ),

@@ -209,9 +209,9 @@ class BudgetSummary {
 
   /// '今日の残り予算' / '今週の残り予算' / '今月の残り予算'.
   String get periodRemainingLabel => switch (payCycle) {
-        PayCycle.daily => '今日の残り予算',
-        PayCycle.weekly => '今週の残り予算',
-        PayCycle.monthly => '今月の残り予算',
+        PayCycle.daily => 'remaining_budget_today',
+        PayCycle.weekly => 'remaining_budget_this_week',
+        PayCycle.monthly => 'remaining_budget_this_month',
       };
 
   BudgetStatus get periodStatus {
@@ -272,13 +272,13 @@ class BudgetSummary {
   static String _labelFor(BudgetStatus status) {
     switch (status) {
       case BudgetStatus.unset:
-        return '予算未設定';
+        return 'budget_not_set';
       case BudgetStatus.onTrack:
-        return '順調';
+        return 'on_track';
       case BudgetStatus.warning:
-        return 'ペース注意';
+        return 'watch_spending_pace';
       case BudgetStatus.overBudget:
-        return '予算オーバー';
+        return 'over_budget_2';
     }
   }
 }

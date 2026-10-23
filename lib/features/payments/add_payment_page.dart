@@ -61,9 +61,9 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
       initialDate: _date,
       firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 1, 12, 31),
-      helpText: context.tr('日付を選択'),
-      confirmText: context.tr('決定'),
-      cancelText: context.tr('キャンセル'),
+      helpText: context.tr('select_date'),
+      confirmText: context.tr('ok'),
+      cancelText: context.tr('cancel'),
       locale: Localizations.localeOf(context),
     );
     if (picked != null) setState(() => _date = picked);
@@ -110,7 +110,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: AppText('支払いを保存しました')),
+        const SnackBar(content: AppText('record.payment_saved')),
       );
       if (context.canPop()) context.pop(saved);
     } catch (error) {
@@ -130,7 +130,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppText('支払いを追加'),
+        title: const AppText('add_payment'),
         actions: headerActions(
           context,
           showLanguageLabel: context.isExpanded,
@@ -148,8 +148,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
             ),
             children: <Widget>[
               AppText(
-                'レシートがない支払い（家賃・振込・貸付など）を記録します。'
-                '保存すると、ダッシュボード・予算・集計に自動で反映されます。',
+                'payments.no_receipt_help',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   height: 1.5,
@@ -178,20 +177,20 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                       style: theme.textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w700),
                       decoration: InputDecoration(
-                        labelText: context.tr('金額'),
+                        labelText: context.tr('amount'),
                         prefixText: '¥ ',
                         prefixIcon: const Icon(Icons.payments_outlined),
                       ),
                       validator: (value) {
                         if ((value ?? '').trim().isEmpty) {
-                          return context.tr('金額を入力してください');
+                          return context.tr('currency.amount_required');
                         }
                         final amount = parseAmountInput(value!);
                         if (amount == null) {
-                          return context.tr('数字で入力してください');
+                          return context.tr('please_enter_a_number');
                         }
                         if (amount <= 0) {
-                          return context.tr('0より大きい金額を入力してください');
+                          return context.tr('enter_an_amount_greater_than_0');
                         }
                         return null;
                       },
@@ -211,7 +210,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                     ),
                     const SizedBox(height: 16),
                     AppText(
-                      'カテゴリ',
+                      'categories',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -222,7 +221,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                       runSpacing: 8,
                       children: <Widget>[
                         ChoiceChip(
-                          label: const AppText('未分類'),
+                          label: const AppText('uncategorised'),
                           selected: _categoryId == null,
                           onSelected: (_) =>
                               setState(() => _categoryId = null),
@@ -263,7 +262,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                       initialValue: _method,
                       isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: context.tr('支払い方法（必須）'),
+                        labelText: context.tr('payment_method_required'),
                         prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                       ),
                       items: <DropdownMenuItem<PaymentMethod>>[
@@ -290,7 +289,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                       ],
                       onChanged: (value) => setState(() => _method = value),
                       validator: (value) => value == null
-                          ? context.tr('支払い方法を選択してください')
+                          ? context.tr('please_choose_a_payment_method')
                           : null,
                     ),
                     const SizedBox(height: 12),
@@ -300,8 +299,8 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                       maxLines: 4,
                       textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
-                        labelText: context.tr('メモ（内容）'),
-                        hintText: context.tr('例: 家賃、友人への貸付'),
+                        labelText: context.tr('note_what_it_was_for'),
+                        hintText: context.tr('e_g_rent_money_lent_to_a_friend'),
                         prefixIcon: const Icon(Icons.notes_outlined),
                       ),
                     ),
@@ -345,7 +344,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.check),
-              label: const AppText('保存する'),
+              label: const AppText('save_2'),
             ),
           ),
         ),

@@ -23,7 +23,7 @@ class TesseractOcrService implements OcrService {
     final global = _tesseractGlobal;
     if (global == null || global.isUndefinedOrNull) {
       throw const OcrException(
-        'ブラウザOCRエンジンを読み込めませんでした。通信環境を確認して再試行してください。',
+        'ocr.browser_engine_failed',
       );
     }
 
@@ -38,7 +38,7 @@ class TesseractOcrService implements OcrService {
       final text = result.data.text;
       if (text.trim().isEmpty) {
         throw const OcrException(
-          '文字を認識できませんでした。明るい場所で、レシート全体が入るように撮影してください。',
+          'ocr.browser_no_text',
         );
       }
 
@@ -74,7 +74,7 @@ class TesseractOcrService implements OcrService {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       throw const OcrException(
-        'ブラウザOCRエンジンを読み込めませんでした。通信環境を確認して再試行してください。',
+        'ocr.browser_engine_failed',
       );
     }
 
@@ -94,7 +94,7 @@ class TesseractOcrService implements OcrService {
       if (!completer.isCompleted) {
         completer.completeError(
           const OcrException(
-            'ブラウザOCRエンジンを読み込めませんでした。通信環境を確認して再試行してください。',
+            'ocr.browser_engine_failed',
           ),
         );
       }

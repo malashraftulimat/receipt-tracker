@@ -11,7 +11,7 @@ void main() {
       expect(period.start, DateTime(2026, 10, 1));
       expect(period.end, DateTime(2026, 11, 1));
       expect(period.days, 31);
-      expect(period.label, '今月');
+      expect(period.label, 'paycycle.this_month');
       expect(period.contains(DateTime(2026, 10, 31, 23, 59)), isTrue);
       expect(period.contains(DateTime(2026, 11, 1)), isFalse);
       expect(period.daysElapsedOn(DateTime(2026, 10, 21)), 21);
@@ -63,7 +63,7 @@ void main() {
       expect(period.contains(date), isTrue);
       expect(period.start.isAfter(date), isFalse);
       expect(period.end.isAfter(date), isTrue);
-      expect(period.label, '今週');
+      expect(period.label, 'paycycle.this_week');
 
       // Every day of the week maps to the same period.
       for (var i = 0; i < period.days; i++) {
@@ -82,7 +82,7 @@ void main() {
       expect(period.start, DateTime(2026, 10, 21));
       expect(period.end, DateTime(2026, 10, 22));
       expect(period.days, 1);
-      expect(period.label, '今日');
+      expect(period.label, 'paycycle.today');
       expect(period.contains(DateTime(2026, 10, 21, 23, 59)), isTrue);
       expect(period.contains(DateTime(2026, 10, 22)), isFalse);
       expect(period.daysElapsedOn(DateTime(2026, 10, 21, 23)), 1);
@@ -198,7 +198,7 @@ void main() {
       expect(summary.dailyAllowance, 11000);
       expect(summary.periodProgress, closeTo(15000 / 70000, 1e-9));
       expect(summary.periodStatus, BudgetStatus.onTrack);
-      expect(summary.periodRemainingLabel, '今週の残り予算');
+      expect(summary.periodRemainingLabel, 'remaining_budget_this_week');
 
       // Calendar-month view is untouched.
       expect(summary.remaining, 160000);

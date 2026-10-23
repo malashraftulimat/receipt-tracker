@@ -68,18 +68,18 @@ class _SummaryStrip extends StatelessWidget {
       decoration: AppPalette.card(context, accent: AppPalette.cyan),
       child: Row(
         children: <Widget>[
-          _SummaryValue(label: '件数', value: '${receipts.length}件'),
+          _SummaryValue(label: 'count', value: '${receipts.length}件'),
           const SizedBox(width: 20),
           _SummaryValue(
-            label: '合計',
+            label: 'total',
             value: formatYen(total),
             accent: AppPalette.emerald,
           ),
           const SizedBox(width: 20),
-          _SummaryValue(label: '平均', value: formatYen(average)),
+          _SummaryValue(label: 'average', value: formatYen(average)),
           const Spacer(),
           IconButton(
-            tooltip: context.tr('最新の状態に更新'),
+            tooltip: context.tr('refresh'),
             visualDensity: VisualDensity.compact,
             onPressed: onRefresh,
             icon: const Icon(
@@ -350,14 +350,13 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             AppText(
-              'レシートがまだありません',
+              'no_receipts_yet',
               style: theme.textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             AppText(
-              'カメラでバーコードとレシート文字を同時に読み取り、\n'
-              '店舗名・日付・合計・消費税を自動入力します。',
+              'read_barcodes_and_receipt_text_with_the_came',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -371,7 +370,7 @@ class _EmptyState extends StatelessWidget {
                   foregroundColor: AppPalette.backgroundDeep,
                 ),
                 icon: const Icon(Icons.document_scanner_outlined),
-                label: const AppText('スキャンする'),
+                label: const AppText('scan_2'),
               ),
             ),
           ],
@@ -399,7 +398,7 @@ class _ErrorState extends StatelessWidget {
             Icon(Icons.cloud_off, size: 44, color: theme.colorScheme.error),
             const SizedBox(height: 12),
             AppText(
-              'データを読み込めませんでした',
+              'could_not_load_data',
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
@@ -413,7 +412,7 @@ class _ErrorState extends StatelessWidget {
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: onRetry, child: const AppText('再試行')),
+            OutlinedButton(onPressed: onRetry, child: const AppText('retry')),
           ],
         ),
       ),

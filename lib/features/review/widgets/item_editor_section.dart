@@ -125,7 +125,7 @@ class ItemEditorSection extends StatelessWidget {
           Row(
             children: <Widget>[
               AppText(
-                '明細（商品）',
+                'items',
                 style: theme.textTheme.labelLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
@@ -155,7 +155,7 @@ class ItemEditorSection extends StatelessWidget {
             child: TextButton.icon(
               onPressed: onAdd,
               icon: const Icon(Icons.add, size: 18),
-              label: const AppText('明細を追加'),
+              label: const AppText('add_item'),
             ),
           ),
           const Divider(height: 18),
@@ -213,14 +213,14 @@ class _ItemCard extends StatelessWidget {
                   onChanged: (_) => onChanged(),
                   textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
-                    labelText: context.tr('商品名'),
+                    labelText: context.tr('item_name'),
                     isDense: true,
                     border: const OutlineInputBorder(),
                   ),
                 ),
               ),
               IconButton(
-                tooltip: context.tr('削除'),
+                tooltip: context.tr('a11y.delete'),
                 onPressed: onRemove,
                 icon: Icon(
                   Icons.delete_outline,
@@ -238,7 +238,7 @@ class _ItemCard extends StatelessWidget {
                 width: 64,
                 child: _NumberField(
                   controller: editor.quantity,
-                  label: '数量',
+                  label: 'quantity',
                   onChanged: onChanged,
                 ),
               ),
@@ -246,7 +246,7 @@ class _ItemCard extends StatelessWidget {
               Expanded(
                 child: _NumberField(
                   controller: editor.unitPrice,
-                  label: '単価',
+                  label: 'unit_price',
                   currency: currency,
                   signed: true,
                   onChanged: onChanged,
@@ -256,7 +256,7 @@ class _ItemCard extends StatelessWidget {
               Expanded(
                 child: _NumberField(
                   controller: editor.totalPrice,
-                  label: '金額',
+                  label: 'amount',
                   currency: currency,
                   signed: true,
                   onChanged: onChanged,
@@ -287,11 +287,11 @@ class _ItemCard extends StatelessWidget {
                   isDense: true,
                   style: theme.textTheme.labelSmall
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  hint: const AppText('カテゴリ自動', style: TextStyle(fontSize: 11)),
+                  hint: const AppText('auto_category', style: TextStyle(fontSize: 11)),
                   items: <DropdownMenuItem<String?>>[
                     const DropdownMenuItem<String?>(
                       value: null,
-                      child: AppText('未分類', style: TextStyle(fontSize: 11)),
+                      child: AppText('uncategorised', style: TextStyle(fontSize: 11)),
                     ),
                     for (final category in categories)
                       DropdownMenuItem<String?>(
@@ -369,15 +369,15 @@ class _TaxSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = rate == 8 ? '8%' : (rate == 10 ? '10%' : '税率');
+    final label = rate == 8 ? '8%' : (rate == 10 ? '10%' : 'tax_rate');
 
     return PopupMenuButton<int?>(
-      tooltip: context.tr('税率'),
+      tooltip: context.tr('tax_rate'),
       onSelected: onChanged,
       itemBuilder: (context) => const <PopupMenuEntry<int?>>[
-        PopupMenuItem<int?>(value: 8, child: AppText('8%（軽減）')),
-        PopupMenuItem<int?>(value: 10, child: AppText('10%（標準）')),
-        PopupMenuItem<int?>(value: null, child: AppText('指定なし')),
+        PopupMenuItem<int?>(value: 8, child: AppText('8_reduced')),
+        PopupMenuItem<int?>(value: 10, child: AppText('10_standard')),
+        PopupMenuItem<int?>(value: null, child: AppText('not_specified')),
       ],
       child: Container(
         height: 44,
@@ -448,7 +448,7 @@ class _ValidationRow extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: AppText(
-              '明細が未入力です。必要な場合は「明細を追加」から入力できます。',
+              'no_items_entered_use_add_item_if_needed',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -499,7 +499,7 @@ class _ValidationRow extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onMatchTotal,
-              child: const AppText('合計金額に合わせる'),
+              child: const AppText('match_total_amount'),
             ),
           ),
       ],

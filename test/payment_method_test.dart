@@ -49,10 +49,10 @@ void main() {
       expect(PaymentMethod.tryParse('bitcoin'), isNull);
     });
 
-    test('labels fall back to 未設定 when unset', () {
-      expect(PaymentMethod.labelOf(null), '未設定');
-      expect(PaymentMethod.labelOf(PaymentMethod.cash), '現金');
-      expect(PaymentMethod.labelOf(PaymentMethod.icCard), 'ICカード（Suica / PASMO）');
+    test('labels are message ids, including the unset fallback', () {
+      expect(PaymentMethod.labelOf(null), 'not_set');
+      expect(PaymentMethod.labelOf(PaymentMethod.cash), 'cash');
+      expect(PaymentMethod.labelOf(PaymentMethod.icCard), 'ic_card_suica_pasmo');
     });
   });
 
@@ -73,13 +73,13 @@ void main() {
     test('reads the stored payment method', () {
       final receipt = Receipt.fromJson(row(paymentMethod: 'bank_transfer'));
       expect(receipt.paymentMethod, PaymentMethod.bankTransfer);
-      expect(receipt.displayPaymentMethod, '銀行振込');
+      expect(receipt.displayPaymentMethod, 'bank_transfer');
     });
 
     test('tolerates old documents without the field', () {
       final receipt = Receipt.fromJson(row());
       expect(receipt.paymentMethod, isNull);
-      expect(receipt.displayPaymentMethod, '未設定');
+      expect(receipt.displayPaymentMethod, 'not_set');
     });
 
     test('tolerates unknown stored values', () {
@@ -98,7 +98,7 @@ void main() {
     test('receiptless payments use the note as the list title', () {
       final receipt = Receipt.fromJson(row(paymentMethod: 'cash'));
       expect(receipt.displayTitle, '家賃');
-      expect(receipt.displayMerchant, '店舗名なし');
+      expect(receipt.displayMerchant, 'no_store_name');
       expect(
         Receipt.fromJson(row()).copyWith(merchant: 'やよい軒').displayTitle,
         'やよい軒',

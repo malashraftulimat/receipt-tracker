@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app_language.dart';
+import 'messages.dart';
 import 'translations_ar.dart';
 import 'translations_en.dart';
 
@@ -11,9 +12,15 @@ const List<Locale> kSupportedAppLocales = <Locale>[
   Locale('ar'),
 ];
 
-/// Small, dependency-free localization layer for the app's existing Japanese
-/// string literals. English / Arabic dictionaries are keyed by the Japanese
-/// source, and a few regex rules cover dynamic counts and formatted amounts.
+/// Localization layer for the whole app.
+///
+/// Every user-visible string is addressed by a stable message id whose
+/// Japanese text, English text and Arabic text live in
+/// `messages.dart` / `translations_en.dart` / `translations_ar.dart`.
+///
+/// Messages may contain `{name}` placeholders and can opt into plural forms
+/// by defining `<id>.zero`, `<id>.one`, `<id>.two`, `<id>.few`, `<id>.many`
+/// and `<id>.other` entries (CLDR categories for ja / en / ar).
 class AppLocalizations {
   const AppLocalizations(this.language);
 
@@ -27,193 +34,80 @@ class AppLocalizations {
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
 
-  String translate(String source) {
-    if (language == AppLanguage.ja) return source;
+  static bool isMessageId(String value) => kMessageKeys.containsKey(value);
 
-    final dictionary =
-        language == AppLanguage.en ? kEnglishTranslations : kArabicTranslations;
-    final exact = dictionary[source];
-    if (exact != null) return exact;
+  Map<String, String> get _dictionary => switch (language) {
+        AppLanguage.ja => kMessageKeys,
+        AppLanguage.en => kEnglishTranslations,
+        AppLanguage.ar => kArabicTranslations,
+      };
 
-    final rules = language == AppLanguage.en ? _englishRules : _arabicRules;
-    for (final rule in rules) {
-      final match = rule.pattern.firstMatch(source);
-      if (match != null) return rule.build(match);
+  /// Translates a message id, or passes user data (merchant / item / note)
+  /// through unchanged. Seeded category names stored in Firestore are mapped
+  /// to their message id so old documents translate without being rewritten.
+  String translate(String id) {
+    if (kMessageKeys.containsKey(id)) return _dictionary[id] ?? kMessageKeys[id]!;
+    final seedId = kSeedNameIds[id];
+    if (seedId != null) return _dictionary[seedId] ?? kMessageKeys[seedId]!;
+    return id;
+  }
+
+  /// Translates [id] and interpolates `{placeholders}` from [params].
+  ///
+  /// When [count] is supplied the matching CLDR plural form is chosen.
+  String msg(
+    String id, {
+    Map<String, Object?> params = const <String, Object?>{},
+    num? count,
+  }) {
+    var resolvedId = id;
+    if (count != null) {
+      final category = pluralCategory(language, count);
+      if (kMessageKeys.containsKey('$id.$category')) {
+        resolvedId = '$id.$category';
+      } else if (kMessageKeys.containsKey('$id.other')) {
+        resolvedId = '$id.other';
+      }
     }
+    var resolvedParams = params;
+    if (count != null && params['count'] == null) {
+      resolvedParams = <String, Object?>{...params, 'count': count};
+    }
+    return interpolate(translate(resolvedId), resolvedParams);
+  }
 
-    return source;
+  /// Replaces `{name}` placeholders in [pattern]. Unknown placeholders are kept.
+  static String interpolate(String pattern, Map<String, Object?> params) {
+    if (params.isEmpty || !pattern.contains('{')) return pattern;
+    var result = pattern;
+    params.forEach((key, value) {
+      result = result.replaceAll('{$key}', '${value ?? ''}');
+    });
+    return result;
+  }
+
+  /// CLDR plural category for the supported languages.
+  static String pluralCategory(AppLanguage language, num value) {
+    final n = value.abs();
+    switch (language) {
+      case AppLanguage.ja:
+        return 'other';
+      case AppLanguage.en:
+        return n == 1 ? 'one' : 'other';
+      case AppLanguage.ar:
+        if (n == 0) return 'zero';
+        if (n == 1) return 'one';
+        if (n == 2) return 'two';
+        final mod100 = n % 100;
+        if (mod100 >= 3 && mod100 <= 10) return 'few';
+        if (mod100 >= 11 && mod100 <= 99) return 'many';
+        return 'other';
+    }
   }
 }
 
-class _DynamicRule {
-  const _DynamicRule(this.pattern, this.build);
-
-  final RegExp pattern;
-  final String Function(RegExpMatch match) build;
-}
-
-final List<_DynamicRule> _englishRules = <_DynamicRule>[
-  _DynamicRule(RegExp(r'^(\d+)件 / (\d+)件$'), (m) => '${m[1]} / ${m[2]} items'),
-  _DynamicRule(RegExp(r'^(\d+)件$'), (m) {
-    final count = int.tryParse(m[1] ?? '') ?? 0;
-    return '$count ${count == 1 ? 'item' : 'items'}';
-  }),
-  _DynamicRule(RegExp(r'^(\d+)枚$'), (m) {
-    final count = int.tryParse(m[1] ?? '') ?? 0;
-    return '$count ${count == 1 ? 'photo' : 'photos'}';
-  }),
-  _DynamicRule(RegExp(r'^(\d+)行$'), (m) => '${m[1]} lines'),
-  _DynamicRule(RegExp(r'^(\d+) 行$'), (m) => '${m[1]} lines'),
-  _DynamicRule(RegExp(r'^(\d+) 行を表示$'), (m) => 'Show ${m[1]} lines'),
-  _DynamicRule(RegExp(r'^(\d+)日超過$'), (m) => '${m[1]} days overdue'),
-  _DynamicRule(RegExp(r'^あと(\d+)日$'), (m) => 'in ${m[1]} days'),
-  _DynamicRule(RegExp(r'^(\d+)日$'), (m) => '${m[1]} days'),
-  _DynamicRule(RegExp(r'^取り込み済み: (\d+) 枚$'), (m) => 'Captured: ${m[1]} photos'),
-  _DynamicRule(RegExp(r'^(\d+)枚目を読み取りました。続きを撮影してください$'),
-      (m) => 'Photo ${m[1]} captured. Continue with the next part.'),
-  _DynamicRule(RegExp(r'^「(.+)」を保存しました$'), (m) => 'Saved “${m[1]}”'),
-  _DynamicRule(RegExp(r'^「(.+)」を削除します。$'), (m) => 'Delete “${m[1]}”.'),
-  _DynamicRule(RegExp(r'^CSVを書き出しました: (.+)$'), (m) => 'CSV exported: ${m[1]}'),
-  _DynamicRule(RegExp(r'^書き出しに失敗しました: (.+)$'), (m) => 'Export failed: ${m[1]}'),
-  _DynamicRule(RegExp(r'^保存に失敗しました: (.+)$'), (m) => 'Could not save: ${m[1]}'),
-  _DynamicRule(
-      RegExp(r'^削除に失敗しました: (.+)$'), (m) => 'Could not delete: ${m[1]}'),
-  _DynamicRule(RegExp(r'^カテゴリを読み込めませんでした\n(.+)$'),
-      (m) => 'Could not load categories\n${m[1]}'),
-  _DynamicRule(RegExp(r'^ブラウザOCRでエラーが発生しました: (.+)$'),
-      (m) => 'Browser OCR error: ${m[1]}'),
-  _DynamicRule(
-      RegExp(r'^(.+)に失敗しました: (.+)$'), (m) => '${m[1]} failed: ${m[2]}'),
-  _DynamicRule(RegExp(r'^失敗しました: (.+)$'), (m) => 'Failed: ${m[1]}'),
-  _DynamicRule(RegExp(r'^(.+)を読み込めませんでした\n(.+)$'),
-      (m) => 'Could not load ${m[1]}\n${m[2]}'),
-  _DynamicRule(RegExp(r'^集計を読み込めませんでした\n(.+)$'),
-      (m) => 'Could not load analytics\n${m[1]}'),
-  _DynamicRule(RegExp(r'^読み込めませんでした\n(.+)$'), (m) => 'Could not load\n${m[1]}'),
-  _DynamicRule(RegExp(r'^支払期限 (.+)$'), (m) => 'Due date ${m[1]}'),
-  _DynamicRule(RegExp(r'^リマインダー: (.+)$'), (m) => 'Reminder: ${m[1]}'),
-  _DynamicRule(RegExp(r'^更新: (.+)$'), (m) => 'Updated: ${m[1]}'),
-  _DynamicRule(RegExp(r'^登録: (.+)$'), (m) => 'Created: ${m[1]}'),
-  _DynamicRule(RegExp(r'^今日 (.+)$'), (m) => 'Today ${m[1]}'),
-  _DynamicRule(RegExp(r'^1日 (.+)$'), (m) => 'Per day ${m[1]}'),
-  _DynamicRule(RegExp(r'^貯蓄 (.+)%$'), (m) => 'Savings ${m[1]}%'),
-  _DynamicRule(RegExp(r'^税額合計 (.+)$'), (m) => 'Total tax ${m[1]}'),
-  _DynamicRule(RegExp(r'^明細 (.+)$'), (m) => 'Items ${m[1]}'),
-  _DynamicRule(RegExp(r'^支出 (.+) / 自由枠 (.+)$'),
-      (m) => 'Spent ${m[1]} / available ${m[2]}'),
-  _DynamicRule(
-      RegExp(r'^先月より (.+)$'), (m) => 'Compared with last month: ${m[1]}'),
-  _DynamicRule(RegExp(r'^予算を超えています。残り日数は (\d+) 日です。$'),
-      (m) => 'Over budget. ${m[1]} days remaining.'),
-  _DynamicRule(RegExp(r'^残り (\d+) 日、1日 (.+) が目安です。$'),
-      (m) => '${m[1]} days left; about ${m[2]} per day.'),
-  _DynamicRule(
-      RegExp(r'^計画より (.+) 多く使っています。残り (\d+) 日、1日 (.+) が目安です。$'),
-      (m) =>
-          'You are spending ${m[1]} more than planned.\n${m[2]} days left; about ${m[3]} per day.'),
-  _DynamicRule(
-      RegExp(r'^計画より (.+) 節約できています。このペースなら貯蓄目標 (.+) に届きます。$'),
-      (m) =>
-          'You are saving ${m[1]} compared with the plan.\nAt this pace you will reach the savings goal of ${m[2]}.'),
-  _DynamicRule(RegExp(r'^計画より (.+) 多く使っています。$'),
-      (m) => 'You are spending ${m[1]} more than planned.'),
-  _DynamicRule(RegExp(r'^計画より (.+) 節約できています。$'),
-      (m) => 'You are saving ${m[1]} compared with the plan.'),
-  _DynamicRule(RegExp(r'^このペースなら貯蓄目標 (.+) に届きます。$'),
-      (m) => 'At this pace you will reach the savings goal of ${m[1]}.'),
-  _DynamicRule(RegExp(r'^小計 \+ 消費税 = (.+) と合計 (.+) が一致しません。$'),
-      (m) => 'Subtotal + tax = ${m[1]} does not match total ${m[2]}.'),
-  _DynamicRule(RegExp(r'^明細合計と合計が一致しません（差額 (.+)）$'),
-      (m) => 'Item total does not match receipt total (difference ${m[1]}).'),
-  _DynamicRule(RegExp(r'^明細合計 (.+) は合計と一致しています$'),
-      (m) => 'Item total ${m[1]} matches the receipt total.'),
-  _DynamicRule(RegExp(r'^対象期間: (.+)$'), (m) => 'Period: ${m[1]}'),
-  _DynamicRule(RegExp(r'^次の支給日: (.+)$'), (m) => 'Next payday: ${m[1]}'),
-  _DynamicRule(RegExp(r'^今回の対象期間: (.+)（あと(\d+)日）$'),
-      (m) => 'Current period: ${m[1]} (${m[2]} days left)'),
-  _DynamicRule(RegExp(r'^月換算: (.+)（この月の日数で計算）$'),
-      (m) => 'Monthly equivalent: ${m[1]} (based on this month\'s days)'),
-];
-
-final List<_DynamicRule> _arabicRules = <_DynamicRule>[
-  _DynamicRule(RegExp(r'^(\d+)件 / (\d+)件$'), (m) => '${m[1]} / ${m[2]} عناصر'),
-  _DynamicRule(RegExp(r'^(\d+)件$'), (m) {
-    final count = int.tryParse(m[1] ?? '') ?? 0;
-    return '$count ${count == 1 ? 'عنصر' : 'عناصر'}';
-  }),
-  _DynamicRule(RegExp(r'^(\d+)枚$'), (m) {
-    final count = int.tryParse(m[1] ?? '') ?? 0;
-    return '$count ${count == 1 ? 'صورة' : 'صور'}';
-  }),
-  _DynamicRule(RegExp(r'^(\d+)行$'), (m) => '${m[1]} سطر'),
-  _DynamicRule(RegExp(r'^(\d+) 行$'), (m) => '${m[1]} سطر'),
-  _DynamicRule(RegExp(r'^(\d+) 行を表示$'), (m) => 'عرض ${m[1]} سطر'),
-  _DynamicRule(RegExp(r'^(\d+)日超過$'), (m) => 'متأخر ${m[1]} يوم'),
-  _DynamicRule(RegExp(r'^あと(\d+)日$'), (m) => 'خلال ${m[1]} يوم'),
-  _DynamicRule(RegExp(r'^(\d+)日$'), (m) => '${m[1]} يوم'),
-  _DynamicRule(RegExp(r'^取り込み済み: (\d+) 枚$'), (m) => 'تم الالتقاط: ${m[1]} صور'),
-  _DynamicRule(RegExp(r'^(\d+)枚目を読み取りました。続きを撮影してください$'),
-      (m) => 'تم التقاط الصورة ${m[1]}. تابع الجزء التالي.'),
-  _DynamicRule(RegExp(r'^「(.+)」を保存しました$'), (m) => 'تم حفظ «${m[1]}»'),
-  _DynamicRule(RegExp(r'^「(.+)」を削除します。$'), (m) => 'حذف «${m[1]}».'),
-  _DynamicRule(RegExp(r'^CSVを書き出しました: (.+)$'), (m) => 'تم تصدير CSV: ${m[1]}'),
-  _DynamicRule(RegExp(r'^書き出しに失敗しました: (.+)$'), (m) => 'فشل التصدير: ${m[1]}'),
-  _DynamicRule(RegExp(r'^保存に失敗しました: (.+)$'), (m) => 'تعذّر الحفظ: ${m[1]}'),
-  _DynamicRule(RegExp(r'^削除に失敗しました: (.+)$'), (m) => 'تعذّر الحذف: ${m[1]}'),
-  _DynamicRule(
-      RegExp(r'^カテゴリを読み込めませんでした\n(.+)$'), (m) => 'تعذّر تحميل الفئات\n${m[1]}'),
-  _DynamicRule(RegExp(r'^ブラウザOCRでエラーが発生しました: (.+)$'),
-      (m) => 'خطأ في OCR بالمتصفح: ${m[1]}'),
-  _DynamicRule(RegExp(r'^(.+)に失敗しました: (.+)$'), (m) => 'فشل ${m[1]}: ${m[2]}'),
-  _DynamicRule(RegExp(r'^失敗しました: (.+)$'), (m) => 'فشل: ${m[1]}'),
-  _DynamicRule(RegExp(r'^(.+)を読み込めませんでした\n(.+)$'),
-      (m) => 'تعذّر تحميل ${m[1]}\n${m[2]}'),
-  _DynamicRule(RegExp(r'^集計を読み込めませんでした\n(.+)$'),
-      (m) => 'تعذّر تحميل التحليلات\n${m[1]}'),
-  _DynamicRule(RegExp(r'^読み込めませんでした\n(.+)$'), (m) => 'تعذّر التحميل\n${m[1]}'),
-  _DynamicRule(RegExp(r'^支払期限 (.+)$'), (m) => 'تاريخ الاستحقاق ${m[1]}'),
-  _DynamicRule(RegExp(r'^リマインダー: (.+)$'), (m) => 'تذكير: ${m[1]}'),
-  _DynamicRule(RegExp(r'^更新: (.+)$'), (m) => 'حُدّث: ${m[1]}'),
-  _DynamicRule(RegExp(r'^登録: (.+)$'), (m) => 'أُنشئ: ${m[1]}'),
-  _DynamicRule(RegExp(r'^今日 (.+)$'), (m) => 'اليوم ${m[1]}'),
-  _DynamicRule(RegExp(r'^1日 (.+)$'), (m) => 'يومياً ${m[1]}'),
-  _DynamicRule(RegExp(r'^貯蓄 (.+)%$'), (m) => 'الادخار ${m[1]}%'),
-  _DynamicRule(RegExp(r'^税額合計 (.+)$'), (m) => 'إجمالي الضريبة ${m[1]}'),
-  _DynamicRule(RegExp(r'^明細 (.+)$'), (m) => 'العناصر ${m[1]}'),
-  _DynamicRule(RegExp(r'^支出 (.+) / 自由枠 (.+)$'),
-      (m) => 'المصروف ${m[1]} / المتاح ${m[2]}'),
-  _DynamicRule(RegExp(r'^先月より (.+)$'), (m) => 'مقارنة بالشهر الماضي: ${m[1]}'),
-  _DynamicRule(RegExp(r'^予算を超えています。残り日数は (\d+) 日です。$'),
-      (m) => 'تجاوزت الميزانية. بقي ${m[1]} يوم.'),
-  _DynamicRule(RegExp(r'^残り (\d+) 日、1日 (.+) が目安です。$'),
-      (m) => 'بقي ${m[1]} يوم؛ نحو ${m[2]} يومياً.'),
-  _DynamicRule(
-      RegExp(r'^計画より (.+) 多く使っています。残り (\d+) 日、1日 (.+) が目安です。$'),
-      (m) =>
-          'تنفق ${m[1]} أكثر من الخطة.\nبقي ${m[2]} يوم؛ نحو ${m[3]} يومياً.'),
-  _DynamicRule(
-      RegExp(r'^計画より (.+) 節約できています。このペースなら貯蓄目標 (.+) に届きます。$'),
-      (m) =>
-          'توفّر ${m[1]} مقارنة بالخطة.\nبهذه الوتيرة ستصل إلى هدف الادخار ${m[2]}.'),
-  _DynamicRule(
-      RegExp(r'^計画より (.+) 多く使っています。$'), (m) => 'تنفق ${m[1]} أكثر من الخطة.'),
-  _DynamicRule(
-      RegExp(r'^計画より (.+) 節約できています。$'), (m) => 'توفّر ${m[1]} مقارنة بالخطة.'),
-  _DynamicRule(RegExp(r'^このペースなら貯蓄目標 (.+) に届きます。$'),
-      (m) => 'بهذه الوتيرة ستصل إلى هدف الادخار ${m[1]}.'),
-  _DynamicRule(RegExp(r'^小計 \+ 消費税 = (.+) と合計 (.+) が一致しません。$'),
-      (m) => 'المجموع الفرعي + الضريبة = ${m[1]} لا يطابق الإجمالي ${m[2]}.'),
-  _DynamicRule(RegExp(r'^明細合計と合計が一致しません（差額 (.+)）$'),
-      (m) => 'إجمالي العناصر لا يطابق إجمالي الإيصال (الفرق ${m[1]}).'),
-  _DynamicRule(RegExp(r'^明細合計 (.+) は合計と一致しています$'),
-      (m) => 'إجمالي العناصر ${m[1]} يطابق إجمالي الإيصال.'),
-  _DynamicRule(RegExp(r'^対象期間: (.+)$'), (m) => 'الفترة: ${m[1]}'),
-  _DynamicRule(RegExp(r'^次の支給日: (.+)$'), (m) => 'موعد الدفع التالي: ${m[1]}'),
-  _DynamicRule(RegExp(r'^今回の対象期間: (.+)（あと(\d+)日）$'),
-      (m) => 'الفترة الحالية: ${m[1]} (بقي ${m[2]} يوم)'),
-  _DynamicRule(RegExp(r'^月換算: (.+)（この月の日数で計算）$'),
-      (m) => 'المكافئ الشهري: ${m[1]} (حسب أيام هذا الشهر)'),
-];
+/// Parameters accepted by [AppText] / [BuildContext.tr].
+typedef MessageParams = Map<String, Object?>;
 
 class _AppLocalizationsDelegate
     extends LocalizationsDelegate<AppLocalizations> {
@@ -239,5 +133,11 @@ class _AppLocalizationsDelegate
 extension AppLocalizationContext on BuildContext {
   AppLocalizations get l10n => AppLocalizations.of(this);
 
-  String tr(String source) => l10n.translate(source);
+  /// Translates a message id with optional `{name}` parameters / plural count.
+  String tr(
+    String id, {
+    MessageParams params = const <String, Object?>{},
+    num? count,
+  }) =>
+      l10n.msg(id, params: params, count: count);
 }

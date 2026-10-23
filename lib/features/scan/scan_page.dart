@@ -42,7 +42,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
   final List<Uint8List> _chunkImages = <Uint8List>[];
   String? _error;
   AiReceiptOcrException? _aiFailure;
-  String _processingLabel = 'AIがレシートを解析しています…';
+  String _processingLabel = 'scan.ai_analyzing';
   double? _focusX;
   double? _focusY;
   int _focusRingId = 0;
@@ -130,11 +130,9 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       _cameraBlocked = true;
       _cameraError = switch (error.errorCode) {
         MobileScannerErrorCode.permissionDenied =>
-          'ブラウザまたは端末でカメラへのアクセスが拒否されています。'
-              'サイト設定でカメラを許可して再試行してください。',
-        MobileScannerErrorCode.unsupported => 'このブラウザではライブカメラを利用できません。'
-            '画像を選択してOCRするか、手入力で登録してください。',
-        _ => error.errorDetails?.message ?? 'カメラを起動できませんでした。',
+          'scan.camera_denied_body',
+        MobileScannerErrorCode.unsupported => 'scan.camera_unavailable_body',
+        _ => error.errorDetails?.message ?? 'scan.camera_start_failed',
       };
     });
   }
@@ -267,7 +265,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
     setState(() {
       _processing = true;
-      _processingLabel = 'AIがレシートを解析しています…';
+      _processingLabel = 'scan.ai_analyzing';
       _error = null;
       _aiFailure = null;
     });
@@ -294,7 +292,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
     setState(() {
       _processing = true;
-      _processingLabel = 'AIがレシートを解析しています…';
+      _processingLabel = 'scan.ai_analyzing';
       _error = null;
       _aiFailure = null;
     });
@@ -323,7 +321,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       onFallback: (aiError) {
         if (!mounted) return;
         setState(() {
-          _processingLabel = 'AIを利用できないため、端末内OCRで解析しています…';
+          _processingLabel = 'scan.analyzing_fallback';
           _aiFailure = aiError is AiReceiptOcrException ? aiError : null;
         });
       },
@@ -349,8 +347,8 @@ class _ScanPageState extends ConsumerState<ScanPage> {
           : result.aiKeyMissing
               ? 'AI key missing — using on-device OCR.'
               : result.aiServiceUnavailable
-                  ? 'AIサービスを準備しています。しばらくしてからお試しください。'
-                  : 'AIを利用できないため、端末内OCRで読み取りました。';
+                  ? 'the_ai_service_is_getting_ready_please_try_a'
+                  : 'ai_was_unavailable_so_the_receipt_was_read_w';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: AppText(message)),
       );
@@ -367,7 +365,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 
     setState(() {
       _processing = true;
-      _processingLabel = '端末内OCRでレシートを解析しています…';
+      _processingLabel = 'scan.ondevice_analyzing';
       _error = null;
     });
 
@@ -492,7 +490,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     if (!_hasLiveCamera || _cameraBlocked) {
       return Scaffold(
         appBar: AppBar(
-          title: const AppText('スキャン'),
+          title: const AppText('scan'),
           actions: headerActions(
             context,
             showLanguageLabel: context.isExpanded,
@@ -517,19 +515,19 @@ class _ScanPageState extends ConsumerState<ScanPage> {
       appBar: AppBar(
         backgroundColor: AppPalette.backgroundDeep,
         foregroundColor: AppPalette.text,
-        title: const AppText('スキャン'),
+        title: const AppText('scan'),
         actions: headerActions(
           context,
           showLanguageLabel: context.isExpanded,
           actions: <Widget>[
             IconButton(
-              tooltip: context.tr('支払いを追加'),
+              tooltip: context.tr('add_payment'),
               onPressed: _processing ? null : _openQuickPayment,
               icon: const Icon(Icons.add_card_outlined),
             ),
             if (!kIsWeb)
               IconButton(
-                tooltip: context.tr('ライト'),
+                tooltip: context.tr('light'),
                 onPressed: _toggleTorch,
                 icon: const Icon(Icons.flashlight_on_outlined),
               ),
@@ -626,7 +624,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                   ),
                   const SizedBox(height: 8),
                   const AppText(
-                    '撮影した写真はGoogleのGemini APIに送信してテキスト抽出を行います。写真は保存されません。',
+                    'the_photo_is_sent_to_google_s_gemini_api_for',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppPalette.textFaint,
@@ -651,10 +649,9 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                       _AiNoticeCard(
                         icon: Icons.key_off_outlined,
                         color: AppPalette.cyan,
-                        title: 'AIキーが未設定です',
+                        title: 'scan.ai_key_missing_title',
                         message:
-                            '設定で Gemini API キーを保存すると、AI抽出を利用できます。'
-                            '未設定のあいだは端末内OCRで読み取ります。',
+                            'scan.ai_key_missing_body',
                         onOpenSettings: () => context.push('/settings'),
                       )
                     else if (_aiFailure!.kind ==
@@ -662,7 +659,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                       _AiNoticeCard(
                         icon: Icons.hourglass_bottom_outlined,
                         color: AppPalette.amber,
-                        title: '本日のAI利用上限に達しました',
+                        title: 'scan.ai_daily_limit_title',
                         message: _aiFailure!.message,
                         onOpenSettings: () => context.push('/settings'),
                       )
@@ -709,7 +706,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                         ),
                       ),
                       icon: const Icon(Icons.phone_iphone),
-                      label: const AppText('端末のカメラを使う'),
+                      label: const AppText('use_device_camera'),
                     ),
                   ],
                 ],
@@ -759,7 +756,7 @@ class _ActionButtons extends StatelessWidget {
                   foregroundColor: AppPalette.backgroundDeep,
                 ),
                 icon: const Icon(Icons.photo_camera_outlined),
-                label: const AppText('レシートを撮影'),
+                label: const AppText('capture_receipt'),
               ),
             ),
           ),
@@ -768,7 +765,7 @@ class _ActionButtons extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: busy ? null : onManual,
               icon: const Icon(Icons.edit_outlined),
-              label: const AppText('手入力'),
+              label: const AppText('manual_entry'),
             ),
           ),
         ],
@@ -789,7 +786,7 @@ class _ActionButtons extends StatelessWidget {
                       foregroundColor: AppPalette.backgroundDeep,
                     ),
                     icon: const Icon(Icons.photo_camera_outlined),
-                    label: const AppText('撮影して自動入力'),
+                    label: const AppText('capture_and_auto_fill_2'),
                   ),
                 ),
               ),
@@ -802,7 +799,7 @@ class _ActionButtons extends StatelessWidget {
                     color: AppPalette.emerald.withValues(alpha: 0.5),
                   ),
                 ),
-                child: const AppText('このまま登録'),
+                child: const AppText('save_this_barcode'),
               ),
             ],
           ),
@@ -819,7 +816,7 @@ class _ActionButtons extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.photo_camera_outlined),
                 label: AppText(
-                  mode == ScanMode.barcode ? 'レシートを撮影' : 'レシートを撮影して読み取る',
+                  mode == ScanMode.barcode ? 'capture_receipt' : 'capture_and_read_receipt',
                 ),
               ),
             ),
@@ -832,12 +829,12 @@ class _ActionButtons extends StatelessWidget {
             children: <Widget>[
               TextButton(
                 onPressed: busy ? null : onManual,
-                child: const AppText('手入力で登録する'),
+                child: const AppText('enter_manually_2'),
               ),
               TextButton.icon(
                 onPressed: busy ? null : onQuickPayment,
                 icon: const Icon(Icons.add_card_outlined, size: 16),
-                label: const AppText('支払いだけ記録する'),
+                label: const AppText('record_a_payment_only'),
               ),
             ],
           ),
@@ -880,7 +877,7 @@ class _BarcodeBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 AppText(
-                  valid ? 'バーコード検出' : 'バーコード（チェックディジット不一致）',
+                  valid ? 'barcode_detected' : 'barcode_check_digit_mismatch',
                   style: const TextStyle(
                     color: AppPalette.textMuted,
                     fontSize: 11,
@@ -898,7 +895,7 @@ class _BarcodeBanner extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: context.tr('クリア'),
+            tooltip: context.tr('clear'),
             onPressed: onClear,
             icon: const Icon(
               Icons.close,
@@ -1006,7 +1003,7 @@ class _AiNoticeCard extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onOpenSettings,
             icon: const Icon(Icons.settings_outlined, size: 18),
-            label: const AppText('設定を開く'),
+            label: const AppText('scan.open_settings'),
           ),
         ],
       ),
@@ -1046,7 +1043,7 @@ class _AiDiagnosticLine extends StatelessWidget {
             color: AppPalette.amber,
           ),
           title: const AppText(
-            'AIエラーの詳細',
+            'ai_error_details',
             style: TextStyle(
               color: AppPalette.amber,
               fontSize: 11.5,
@@ -1278,13 +1275,12 @@ class _NoCameraView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final title =
-        cameraDenied ? 'カメラへのアクセスを許可してください' : 'このデバイスではライブカメラを利用できません';
+        cameraDenied ? 'scan.camera_permission_title' : 'scan.camera_unavailable_title';
     final description = cameraDenied
         ? 'ブラウザまたは端末の設定でこのサイトのカメラ利用を許可し、'
             '「カメラを再試行」を押してください。'
-            '許可できない場合も、画像を選択してOCRできます。'
-        : 'レシート画像を選択すると、OCRで店舗名・日付・合計・消費税を'
-            '自動入力します。スマートフォンで撮影した画像も利用できます。';
+            'if_you_cannot_allow_it_you_can_still_choose'
+        : 'scan.no_camera_ocr_help';
 
     return Center(
       child: SingleChildScrollView(
@@ -1317,7 +1313,7 @@ class _NoCameraView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const AppText(
-                '撮影した写真はGoogleのGemini APIに送信してテキスト抽出を行います。写真は保存されません。',
+                'the_photo_is_sent_to_google_s_gemini_api_for',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11, height: 1.4),
               ),
@@ -1344,7 +1340,7 @@ class _NoCameraView extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: busy ? null : onRetryCamera,
                   icon: const Icon(Icons.refresh),
-                  label: const AppText('カメラを再試行'),
+                  label: const AppText('retry_camera'),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -1357,27 +1353,27 @@ class _NoCameraView extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.photo_library_outlined),
-                label: AppText(busy ? '解析中…' : '画像を選択してOCR'),
+                label: AppText(busy ? 'analysing' : 'choose_an_image_for_ocr'),
               ),
               if (onDeviceCamera != null) ...<Widget>[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: busy ? null : onDeviceCamera,
                   icon: const Icon(Icons.phone_iphone),
-                  label: const AppText('端末のカメラを使う'),
+                  label: const AppText('use_device_camera'),
                 ),
               ],
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: busy ? null : onManual,
                 icon: const Icon(Icons.edit_outlined),
-                label: const AppText('手入力で登録'),
+                label: const AppText('enter_manually'),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: busy ? null : onQuickPayment,
                 icon: const Icon(Icons.add_card_outlined),
-                label: const AppText('支払いだけ記録する'),
+                label: const AppText('record_a_payment_only'),
               ),
             ],
           ),
@@ -1421,7 +1417,7 @@ class _LongReceiptControls extends StatelessWidget {
             if (chunkCount > 0)
               TextButton(
                 onPressed: busy ? null : onClear,
-                child: const AppText('クリア'),
+                child: const AppText('clear'),
               ),
           ],
         ),
@@ -1433,14 +1429,14 @@ class _LongReceiptControls extends StatelessWidget {
                 onPressed: busy ? null : onAdd,
                 icon: const Icon(Icons.add_a_photo_outlined),
                 label: AppText(
-                  busy ? '読み取り中…' : (chunkCount == 0 ? '1枚目を撮影' : '次のチャンクを撮影'),
+                  busy ? 'reading' : (chunkCount == 0 ? 'capture_first_part' : 'capture_next_part'),
                 ),
               ),
             ),
             const SizedBox(width: 8),
             OutlinedButton(
               onPressed: busy || chunkCount == 0 ? null : onMerge,
-              child: const AppText('結合して確認'),
+              child: const AppText('merge_and_review'),
             ),
           ],
         ),
