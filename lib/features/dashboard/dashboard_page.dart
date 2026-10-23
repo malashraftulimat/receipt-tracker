@@ -47,6 +47,11 @@ class DashboardPage extends ConsumerWidget {
           context,
           showLanguageLabel: expanded,
           actions: <Widget>[
+            IconButton(
+              tooltip: context.tr('支払いを追加'),
+              onPressed: () => context.push('/payment/new'),
+              icon: const Icon(Icons.add_card_outlined),
+            ),
             if (!expanded)
               IconButton(
                 tooltip: context.tr('集計'),

@@ -1,3 +1,5 @@
+import 'payment_method.dart';
+
 enum ReceiptViewMode { list, grid }
 
 const Object _unset = Object();
@@ -7,6 +9,7 @@ class ReceiptFilter {
   const ReceiptFilter({
     this.search = '',
     this.categoryId,
+    this.paymentMethod,
     this.month,
     this.from,
     this.to,
@@ -15,6 +18,9 @@ class ReceiptFilter {
 
   final String search;
   final String? categoryId;
+
+  /// Only show receipts paid with this method (null = any).
+  final PaymentMethod? paymentMethod;
 
   /// First day of the selected month (mutually exclusive with [from]/[to]).
   final DateTime? month;
@@ -35,6 +41,7 @@ class ReceiptFilter {
   bool get hasFilters =>
       search.trim().isNotEmpty ||
       categoryId != null ||
+      paymentMethod != null ||
       month != null ||
       from != null;
 
@@ -43,6 +50,7 @@ class ReceiptFilter {
   ReceiptFilter copyWith({
     String? search,
     Object? categoryId = _unset,
+    Object? paymentMethod = _unset,
     Object? month = _unset,
     Object? from = _unset,
     Object? to = _unset,
@@ -53,6 +61,9 @@ class ReceiptFilter {
       categoryId: identical(categoryId, _unset)
           ? this.categoryId
           : categoryId as String?,
+      paymentMethod: identical(paymentMethod, _unset)
+          ? this.paymentMethod
+          : paymentMethod as PaymentMethod?,
       month: identical(month, _unset) ? this.month : month as DateTime?,
       from: identical(from, _unset) ? this.from : from as DateTime?,
       to: identical(to, _unset) ? this.to : to as DateTime?,

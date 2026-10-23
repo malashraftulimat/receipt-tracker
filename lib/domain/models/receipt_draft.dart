@@ -1,4 +1,5 @@
 import '../parser/receipt_parser.dart';
+import 'payment_method.dart';
 import 'receipt.dart';
 import 'receipt_item.dart';
 
@@ -25,6 +26,7 @@ class ReceiptDraft {
     this.barcodeId,
     this.categoryId,
     this.note,
+    this.paymentMethod,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
     this.source = ReceiptSource.manual,
@@ -51,6 +53,10 @@ class ReceiptDraft {
   final String? barcodeId;
   final String? categoryId;
   final String? note;
+
+  /// Optional for scanned receipts, required for quick (receiptless) payments.
+  final PaymentMethod? paymentMethod;
+
   final String? rawOcrText;
   final List<ReceiptItem> items;
   final ReceiptSource source;
@@ -118,6 +124,7 @@ class ReceiptDraft {
       barcodeId: receipt.barcodeId,
       categoryId: receipt.categoryId,
       note: receipt.note,
+      paymentMethod: receipt.paymentMethod,
       rawOcrText: receipt.rawOcrText,
       items: receipt.items,
       source: receipt.source,
@@ -151,6 +158,7 @@ class ReceiptDraft {
             (barcodeId ?? '').trim().isEmpty ? null : barcodeId!.trim(),
         'category_id': categoryId,
         'note': (note ?? '').trim().isEmpty ? null : note!.trim(),
+        'payment_method': paymentMethod?.wireName,
         'source': source.name,
         'raw_ocr_text': rawOcrText,
         if (includeItems)

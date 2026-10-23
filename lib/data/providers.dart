@@ -6,6 +6,7 @@ import '../core/settings/pay_cycle_provider.dart';
 import '../domain/models/category.dart';
 import '../domain/models/coupon.dart';
 import '../domain/models/monthly_budget.dart';
+import '../domain/models/payment_method.dart';
 import '../domain/models/pay_cycle.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
@@ -128,6 +129,9 @@ class ReceiptFilterController extends Notifier<ReceiptFilter> {
         categoryId: state.categoryId == categoryId ? null : categoryId,
       );
 
+  void setPaymentMethod(PaymentMethod? method) =>
+      state = state.copyWith(paymentMethod: method);
+
   void setMonth(DateTime? month) => state = state.copyWith(
         month: month == null ? null : DateTime(month.year, month.month),
         from: null,
@@ -245,9 +249,10 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
             date.day == now.day) {
           todaySpent += receipt.totalAmount;
         }
-        if (period != null && period.contains(date)) {
-          periodSpent += receipt.totalAmount;
-        }
+      }
+      if (period != null) {
+        // Receipts and receiptless payments alike count towards the period.
+        periodSpent = receipts.totalInPeriod(period);
       }
     }
 

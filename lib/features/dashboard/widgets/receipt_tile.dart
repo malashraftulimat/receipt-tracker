@@ -88,7 +88,7 @@ class ReceiptTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       AppText(
-                        receipt.displayMerchant,
+                        receipt.displayTitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall
@@ -110,6 +110,14 @@ class ReceiptTile extends StatelessWidget {
                               color: accent,
                             ),
                           ),
+                          if (receipt.paymentMethod != null) ...<Widget>[
+                            const SizedBox(width: 4),
+                            CategoryPill(
+                              label: receipt.displayPaymentMethod,
+                              color: AppPalette.sky,
+                              icon: receipt.paymentMethod!.icon,
+                            ),
+                          ],
                           if (receipt.barcodeId != null) ...<Widget>[
                             const SizedBox(width: 4),
                             Icon(
@@ -185,7 +193,7 @@ class ReceiptGridCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               AppText(
-                receipt.displayMerchant,
+                receipt.displayTitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleSmall

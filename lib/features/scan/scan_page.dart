@@ -465,6 +465,21 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         null,
       );
 
+  /// Quick entry for an expense without a receipt (rent, transfers, ...).
+  /// Uses the same receipts collection with `source = manual`.
+  Future<void> _openQuickPayment() async {
+    if (_navigating) return;
+    setState(() => _navigating = true);
+    await _stopScanner();
+    if (!mounted) return;
+
+    await context.push<Receipt>('/payment/new');
+
+    if (!mounted) return;
+    setState(() => _navigating = false);
+    await _restartScannerIfNeeded();
+  }
+
   // -------------------------------------------------------------------------
   // UI
   // -------------------------------------------------------------------------
@@ -486,6 +501,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         body: _NoCameraView(
           onPickImage: _captureAndRecognize,
           onManual: _openManual,
+          onQuickPayment: _openQuickPayment,
           onDeviceCamera: kIsWeb ? _captureWithDeviceCamera : null,
           busy: _processing,
           error: _cameraError ?? _error,
@@ -506,6 +522,11 @@ class _ScanPageState extends ConsumerState<ScanPage> {
           context,
           showLanguageLabel: context.isExpanded,
           actions: <Widget>[
+            IconButton(
+              tooltip: context.tr('支払いを追加'),
+              onPressed: _processing ? null : _openQuickPayment,
+              icon: const Icon(Icons.add_card_outlined),
+            ),
             if (!kIsWeb)
               IconButton(
                 tooltip: context.tr('ライト'),
@@ -664,6 +685,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                       busy: _processing,
                       onCapture: _captureAndRecognize,
                       onManual: _openManual,
+                      onQuickPayment: _openQuickPayment,
                       onUseBarcodeOnly: () {
                         final barcode = session.barcode;
                         if (barcode == null) return;
@@ -711,6 +733,7 @@ class _ActionButtons extends StatelessWidget {
     required this.busy,
     required this.onCapture,
     required this.onManual,
+    required this.onQuickPayment,
     required this.onUseBarcodeOnly,
   });
 
@@ -719,6 +742,7 @@ class _ActionButtons extends StatelessWidget {
   final bool busy;
   final VoidCallback onCapture;
   final VoidCallback onManual;
+  final VoidCallback onQuickPayment;
   final VoidCallback onUseBarcodeOnly;
 
   @override
@@ -802,9 +826,20 @@ class _ActionButtons extends StatelessWidget {
           ),
         if (mode != ScanMode.barcode) ...<Widget>[
           const SizedBox(height: 8),
-          TextButton(
-            onPressed: busy ? null : onManual,
-            child: const AppText('手入力で登録する'),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 4,
+            children: <Widget>[
+              TextButton(
+                onPressed: busy ? null : onManual,
+                child: const AppText('手入力で登録する'),
+              ),
+              TextButton.icon(
+                onPressed: busy ? null : onQuickPayment,
+                icon: const Icon(Icons.add_card_outlined, size: 16),
+                label: const AppText('支払いだけ記録する'),
+              ),
+            ],
           ),
         ],
       ],
@@ -1220,6 +1255,7 @@ class _NoCameraView extends StatelessWidget {
   const _NoCameraView({
     required this.onPickImage,
     required this.onManual,
+    required this.onQuickPayment,
     required this.busy,
     this.onDeviceCamera,
     this.error,
@@ -1230,6 +1266,7 @@ class _NoCameraView extends StatelessWidget {
 
   final VoidCallback onPickImage;
   final VoidCallback onManual;
+  final VoidCallback onQuickPayment;
   final VoidCallback? onDeviceCamera;
   final bool busy;
   final String? error;
@@ -1335,6 +1372,12 @@ class _NoCameraView extends StatelessWidget {
                 onPressed: busy ? null : onManual,
                 icon: const Icon(Icons.edit_outlined),
                 label: const AppText('手入力で登録'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: busy ? null : onQuickPayment,
+                icon: const Icon(Icons.add_card_outlined),
+                label: const AppText('支払いだけ記録する'),
               ),
             ],
           ),

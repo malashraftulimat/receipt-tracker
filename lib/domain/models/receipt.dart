@@ -1,4 +1,6 @@
 import 'category.dart';
+import 'payment_method.dart';
+import 'pay_cycle.dart';
 import 'receipt_item.dart';
 
 enum ReceiptSource { barcode, ocr, manual }
@@ -48,6 +50,7 @@ class Receipt {
     this.barcodeId,
     this.categoryId,
     this.note,
+    this.paymentMethod,
     this.source = ReceiptSource.manual,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
@@ -89,6 +92,11 @@ class Receipt {
   final String? barcodeId;
   final String? categoryId;
   final String? note;
+
+  /// How the payment was made. Null for documents saved before this field
+  /// existed (and for receipts where the user left it unset).
+  final PaymentMethod? paymentMethod;
+
   final ReceiptSource source;
   final String? rawOcrText;
 
@@ -120,7 +128,19 @@ class Receipt {
       ? '店舗名なし'
       : merchant!.trim();
 
+  /// Merchant for receipts, otherwise the note (used by quick payments that
+  /// have no merchant), otherwise a placeholder.
+  String get displayTitle {
+    final name = (merchant ?? '').trim();
+    if (name.isNotEmpty) return name;
+    final memo = (note ?? '').trim();
+    if (memo.isNotEmpty) return memo;
+    return '店舗名なし';
+  }
+
   String get displayCategory => category?.name ?? '未分類';
+
+  String get displayPaymentMethod => PaymentMethod.labelOf(paymentMethod);
 
   DateTime get monthStart => DateTime(purchasedAt.year, purchasedAt.month);
 
@@ -154,6 +174,7 @@ class Receipt {
       barcodeId: json['barcode_id'] as String?,
       categoryId: json['category_id'] as String?,
       note: json['note'] as String?,
+      paymentMethod: PaymentMethod.tryParse(json['payment_method']),
       // Legacy image_base64 documents are tolerated but the photo is ignored.
       source: receiptSourceFromString(json['source'] as String?),
       rawOcrText: json['raw_ocr_text'] as String?,
@@ -190,6 +211,7 @@ class Receipt {
     String? barcodeId,
     String? categoryId,
     String? note,
+    PaymentMethod? paymentMethod,
     ReceiptSource? source,
     String? rawOcrText,
     List<ReceiptItem>? items,
@@ -216,6 +238,7 @@ class Receipt {
       barcodeId: barcodeId ?? this.barcodeId,
       categoryId: categoryId ?? this.categoryId,
       note: note ?? this.note,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       source: source ?? this.source,
       rawOcrText: rawOcrText ?? this.rawOcrText,
       items: items ?? this.items,
@@ -229,5 +252,24 @@ class Receipt {
     if (value == null) return null;
     if (value is DateTime) return value.toLocal();
     return DateTime.tryParse(value.toString())?.toLocal();
+  }
+}
+
+/// Pay-period helpers shared by the budget summary and the tests.
+extension ReceiptPeriodSpending on Iterable<Receipt> {
+  /// Sum of the receipts purchased inside [period] (`[start, end)`).
+  double totalInPeriod(PayPeriod period) {
+    var total = 0.0;
+    for (final receipt in this) {
+      if (period.contains(receipt.purchasedAt)) total += receipt.totalAmount;
+    }
+    return total;
+  }
+
+  /// Receipts purchased inside [period], newest first.
+  List<Receipt> withinPeriod(PayPeriod period) {
+    final rows = where((receipt) => period.contains(receipt.purchasedAt))
+        .toList(growable: false);
+    return rows..sort((a, b) => b.purchasedAt.compareTo(a.purchasedAt));
   }
 }

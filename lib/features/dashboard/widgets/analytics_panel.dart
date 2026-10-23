@@ -73,6 +73,13 @@ class AnalyticsPanel extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             _ChartCard(
+              title: '支払い方法別（今月）',
+              child: data.paymentMethods.isEmpty
+                  ? const _EmptyChart(message: '今月のデータがありません')
+                  : _PaymentMethodBreakdown(data: data),
+            ),
+            const SizedBox(height: 14),
+            _ChartCard(
               title: '前月比（累計支出）',
               child: _MonthComparison(data: data),
             ),
@@ -393,6 +400,92 @@ class _CategoryBreakdown extends StatelessWidget {
               ),
           ],
         ),
+      ],
+    );
+  }
+}
+
+class _PaymentMethodBreakdown extends StatelessWidget {
+  const _PaymentMethodBreakdown({required this.data});
+
+  final AnalyticsData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      children: <Widget>[
+        for (final item in data.paymentMethods)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    item.method?.icon ?? Icons.help_outline,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: AppText(
+                              item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                          AppText(
+                            '${item.percentOf(data.monthTotal).toStringAsFixed(0)}%',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          AppText(
+                            formatYen(item.amount),
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: (item.percentOf(data.monthTotal) / 100)
+                              .clamp(0.0, 1.0),
+                          minHeight: 5,
+                          backgroundColor: theme.colorScheme.outlineVariant
+                              .withValues(alpha: 0.35),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppPalette.cyan,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AppText(
+                  '${item.count}件',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

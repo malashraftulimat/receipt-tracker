@@ -8,6 +8,7 @@ import '../../features/budget/budget_page.dart';
 import '../../features/categories/categories_page.dart';
 import '../../features/coupons/coupons_page.dart';
 import '../../features/dashboard/dashboard_page.dart';
+import '../../features/payments/add_payment_page.dart';
 import '../../features/receipts/receipt_detail_page.dart';
 import '../../features/review/review_page.dart';
 import '../../features/scan/scan_page.dart';
@@ -96,6 +97,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/scan',
         name: 'scan',
         builder: (context, state) => const ScanPage(),
+      ),
+      GoRoute(
+        path: '/payment/new',
+        name: 'addPayment',
+        builder: (context, state) => const AddPaymentPage(),
       ),
       GoRoute(
         path: '/review',

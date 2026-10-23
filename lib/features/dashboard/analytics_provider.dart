@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_palette.dart';
 import '../../data/providers.dart';
+import '../../domain/models/payment_method.dart';
 import '../../domain/models/receipt_filter.dart';
 
 class MonthTotal {
@@ -39,6 +40,24 @@ class MerchantTotal {
   final int count;
 }
 
+/// Current-month spending grouped by payment method.
+class PaymentMethodTotal {
+  const PaymentMethodTotal({
+    required this.method,
+    required this.amount,
+    required this.count,
+  });
+
+  /// Null = unset (receipts saved before the field existed).
+  final PaymentMethod? method;
+  final double amount;
+  final int count;
+
+  String get label => PaymentMethod.labelOf(method);
+
+  double percentOf(double total) => total <= 0 ? 0 : amount / total * 100;
+}
+
 class AnalyticsData {
   const AnalyticsData({
     required this.months,
@@ -47,6 +66,7 @@ class AnalyticsData {
     required this.monthCount,
     required this.sixMonthTotal,
     required this.topMerchants,
+    this.paymentMethods = const <PaymentMethodTotal>[],
     this.previousMonthTotal = 0,
     this.previousMonthCount = 0,
     this.currentDaily = const <double>[],
@@ -59,6 +79,9 @@ class AnalyticsData {
   final int monthCount;
   final double sixMonthTotal;
   final List<MerchantTotal> topMerchants;
+
+  /// Current-month spend per payment method (cash, cards, e-money, ...).
+  final List<PaymentMethodTotal> paymentMethods;
 
   /// Month-over-month comparison (current vs previous month).
   final double previousMonthTotal;
@@ -90,6 +113,7 @@ class AnalyticsData {
     monthCount: 0,
     sixMonthTotal: 0,
     topMerchants: <MerchantTotal>[],
+    paymentMethods: <PaymentMethodTotal>[],
   );
 }
 
@@ -153,6 +177,27 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
       .toList()
     ..sort((a, b) => b.amount.compareTo(a.amount));
 
+  // --- current month by payment method ------------------------------------
+  final paymentBuckets = <PaymentMethod?, _TotalBucket>{};
+  for (final receipt in currentMonth) {
+    final bucket = paymentBuckets.putIfAbsent(
+      receipt.paymentMethod,
+      _TotalBucket.new,
+    );
+    bucket.amount += receipt.totalAmount;
+    bucket.count += 1;
+  }
+  final paymentMethods = paymentBuckets.entries
+      .map(
+        (entry) => PaymentMethodTotal(
+          method: entry.key,
+          amount: entry.value.amount,
+          count: entry.value.count,
+        ),
+      )
+      .toList()
+    ..sort((a, b) => b.amount.compareTo(a.amount));
+
   // --- top merchants ------------------------------------------------------
   final merchantBuckets = <String, _CategoryBucket>{};
   for (final receipt in receipts) {
@@ -209,8 +254,14 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
     monthCount: currentMonth.length,
     sixMonthTotal: receipts.fold<double>(0, (sum, r) => sum + r.totalAmount),
     topMerchants: topMerchants.take(3).toList(growable: false),
+    paymentMethods: paymentMethods,
   );
 });
+
+class _TotalBucket {
+  double amount = 0;
+  int count = 0;
+}
 
 class _CategoryBucket {
   _CategoryBucket({required this.label, required this.color});

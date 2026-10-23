@@ -6,6 +6,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/category.dart';
+import '../../../domain/models/payment_method.dart';
 import '../../../domain/models/receipt_filter.dart';
 import '../../../core/localization/localization.dart';
 
@@ -116,6 +117,11 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                 onPressed: _pickRange,
                 icon: const Icon(Icons.date_range_outlined),
               ),
+              const SizedBox(width: 6),
+              _PaymentMethodFilter(
+                method: filter.paymentMethod,
+                onChanged: notifier.setPaymentMethod,
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -127,6 +133,7 @@ class _FilterBarState extends ConsumerState<FilterBar> {
                 _FilterChip(
                   label: 'すべて',
                   selected: filter.categoryId == null &&
+                      filter.paymentMethod == null &&
                       filter.month == null &&
                       filter.from == null,
                   onTap: notifier.reset,
@@ -180,6 +187,97 @@ class _FilterBarState extends ConsumerState<FilterBar> {
 
   bool _sameMonth(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month;
+}
+
+/// Compact pill that opens the payment-method filter menu.
+class _PaymentMethodFilter extends StatelessWidget {
+  const _PaymentMethodFilter({required this.method, required this.onChanged});
+
+  final PaymentMethod? method;
+  final ValueChanged<PaymentMethod?> onChanged;
+
+  static const String _all = '__all__';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final active = method != null;
+    final color = active
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return PopupMenuButton<String>(
+      tooltip: context.tr('支払い方法で絞り込み'),
+      initialValue: method?.wireName ?? _all,
+      onSelected: (value) =>
+          onChanged(value == _all ? null : PaymentMethod.tryParse(value)),
+      itemBuilder: (context) => <PopupMenuEntry<String>>[
+        const PopupMenuItem<String>(
+          value: _all,
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.clear_all, size: 18),
+              SizedBox(width: 8),
+              AppText('すべて'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        for (final option in PaymentMethod.values)
+          PopupMenuItem<String>(
+            value: option.wireName,
+            child: Row(
+              children: <Widget>[
+                Icon(option.icon, size: 18),
+                const SizedBox(width: 8),
+                AppText(option.label),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: active ? 12 : 10,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          color: active
+              ? theme.colorScheme.primary.withValues(alpha: 0.16)
+              : theme.colorScheme.surfaceContainerHighest
+                  .withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                : theme.colorScheme.outlineVariant,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(method?.icon ?? Icons.credit_card_outlined,
+                size: 18, color: color),
+            if (active) ...<Widget>[
+              const SizedBox(width: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 132),
+                child: AppText(
+                  method!.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ViewToggleButton extends StatelessWidget {

@@ -402,6 +402,36 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   '「Project URL」と「anon public / publishable key」。\nこれらのキーはクライアント公開前提の値です。\nテーブルは supabase/schema.sql で作成してください。':
       '“Project URL” and “anon public / publishable key”.\nThese keys are intended to be public in the client.\nCreate the tables with supabase/schema.sql.',
 
+  // Quick payments (receiptless expenses) & payment methods
+  '支払いを追加': 'Add payment',
+  '支払いだけ記録する': 'Record a payment only',
+  '支払いを保存しました': 'Payment saved',
+  '支払い方法': 'Payment method',
+  '支払い方法（必須）': 'Payment method (required)',
+  '支払い方法（任意）': 'Payment method (optional)',
+  '支払い方法を選択してください': 'Please choose a payment method',
+  '支払い方法で絞り込み': 'Filter by payment method',
+  '支払い方法別（今月）': 'By payment method (this month)',
+  'レシートがない支払い（家賃・振込・貸付など）を記録します。'
+          '保存すると、ダッシュボード・予算・集計に自動で反映されます。':
+      'Record an expense without a receipt (rent, transfers, money lent, ...). '
+          'It immediately appears in the dashboard, budget and analytics.',
+  '日付': 'Date',
+  '金額を入力してください': 'Please enter an amount',
+  '0より大きい金額を入力してください': 'Enter an amount greater than 0',
+  'メモ（内容）': 'Note (what it was for)',
+  '例: 家賃、友人への貸付': 'e.g. rent, money lent to a friend',
+  '未設定': 'Not set',
+  '店舗名なし': 'No store name',
+  '現金': 'Cash',
+  'クレジットカード': 'Credit card',
+  'デビットカード': 'Debit card',
+  '銀行振込': 'Bank transfer',
+  '口座振替・公共料金': 'Direct debit / utility bills',
+  'QR・電子マネー': 'QR / e-money',
+  'ICカード（Suica / PASMO）': 'IC card (Suica / PASMO)',
+  'コンビニ払い': 'Convenience-store payment',
+
   // Category names (seeded defaults)
   '食費': 'Food',
   '外食': 'Dining out',

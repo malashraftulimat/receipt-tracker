@@ -191,7 +191,7 @@ class _DetailBody extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               AppText(
-                                receipt.displayMerchant,
+                                receipt.displayTitle,
                                 style: theme.textTheme.titleLarge
                                     ?.copyWith(fontWeight: FontWeight.w700),
                               ),
@@ -225,6 +225,18 @@ class _DetailBody extends StatelessWidget {
                           color: accent,
                           icon: category?.iconData,
                         ),
+                        if (receipt.paymentMethod != null)
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            label: AppText(
+                              receipt.displayPaymentMethod,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            avatar: Icon(
+                              receipt.paymentMethod!.icon,
+                              size: 14,
+                            ),
+                          ),
                         Chip(
                           visualDensity: VisualDensity.compact,
                           label: AppText(

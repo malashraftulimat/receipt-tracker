@@ -114,7 +114,11 @@ scanner falls back to on-device OCR.
 users/{userId}/receipts/{receiptId}
   merchant, purchased_at, total_amount, subtotal_amount,
   tax_8_amount, tax_10_amount, barcode_id (invoice / reference no.),
-  items[], raw_ocr_text, source, created_at, updated_at, ...
+  payment_method (cash / credit_card / debit_card / bank_transfer /
+                  direct_debit / qr_emoney / ic_card /
+                  convenience_store / other, optional),
+  items[], raw_ocr_text, source (barcode / ocr / manual),
+  created_at, updated_at, ...
 
 users/{userId}/coupons/{couponId}
   name, merchant, valid_from, valid_until,
@@ -146,13 +150,14 @@ document, so a receipt + items are written atomically.
 | Sync | Firestore per-user receipts/items, categories and budgets (no photos) |
 | Scan | Live 1D barcode (duplicate guard), tap-to-focus web camera, device-camera input, AI extraction, auto-detect and long-receipt modes |
 | Parse | Gemini structured JSON (merchant, ISO/Reiwa date, total, subtotal, 8%/10% tax, invoice no., items), with parser fallback |
-| Review | In-memory image preview, editable extracted items directly below it, header, tax, category, due date, notes, warnings and duplicate banner |
+| Review | In-memory image preview, editable extracted items directly below it, header, tax, category, payment method, due date, notes, warnings and duplicate banner |
+| Quick payment | Receiptless expense (rent, transfers, money lent) saved into the same collection as `source = manual`: amount, date, category, required payment method, note |
 | Coupons | Printed coupons extracted with name / validFrom / validUntil / discount, saved per receipt, daily reminders with **Mark as Used** / **Remind Tomorrow**, automatic expiry |
 | Categorize | 8 seeded categories + custom categories with colour & icon |
 | Dashboard | Month/day grouping, list/grid views, monthly subtotals |
-| Search/Filter | Merchant/note/barcode search, category chips, 今月/先月, custom ranges |
+| Search/Filter | Merchant/note/barcode search, category chips, payment-method filter, 今月/先月, custom ranges |
 | Budget | Daily / weekly / monthly salary cycle (with weekly weekday and monthly payday anchors), savings goal, fixed costs, remaining-per-pay-period pacing |
-| Analytics | 6-month bars, category donut, top merchants, monthly metrics (`fl_chart`) |
+| Analytics | 6-month bars, category donut, payment-method breakdown, top merchants, monthly metrics (`fl_chart`) |
 | Languages | Browser / system language auto-detection, header switcher (visible on login & register too), Japanese / English / Arabic (RTL) |
 | Export | UTF-8 CSV for Excel / Numbers (no images) |
 
@@ -181,6 +186,27 @@ The dashboard card and the budget page show the amount left for the current pay
 period, its date range, and the per-day allowance for the days remaining until
 the next payday. The preference is stored in `SharedPreferences` (like the theme
 and language); the plan itself stays in Firestore per user.
+
+### Quick payments (no receipt)
+
+The **支払いを追加 / Add payment** screen (dashboard app-bar button, scan screen
+button, route `/payment/new`) records expenses that have no receipt — rent,
+bank transfers, money lent to a friend, and so on. It asks for amount (required),
+date (defaults to today), category, payment method (required) and a note.
+
+There is no parallel payments store: the entry is written to
+`users/{uid}/receipts` with `source = manual`, so the dashboard list, monthly
+subtotals, budget pacing (including daily / weekly / monthly pay periods) and
+analytics count it automatically. The note doubles as the list title when no
+merchant is set.
+
+Payment methods are a stored enum (`payment_method`, snake_case wire names,
+localized ja/en/ar): cash, credit card, debit card, bank transfer, direct
+debit / utility bills, QR / e-money, IC card (Suica / PASMO), convenience-store
+payment and other. Scanned receipts can set the same field in the review screen
+(optional, default **未設定**); documents written before the field existed simply
+read back as unset. The dashboard shows a chip per list row, can filter by
+method, and analytics includes a current-month breakdown per method.
 
 
 ---
@@ -212,7 +238,7 @@ lib/
 │       └── ocr/                    # direct Gemini API + ML Kit / Tesseract.js fallback
 └── features/
     ├── auth/ scan/ review/
-    ├── dashboard/ receipts/ categories/ budget/
+    ├── dashboard/ receipts/ categories/ budget/ payments/
     └── settings/
 ```
 

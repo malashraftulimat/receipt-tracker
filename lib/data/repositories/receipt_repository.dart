@@ -72,6 +72,12 @@ class ReceiptRepository {
           .toList(growable: false);
     }
 
+    if (filter.paymentMethod != null) {
+      receipts = receipts
+          .where((receipt) => receipt.paymentMethod == filter.paymentMethod)
+          .toList(growable: false);
+    }
+
     final term = filter.searchTerm.toLowerCase();
     if (term.isNotEmpty) {
       receipts = receipts.where((receipt) {

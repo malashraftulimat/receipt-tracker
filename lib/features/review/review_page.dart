@@ -12,6 +12,7 @@ import '../../data/providers.dart';
 import '../../data/repositories/receipt_repository.dart';
 import '../../data/services/image_input.dart';
 import '../../domain/models/category.dart';
+import '../../domain/models/payment_method.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/models/receipt_item.dart';
@@ -72,6 +73,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   late DateTime _purchasedAt;
   String? _categoryId;
   String? _suggestedCategory;
+
+  /// Optional: how the receipt was paid (unset for older documents).
+  PaymentMethod? _paymentMethod;
 
   /// Coupon printed on the receipt; saved alongside a new receipt.
   ParsedCoupon? _coupon;
@@ -137,6 +141,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
     _purchasedAt = draft?.purchasedAt ?? DateTime.now();
     _categoryId = draft?.categoryId;
+    _paymentMethod = draft?.paymentMethod;
     _suggestedCategory = widget.args.parsed?.suggestedCategory;
     _coupon = widget.args.parsed?.coupon;
     _tax8Base = draft?.tax8Base;
@@ -413,6 +418,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       barcodeId: _barcode.text,
       categoryId: _categoryId,
       note: _note.text,
+      paymentMethod: _paymentMethod,
       rawOcrText: _rawOcrText,
       items: items,
       source: _source,
@@ -793,6 +799,53 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                         ),
                         onSelected: (_) =>
                             setState(() => _categoryId = category.id),
+                      );
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: AppText(
+                '支払い方法（任意）',
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                ChoiceChip(
+                  label: const AppText('未設定'),
+                  selected: _paymentMethod == null,
+                  onSelected: (_) => setState(() => _paymentMethod = null),
+                ),
+                for (final method in PaymentMethod.values)
+                  Builder(
+                    builder: (context) {
+                      final selected = _paymentMethod == method;
+                      return ChoiceChip(
+                        avatar: Icon(
+                          method.icon,
+                          size: 16,
+                          color: selected
+                              ? Colors.white
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        label: AppText(method.label),
+                        selected: selected,
+                        selectedColor: AppPalette.cyan,
+                        labelStyle: TextStyle(
+                          color: selected
+                              ? Colors.white
+                              : theme.colorScheme.onSurface,
+                          fontSize: 12.5,
+                        ),
+                        onSelected: (_) =>
+                            setState(() => _paymentMethod = method),
                       );
                     },
                   ),
