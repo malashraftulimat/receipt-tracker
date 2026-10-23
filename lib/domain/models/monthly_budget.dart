@@ -1,3 +1,5 @@
+import 'pay_cycle.dart';
+
 /// Per-month income / savings / fixed-expense plan.
 class MonthlyBudget {
   const MonthlyBudget({
@@ -8,6 +10,8 @@ class MonthlyBudget {
     this.savingsGoal = 0,
     this.fixedExpenses = 0,
     this.note,
+    this.payCycle,
+    this.incomePerCycle,
   });
 
   final String? id;
@@ -16,7 +20,7 @@ class MonthlyBudget {
   /// First day of the month (local time).
   final DateTime month;
 
-  /// 手取りの月収.
+  /// 手取りの月収（[incomePerCycle] を月換算した値）.
   final int salary;
 
   /// 毎月の貯蓄目標.
@@ -26,6 +30,15 @@ class MonthlyBudget {
   final int fixedExpenses;
 
   final String? note;
+
+  /// 保存したときに使っていた給与サイクル（未設定なら月給扱い）.
+  final PayCycle? payCycle;
+
+  /// ユーザーが入力した「1サイクルあたり」の手取り額.
+  ///
+  /// [salary] はこれを月換算した値なので、日払い・週払いでも丸め誤差なく
+  /// 入力した金額をそのまま再表示できる。
+  final int? incomePerCycle;
 
   /// 自由に使える金額 = 給与 - 貯蓄目標 - 固定費.
   int get disposableIncome => salary - savingsGoal - fixedExpenses;
@@ -45,7 +58,16 @@ class MonthlyBudget {
       savingsGoal: (json['savings_goal'] as num?)?.toInt() ?? 0,
       fixedExpenses: (json['fixed_expenses'] as num?)?.toInt() ?? 0,
       note: json['note'] as String?,
+      payCycle: _parsePayCycle(json['pay_cycle']),
+      incomePerCycle: (json['income_per_cycle'] as num?)?.toInt(),
     );
+  }
+
+  static PayCycle? _parsePayCycle(Object? raw) {
+    for (final cycle in PayCycle.values) {
+      if (cycle.name == raw) return cycle;
+    }
+    return null;
   }
 
   Map<String, dynamic> toRow() => <String, dynamic>{
@@ -55,6 +77,8 @@ class MonthlyBudget {
         'savings_goal': savingsGoal,
         'fixed_expenses': fixedExpenses,
         'note': note,
+        'pay_cycle': payCycle?.name,
+        'income_per_cycle': incomePerCycle,
       };
 
   String get _monthIso {
@@ -67,6 +91,8 @@ class MonthlyBudget {
     int? savingsGoal,
     int? fixedExpenses,
     String? note,
+    PayCycle? payCycle,
+    int? incomePerCycle,
   }) {
     return MonthlyBudget(
       id: id,
@@ -76,6 +102,8 @@ class MonthlyBudget {
       savingsGoal: savingsGoal ?? this.savingsGoal,
       fixedExpenses: fixedExpenses ?? this.fixedExpenses,
       note: note ?? this.note,
+      payCycle: payCycle ?? this.payCycle,
+      incomePerCycle: incomePerCycle ?? this.incomePerCycle,
     );
   }
 }
@@ -83,6 +111,12 @@ class MonthlyBudget {
 enum BudgetStatus { unset, onTrack, warning, overBudget }
 
 /// Budget plan + actual spending for one month, computed on the client.
+///
+/// The monthly numbers ([spent], [disposable], [remaining]) always cover the
+/// calendar month. The `period*` getters cover the **current pay period**
+/// (today / this week / this month, depending on the user's [payCycle]), which
+/// is what a daily- or weekly-paid user needs to see. When no period is given
+/// the period falls back to the whole month, preserving the original numbers.
 class BudgetSummary {
   const BudgetSummary({
     required this.month,
@@ -92,6 +126,13 @@ class BudgetSummary {
     required this.daysInMonth,
     required this.daysElapsed,
     required this.todaySpent,
+    this.payCycle = PayCycle.monthly,
+    this.periodStart,
+    this.periodEnd,
+    this.periodDays,
+    this.periodDaysElapsed,
+    this.periodBudget,
+    this.periodSpent,
   });
 
   final DateTime month;
@@ -102,7 +143,26 @@ class BudgetSummary {
   final int daysElapsed;
   final double todaySpent;
 
-  bool get configured => budget?.isConfigured ?? false;
+  /// Salary cycle the plan is paced against.
+  final PayCycle payCycle;
+
+  /// Current pay period (local midnight); `null` = calendar month.
+  final DateTime? periodStart;
+
+  /// Exclusive end of the current pay period.
+  final DateTime? periodEnd;
+
+  final int? periodDays;
+  final int? periodDaysElapsed;
+
+  /// Amount available for the current pay period.
+  final double? periodBudget;
+
+  /// Spending inside the current pay period.
+  final double? periodSpent;
+
+  /// True when this month or the current pay period has a plan.
+  bool get configured => (budget?.isConfigured ?? false) || cycleBudget != 0;
 
   double get disposable => (budget?.disposableIncome ?? 0).toDouble();
 
@@ -114,10 +174,63 @@ class BudgetSummary {
     return left < 1 ? 1 : left;
   }
 
-  /// How much can still be spent per remaining day.
+  // --- current pay period ------------------------------------------------
+
+  double get cycleBudget => periodBudget ?? disposable;
+
+  double get cycleSpent => periodSpent ?? spent;
+
+  double get periodRemaining => cycleBudget - cycleSpent;
+
+  int get cycleDays => periodDays ?? daysInMonth;
+
+  int get cycleDaysElapsed => periodDaysElapsed ?? daysElapsed;
+
+  /// Days left in the current pay period including today.
+  int get periodDaysRemaining {
+    final left = cycleDays - cycleDaysElapsed + 1;
+    return left < 1 ? 1 : left;
+  }
+
+  /// 0..1+ progress of the current pay period's budget.
+  double get periodProgress {
+    if (!configured || cycleBudget <= 0) return 0;
+    return cycleSpent / cycleBudget;
+  }
+
+  /// Expected spending by today inside the current pay period.
+  double get periodExpectedSpent {
+    if (!configured) return 0;
+    return cycleBudget * cycleDaysElapsed / cycleDays;
+  }
+
+  /// Positive = spending faster than the pay-period plan.
+  double get periodVelocityDelta => cycleSpent - periodExpectedSpent;
+
+  /// '今日の残り予算' / '今週の残り予算' / '今月の残り予算'.
+  String get periodRemainingLabel => switch (payCycle) {
+        PayCycle.daily => '今日の残り予算',
+        PayCycle.weekly => '今週の残り予算',
+        PayCycle.monthly => '今月の残り予算',
+      };
+
+  BudgetStatus get periodStatus {
+    if (!configured) return BudgetStatus.unset;
+    if (periodRemaining < 0) return BudgetStatus.overBudget;
+    if (periodProgress >= 0.9 ||
+        periodVelocityDelta > cycleBudget * 0.15) {
+      return BudgetStatus.warning;
+    }
+    return BudgetStatus.onTrack;
+  }
+
+  /// How much can still be spent per remaining day of the pay period.
   int get dailyAllowance {
     if (!configured) return 0;
-    return remaining <= 0 ? 0 : remaining ~/ daysRemaining;
+    final remainingNow = periodRemaining;
+    return remainingNow <= 0
+        ? 0
+        : remainingNow.floor() ~/ periodDaysRemaining;
   }
 
   /// 0..1+ progress of the disposable budget.
@@ -151,7 +264,12 @@ class BudgetSummary {
     return BudgetStatus.onTrack;
   }
 
-  String get statusLabel {
+  String get statusLabel => _labelFor(status);
+
+  /// Status of the current pay period (today / week / month).
+  String get periodStatusLabel => _labelFor(periodStatus);
+
+  static String _labelFor(BudgetStatus status) {
     switch (status) {
       case BudgetStatus.unset:
         return '予算未設定';

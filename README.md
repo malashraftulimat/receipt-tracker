@@ -123,6 +123,9 @@ users/{userId}/coupons/{couponId}
 
 users/{userId}/categories/{categoryId}
 users/{userId}/budgets/{yyyy-MM}
+  salary (monthly equivalent), savings_goal, fixed_expenses,
+  pay_cycle (daily/weekly/monthly), income_per_cycle, note,
+  month, updated_at
 ```
 
 **No image field is written.** Older documents that still contain
@@ -148,9 +151,37 @@ document, so a receipt + items are written atomically.
 | Categorize | 8 seeded categories + custom categories with colour & icon |
 | Dashboard | Month/day grouping, list/grid views, monthly subtotals |
 | Search/Filter | Merchant/note/barcode search, category chips, 今月/先月, custom ranges |
+| Budget | Daily / weekly / monthly salary cycle (with weekly weekday and monthly payday anchors), savings goal, fixed costs, remaining-per-pay-period pacing |
 | Analytics | 6-month bars, category donut, top merchants, monthly metrics (`fl_chart`) |
 | Languages | Browser / system language auto-detection, header switcher (visible on login & register too), Japanese / English / Arabic (RTL) |
 | Export | UTF-8 CSV for Excel / Numbers (no images) |
+
+---
+
+## Budget & salary cycle
+
+### Daily / weekly / monthly salary
+
+Settings → **給与の受け取り方** lets each user pick how their salary arrives:
+
+- **日払い (daily)** — the plan is paced day by day; the dashboard shows
+  "今日の残り予算".
+- **週払い (weekly)** — a 7-day period starting on a chosen weekday
+  (default Monday); the dashboard shows "今週の残り予算".
+- **月払い (monthly)** — the calendar month by default, or any monthly payday
+  (1–28, or **月末** for the last day of each month).
+
+Only the *pacing* changes: the budget form asks for the income **per cycle**
+("日収 / 週収 / 月収"), keeps the typed amount in `income_per_cycle` and stores
+the monthly equivalent in `salary`, so daily / weekly plans round-trip without
+rounding drift and older monthly plans keep working unchanged. Savings goal and
+fixed expenses stay monthly.
+
+The dashboard card and the budget page show the amount left for the current pay
+period, its date range, and the per-day allowance for the days remaining until
+the next payday. The preference is stored in `SharedPreferences` (like the theme
+and language); the plan itself stays in Firestore per user.
+
 
 ---
 
@@ -164,11 +195,12 @@ lib/
 │   ├── config/                     # FirebaseOptions, App Check and Gemini model/key
 │   ├── localization/               # AppLanguage, AppLocalizations, AppText
 │   ├── router/                     # auth redirect + responsive shell
+│   ├── settings/                   # persisted salary-cycle preference
 │   ├── theme/                      # Material 3 light/dark
 │   ├── utils/                      # money/date formatting, barcode checks
 │   └── widgets/                    # language switcher, press scale, budget bar
 ├── domain/
-│   ├── models/                     # receipt, item, category, budget, filter
+│   ├── models/                     # receipt, item, category, budget, pay cycle, filter
 │   └── parser/                     # OCR post-processing heuristics
 ├── data/
 │   ├── providers.dart              # Riverpod graph (Firebase auth, repos, queries)
@@ -224,7 +256,7 @@ lib/
 | `path_provider` | Temp file for ML Kit `InputImage` |
 | `fl_chart` | Monthly bars + category donut |
 | `intl` | Locale-aware date formatting (ja/en/ar) |
-| `shared_preferences` | Theme + language preferences, coupon action journal / reminder state |
+| `shared_preferences` | Theme + language + salary-cycle preferences, coupon action journal / reminder state |
 | `http` | Worker transport for AI scans without a personal key |
 | `flutter_local_notifications` | Daily coupon reminders + action buttons (Android/iOS/macOS/web) |
 | `timezone` | Absolute scheduling times for reminders |

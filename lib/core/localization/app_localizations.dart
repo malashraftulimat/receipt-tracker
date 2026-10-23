@@ -127,6 +127,12 @@ final List<_DynamicRule> _englishRules = <_DynamicRule>[
       (m) => 'Item total does not match receipt total (difference ${m[1]}).'),
   _DynamicRule(RegExp(r'^明細合計 (.+) は合計と一致しています$'),
       (m) => 'Item total ${m[1]} matches the receipt total.'),
+  _DynamicRule(RegExp(r'^対象期間: (.+)$'), (m) => 'Period: ${m[1]}'),
+  _DynamicRule(RegExp(r'^次の支給日: (.+)$'), (m) => 'Next payday: ${m[1]}'),
+  _DynamicRule(RegExp(r'^今回の対象期間: (.+)（あと(\d+)日）$'),
+      (m) => 'Current period: ${m[1]} (${m[2]} days left)'),
+  _DynamicRule(RegExp(r'^月換算: (.+)（この月の日数で計算）$'),
+      (m) => 'Monthly equivalent: ${m[1]} (based on this month\'s days)'),
 ];
 
 final List<_DynamicRule> _arabicRules = <_DynamicRule>[
@@ -201,6 +207,12 @@ final List<_DynamicRule> _arabicRules = <_DynamicRule>[
       (m) => 'إجمالي العناصر لا يطابق إجمالي الإيصال (الفرق ${m[1]}).'),
   _DynamicRule(RegExp(r'^明細合計 (.+) は合計と一致しています$'),
       (m) => 'إجمالي العناصر ${m[1]} يطابق إجمالي الإيصال.'),
+  _DynamicRule(RegExp(r'^対象期間: (.+)$'), (m) => 'الفترة: ${m[1]}'),
+  _DynamicRule(RegExp(r'^次の支給日: (.+)$'), (m) => 'موعد الدفع التالي: ${m[1]}'),
+  _DynamicRule(RegExp(r'^今回の対象期間: (.+)（あと(\d+)日）$'),
+      (m) => 'الفترة الحالية: ${m[1]} (بقي ${m[2]} يوم)'),
+  _DynamicRule(RegExp(r'^月換算: (.+)（この月の日数で計算）$'),
+      (m) => 'المكافئ الشهري: ${m[1]} (حسب أيام هذا الشهر)'),
 ];
 
 class _AppLocalizationsDelegate

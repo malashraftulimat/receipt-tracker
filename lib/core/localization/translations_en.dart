@@ -271,6 +271,42 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   '予算オーバー': 'Over budget',
   'カテゴリを読み込めませんでした\n': 'Could not load categories\n',
 
+  // Salary cycle (daily / weekly / monthly pay)
+  '給与の受け取り方': 'How you get paid',
+  '日払い': 'Daily',
+  '週払い': 'Weekly',
+  '月払い': 'Monthly',
+  '支給曜日': 'Payday (weekday)',
+  '支給日': 'Payday',
+  '月末': 'End of month',
+  '給与が入るタイミングを選ぶと、ダッシュボードと予算ページが'
+          '「次の支給日まであといくら使えるか」で表示されます。':
+      'Pick when your salary arrives and the dashboard and budget page will '
+          'show how much you can still spend before the next payday.',
+  '貯蓄目標と固定費は月額のまま保存されます。'
+          '日払い・週払いでも金額の入力を月に換算する必要はありません。':
+      'The savings goal and fixed costs are stored as monthly amounts. '
+          'You never have to convert a daily or weekly amount yourself.',
+  '給与プラン': 'Pay plan',
+  '給与サイクルは設定から変更できます。':
+      'You can change the salary cycle in Settings.',
+  '日収（手取り）': 'Daily Income (Net)',
+  '週収（手取り）': 'Weekly Income (Net)',
+  '例: 10,000': 'e.g. 10,000',
+  '例: 50,000': 'e.g. 50,000',
+  '貯蓄目標と固定費は月額で入力してください。':
+      'Enter the savings goal and fixed costs as monthly amounts.',
+  '今日の状況': 'Today\'s status',
+  '今週の状況': 'This week\'s status',
+  '今日の残り予算': 'Remaining budget today',
+  '今週の残り予算': 'Remaining budget this week',
+  '自由に使える金額 = 収入 − 貯蓄目標 − 固定費。\n'
+          'レシートを登録すると、その月の残り予算から自動で差し引かれます。\n'
+          '「1日あたり」は、給与サイクルの残り予算 ÷ 次の支給日までの日数です。':
+      'Available = income − savings goal − fixed costs.\n'
+          'Saving a receipt automatically deducts it from that month\'s remaining budget.\n'
+          '“Per day” is the current pay period\'s remaining budget ÷ days left until the next payday.',
+
   // Review / receipt detail
   '内容の確認': 'Review',
   'レシートを編集': 'Edit receipt',

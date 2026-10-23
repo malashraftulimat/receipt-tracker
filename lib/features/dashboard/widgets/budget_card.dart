@@ -71,12 +71,15 @@ class BudgetCard extends ConsumerWidget {
             );
           }
 
-          final statusColor = switch (summary.status) {
+          final statusColor = switch (summary.periodStatus) {
             BudgetStatus.onTrack => AppPalette.emerald,
             BudgetStatus.warning => AppPalette.amber,
             BudgetStatus.overBudget => AppPalette.danger,
             BudgetStatus.unset => AppPalette.violet,
           };
+          final remainingLabel = summary.periodStart == null
+              ? '今月の残り予算'
+              : summary.periodRemainingLabel;
 
           return _Shell(
             accent: statusColor,
@@ -87,7 +90,7 @@ class BudgetCard extends ConsumerWidget {
                 Row(
                   children: <Widget>[
                     AppText(
-                      '今月の残り予算',
+                      remainingLabel,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -100,7 +103,7 @@ class BudgetCard extends ConsumerWidget {
                       ),
                       decoration: AppPalette.tintedPill(statusColor, radius: 8),
                       child: AppText(
-                        summary.statusLabel,
+                        summary.periodStatusLabel,
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
@@ -112,17 +115,17 @@ class BudgetCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 AppText(
-                  formatYen(summary.remaining.abs()),
+                  formatYen(summary.periodRemaining.abs()),
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: summary.remaining < 0
+                    color: summary.periodRemaining < 0
                         ? AppPalette.danger
                         : AppPalette.emerald,
                   ),
                 ),
                 const SizedBox(height: 8),
                 BudgetGradientBar(
-                  value: summary.progress,
+                  value: summary.periodProgress,
                   height: 9,
                 ),
                 const SizedBox(height: 8),

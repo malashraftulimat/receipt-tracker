@@ -2,9 +2,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models/app_user.dart';
+import '../core/settings/pay_cycle_provider.dart';
 import '../domain/models/category.dart';
 import '../domain/models/coupon.dart';
 import '../domain/models/monthly_budget.dart';
+import '../domain/models/pay_cycle.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
 import '../domain/parser/receipt_parser.dart';
@@ -176,13 +178,20 @@ final budgetProvider = FutureProvider.family<MonthlyBudget?, DateTime>(
   },
 );
 
-/// Plan + actual spending + pacing for a month.
+/// Plan + actual spending + pacing for a month, paced by the pay cycle.
+///
+/// For the current month the summary also carries the **current pay period**
+/// (`daily` = today, `weekly` = this week, `monthly` = the payday-to-payday
+/// month), so the dashboard can show how much is left until the next payday.
+/// Past / future months fall back to the calendar month.
 final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
   (ref, month) async {
     final userId = ref.watch(userIdProvider);
+    final config = ref.watch(payCycleProvider);
     final first = DateTime(month.year, month.month, 1);
+    final monthEnd = DateTime(month.year, month.month + 1, 1);
     final now = DateTime.now();
-    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final daysInMonth = daysInMonthOf(first);
 
     var daysElapsed = 0;
     if (first.year == now.year && first.month == now.month) {
@@ -193,24 +202,65 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
 
     final budget = await ref.watch(budgetProvider(first).future);
 
+    final isCurrentMonth = first.year == now.year && first.month == now.month;
+    final period = isCurrentMonth ? config.periodFor(now) : null;
+
+    // A monthly payday period that started last month (e.g. payday 25, today
+    // Oct 3) was funded by last month's plan. Fall back to this month's plan
+    // when that one is missing.
+    var periodPlan = budget;
+    if (period != null && config.isMonthly) {
+      final periodMonth = firstDayOfMonth(period.start);
+      if (periodMonth != first) {
+        periodPlan =
+            await ref.watch(budgetProvider(periodMonth).future) ?? budget;
+      }
+    }
+
+    // One query covering both the calendar month and the current pay period.
+    final rangeStart = period != null && period.start.isBefore(first)
+        ? period.start
+        : first;
+    final rangeEnd = period != null && period.end.isAfter(monthEnd)
+        ? period.end
+        : monthEnd;
+
     var spent = 0.0;
     var receiptCount = 0;
     var todaySpent = 0.0;
+    var periodSpent = 0.0;
 
     if (userId != null) {
-      final receipts = await ref
-          .watch(receiptRepositoryProvider)
-          .fetch(ReceiptFilter(month: first));
+      final receipts = await ref.watch(receiptRepositoryProvider).fetch(
+            ReceiptFilter(from: rangeStart, to: rangeEnd),
+          );
       for (final receipt in receipts) {
-        spent += receipt.totalAmount;
-        receiptCount += 1;
         final date = receipt.purchasedAt;
+        if (!date.isBefore(first) && date.isBefore(monthEnd)) {
+          spent += receipt.totalAmount;
+          receiptCount += 1;
+        }
         if (date.year == now.year &&
             date.month == now.month &&
             date.day == now.day) {
           todaySpent += receipt.totalAmount;
         }
+        if (period != null && period.contains(date)) {
+          periodSpent += receipt.totalAmount;
+        }
       }
+    }
+
+    double? periodBudget;
+    int? periodDays;
+    int? periodDaysElapsed;
+    if (period != null && periodPlan != null) {
+      final disposable = periodPlan.disposableIncome.toDouble();
+      periodDays = period.days;
+      periodDaysElapsed = period.daysElapsedOn(now);
+      periodBudget = config.isMonthly
+          ? disposable
+          : disposable / config.periodsInMonth(first);
     }
 
     return BudgetSummary(
@@ -221,6 +271,13 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
       daysInMonth: daysInMonth,
       daysElapsed: daysElapsed,
       todaySpent: todaySpent,
+      payCycle: config.cycle,
+      periodStart: period?.start,
+      periodEnd: period?.end,
+      periodDays: periodDays,
+      periodDaysElapsed: periodDaysElapsed,
+      periodBudget: periodBudget,
+      periodSpent: period == null ? null : periodSpent,
     );
   },
 );

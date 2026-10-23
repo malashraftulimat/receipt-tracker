@@ -3,13 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/localization.dart';
+import '../../core/settings/pay_cycle_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
+import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../data/services/ai_key_store.dart';
 import '../../data/services/export_service.dart';
 import '../../data/services/ocr/ai_receipt_ocr_service.dart';
+import '../../domain/models/pay_cycle.dart';
 import '../../domain/models/receipt_filter.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -158,6 +161,8 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 14),
           const _AiKeyCard(),
           const SizedBox(height: 14),
+          const _PayCycleCard(),
+          const SizedBox(height: 14),
           _Card(
             title: '表示',
             children: <Widget>[
@@ -283,6 +288,125 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Daily / weekly / monthly salary — paces the budget on the dashboard.
+class _PayCycleCard extends ConsumerWidget {
+  const _PayCycleCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final config = ref.watch(payCycleProvider);
+    final controller = ref.read(payCycleProvider.notifier);
+    final now = DateTime.now();
+    final period = config.periodFor(now);
+    final labelStyle = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    return _Card(
+      title: '給与の受け取り方',
+      children: <Widget>[
+        AppText(
+          '給与が入るタイミングを選ぶと、ダッシュボードと予算ページが'
+          '「次の支給日まであといくら使えるか」で表示されます。',
+          style: labelStyle,
+        ),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<PayCycle>(
+            segments: const <ButtonSegment<PayCycle>>[
+              ButtonSegment<PayCycle>(
+                value: PayCycle.daily,
+                label: AppText('日払い'),
+                icon: Icon(Icons.today_outlined, size: 18),
+              ),
+              ButtonSegment<PayCycle>(
+                value: PayCycle.weekly,
+                label: AppText('週払い'),
+                icon: Icon(Icons.view_week_outlined, size: 18),
+              ),
+              ButtonSegment<PayCycle>(
+                value: PayCycle.monthly,
+                label: AppText('月払い'),
+                icon: Icon(Icons.calendar_month_outlined, size: 18),
+              ),
+            ],
+            selected: <PayCycle>{config.cycle},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) =>
+                controller.setCycle(selection.first),
+          ),
+        ),
+        if (config.cycle == PayCycle.weekly) ...<Widget>[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            initialValue: config.weeklyStartWeekday,
+            decoration: InputDecoration(
+              labelText: context.tr('支給曜日'),
+              prefixIcon: const Icon(Icons.event_repeat_outlined),
+            ),
+            items: <DropdownMenuItem<int>>[
+              for (var day = DateTime.monday; day <= DateTime.sunday; day++)
+                DropdownMenuItem<int>(
+                  value: day,
+                  child: AppText(formatWeekdayJa(day)),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) controller.setWeeklyStartWeekday(value);
+            },
+          ),
+        ],
+        if (config.cycle == PayCycle.monthly) ...<Widget>[
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            initialValue: config.monthlyPayDay,
+            decoration: InputDecoration(
+              labelText: context.tr('支給日'),
+              prefixIcon: const Icon(Icons.pin_outlined),
+            ),
+            items: <DropdownMenuItem<int>>[
+              for (var day = 1; day <= 28; day++)
+                DropdownMenuItem<int>(
+                  value: day,
+                  child: Text('$day'),
+                ),
+              const DropdownMenuItem<int>(
+                value: PayCycleConfig.endOfMonthPayDay,
+                child: AppText('月末'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) controller.setMonthlyPayDay(value);
+            },
+          ),
+        ],
+        const SizedBox(height: 10),
+        AppText(
+          '今回の対象期間: '
+          '${formatRangeJa(period.start, period.endInclusive)}'
+          '（あと${period.daysRemainingOn(now)}日）',
+          style: labelStyle,
+        ),
+        if (config.cycle != PayCycle.daily) ...<Widget>[
+          const SizedBox(height: 2),
+          AppText(
+            '次の支給日: ${formatDateShortJa(period.end)}',
+            style: labelStyle,
+          ),
+        ],
+        const SizedBox(height: 2),
+        AppText(
+          '貯蓄目標と固定費は月額のまま保存されます。'
+          '日払い・週払いでも金額の入力を月に換算する必要はありません。',
+          style: labelStyle,
+        ),
+      ],
     );
   }
 }

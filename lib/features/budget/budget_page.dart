@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/settings/pay_cycle_provider.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/budget_gradient_bar.dart';
@@ -9,6 +10,7 @@ import '../../core/widgets/language_switcher.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/monthly_budget.dart';
+import '../../domain/models/pay_cycle.dart';
 import '../../core/localization/localization.dart';
 
 /// Income / savings goal / fixed expenses for a month + live pacing.
@@ -56,9 +58,10 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       final budget =
           await ref.read(budgetRepositoryProvider).fetchMonth(_month);
       if (!mounted) return;
+      final config = ref.read(payCycleProvider);
       setState(() {
         _budgetId = budget?.id;
-        _salary.text = _formatInput(budget?.salary);
+        _salary.text = _formatInput(_incomePerCycle(budget, config));
         _savings.text = _formatInput(budget?.savingsGoal);
         _fixed.text = _formatInput(budget?.fixedExpenses);
         _loading = false;
@@ -72,8 +75,32 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     }
   }
 
+  /// Income the user typed for the active cycle.
+  ///
+  /// The stored value is reused when the plan was saved with the same cycle,
+  /// otherwise the monthly income is converted back (e.g. after switching from
+  /// monthly to weekly pay in Settings).
+  int _incomePerCycle(MonthlyBudget? budget, PayCycleConfig config) {
+    if (budget == null) return 0;
+    final stored = budget.incomePerCycle;
+    if (stored != null && budget.payCycle == config.cycle) return stored;
+    return config.perCycleEquivalent(budget.salary, _month);
+  }
+
   String _formatInput(int? value) =>
       (value == null || value == 0) ? '' : formatAmountDigits(value);
+
+  String _incomeLabel(PayCycle cycle) => switch (cycle) {
+        PayCycle.daily => '日収（手取り）',
+        PayCycle.weekly => '週収（手取り）',
+        PayCycle.monthly => '月収（手取り）',
+      };
+
+  String _incomeHint(PayCycle cycle) => switch (cycle) {
+        PayCycle.daily => '例: 10,000',
+        PayCycle.weekly => '例: 50,000',
+        PayCycle.monthly => '例: 250,000',
+      };
 
   void _changeMonth(int delta) {
     setState(() {
@@ -90,12 +117,18 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     });
 
     try {
+      final config = ref.read(payCycleProvider);
+      final incomePerCycle = parseYenInput(_salary.text) ?? 0;
       final budget = MonthlyBudget(
         id: _budgetId,
         month: _month,
-        salary: parseYenInput(_salary.text) ?? 0,
+        // Monthly figure used by analytics; the typed amount is kept verbatim
+        // so daily / weekly plans survive round-trips without rounding drift.
+        salary: config.monthlyEquivalent(incomePerCycle, _month),
         savingsGoal: parseYenInput(_savings.text) ?? 0,
         fixedExpenses: parseYenInput(_fixed.text) ?? 0,
+        payCycle: config.cycle,
+        incomePerCycle: incomePerCycle,
       );
       final saved = await ref.read(budgetRepositoryProvider).save(budget);
       if (!mounted) return;
@@ -121,6 +154,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final summaryAsync = ref.watch(budgetSummaryProvider(_month));
+    final config = ref.watch(payCycleProvider);
+
+    // Keep the form in sync when the salary cycle changes in Settings.
+    ref.listen<PayCycleConfig>(payCycleProvider, (previous, next) {
+      if (previous?.cycle != next.cycle) _load();
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -153,17 +192,54 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   AppText(
-                    '毎月のプラン',
+                    config.isMonthly ? '毎月のプラン' : '給与プラン',
                     style: theme.textTheme.labelLarge
                         ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.payments_outlined,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: AppText(
+                          '給与サイクルは設定から変更できます。',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   _MoneyField(
                     controller: _salary,
-                    label: '月収（手取り）',
-                    hint: '例: 250,000',
+                    label: _incomeLabel(config.cycle),
+                    hint: _incomeHint(config.cycle),
                     icon: Icons.work_outline,
                   ),
+                  if (!config.isMonthly) ...<Widget>[
+                    const SizedBox(height: 6),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _salary,
+                      builder: (context, value, _) {
+                        final perCycle = parseYenInput(value.text) ?? 0;
+                        final monthly =
+                            config.monthlyEquivalent(perCycle, _month);
+                        return AppText(
+                          '月換算: ${formatYen(monthly)}'
+                          '（この月の日数で計算）',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   _MoneyField(
                     controller: _savings,
@@ -177,6 +253,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                     label: '固定費（家賃・光熱費・サブスク）',
                     hint: '例: 80,000',
                     icon: Icons.home_outlined,
+                  ),
+                  const SizedBox(height: 6),
+                  AppText(
+                    '貯蓄目標と固定費は月額で入力してください。',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   if (_error != null) ...<Widget>[
                     const SizedBox(height: 12),
@@ -224,9 +307,9 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               borderRadius: BorderRadius.circular(14),
             ),
             child: AppText(
-              '自由に使える金額 = 月収 − 貯蓄目標 − 固定費。\n'
+              '自由に使える金額 = 収入 − 貯蓄目標 − 固定費。\n'
               'レシートを登録すると、その月の残り予算から自動で差し引かれます。\n'
-              '「1日あたり」は残り予算 ÷ 残り日数です。',
+              '「1日あたり」は、給与サイクルの残り予算 ÷ 次の支給日までの日数です。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.6,
@@ -343,12 +426,26 @@ class _SummaryCard extends StatelessWidget {
       );
     }
 
-    final statusColor = switch (data.status) {
+    final statusColor = switch (data.periodStatus) {
       BudgetStatus.onTrack => AppPalette.emerald,
       BudgetStatus.warning => AppPalette.amber,
       BudgetStatus.overBudget => AppPalette.danger,
       BudgetStatus.unset => AppPalette.violet,
     };
+    final activePeriod = data.periodStart != null;
+    final monthStart = DateTime(data.month.year, data.month.month);
+    final monthEnd = DateTime(data.month.year, data.month.month + 1);
+    final showPeriodRange = data.periodStart != null &&
+        data.periodEnd != null &&
+        !(data.periodStart!.isAtSameMomentAs(monthStart) &&
+            data.periodEnd!.isAtSameMomentAs(monthEnd));
+    final periodLabel = !activePeriod
+        ? '今月の状況'
+        : switch (data.payCycle) {
+            PayCycle.daily => '今日の状況',
+            PayCycle.weekly => '今週の状況',
+            PayCycle.monthly => '今月の状況',
+          };
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -359,7 +456,7 @@ class _SummaryCard extends StatelessWidget {
           Row(
             children: <Widget>[
               AppText(
-                '今月の状況',
+                periodLabel,
                 style: theme.textTheme.labelLarge
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
@@ -371,7 +468,7 @@ class _SummaryCard extends StatelessWidget {
                   radius: 8,
                 ),
                 child: AppText(
-                  data.statusLabel,
+                  data.periodStatusLabel,
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -383,24 +480,40 @@ class _SummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           AppText(
-            formatYen(data.remaining.abs()),
+            formatYen(data.periodRemaining.abs()),
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
-              color:
-                  data.remaining < 0 ? AppPalette.danger : AppPalette.emerald,
+              color: data.periodRemaining < 0
+                  ? AppPalette.danger
+                  : AppPalette.emerald,
             ),
           ),
           AppText(
-            data.remaining < 0 ? '予算オーバー額' : '今月の残り予算',
+            data.periodRemaining < 0
+                ? '予算オーバー額'
+                : (!activePeriod
+                    ? '今月の残り予算'
+                    : data.periodRemainingLabel),
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
+          if (showPeriodRange) ...<Widget>[
+            const SizedBox(height: 2),
+            AppText(
+              '対象期間: '
+              '${formatRangeJa(data.periodStart!, addDays(data.periodEnd!, -1))}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
-          BudgetGradientBar(value: data.progress, height: 11),
+          BudgetGradientBar(value: data.periodProgress, height: 11),
           const SizedBox(height: 6),
           AppText(
-            '支出 ${formatYen(data.spent)} / 自由枠 ${formatYen(data.disposable)} '
-            '(${(data.progress * 100).clamp(0, 999).toStringAsFixed(0)}%)',
+            '支出 ${formatYen(data.cycleSpent)} / 自由枠 '
+            '${formatYen(data.cycleBudget)} '
+            '(${(data.periodProgress * 100).clamp(0, 999).toStringAsFixed(0)}%)',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
@@ -441,14 +554,15 @@ class _SummaryCard extends StatelessWidget {
   }
 
   String _pacingMessage(BudgetSummary data) {
-    if (data.status == BudgetStatus.overBudget) {
-      return '予算を超えています。残り日数は ${data.daysRemaining} 日です。';
+    if (data.periodStatus == BudgetStatus.overBudget) {
+      return '予算を超えています。残り日数は ${data.periodDaysRemaining} 日です。';
     }
-    if (data.velocityDelta > 0) {
-      return '計画より ${formatYen(data.velocityDelta)} 多く使っています。'
-          '残り ${data.daysRemaining} 日、1日 ${formatYen(data.dailyAllowance)} が目安です。';
+    if (data.periodVelocityDelta > 0) {
+      return '計画より ${formatYen(data.periodVelocityDelta)} 多く使っています。'
+          '残り ${data.periodDaysRemaining} 日、'
+          '1日 ${formatYen(data.dailyAllowance)} が目安です。';
     }
-    return '計画より ${formatYen(-data.velocityDelta)} 節約できています。'
+    return '計画より ${formatYen(-data.periodVelocityDelta)} 節約できています。'
         'このペースなら貯蓄目標 ${formatYen(data.budget?.savingsGoal ?? 0)} に届きます。';
   }
 }

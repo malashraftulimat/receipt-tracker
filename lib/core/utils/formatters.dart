@@ -217,6 +217,15 @@ String formatDayJa(DateTime date) {
 
 String formatTimeJa(DateTime date) => DateFormat('HH:mm').format(date);
 
+/// Localized weekday name for [weekday] (1 = Monday … 7 = Sunday).
+///
+/// 2026-01-04 is a Sunday, so `DateTime(2026, 1, 4 + weekday)` lands on the
+/// requested weekday without DST-sensitive duration math.
+String formatWeekdayJa(int weekday, {bool short = false}) {
+  final date = DateTime(2026, 1, 4 + weekday.clamp(1, 7));
+  return DateFormat(short ? 'E' : 'EEEE', _dateLanguage).format(date);
+}
+
 String formatDateTimeJa(DateTime date) =>
     '${formatDateJa(date)} ${formatTimeJa(date)}';
 
