@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models/app_user.dart';
+import '../core/settings/currency_provider.dart';
 import '../core/settings/pay_cycle_provider.dart';
 import '../domain/models/category.dart';
 import '../domain/models/coupon.dart';
@@ -192,6 +193,7 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
   (ref, month) async {
     final userId = ref.watch(userIdProvider);
     final config = ref.watch(payCycleProvider);
+    final currencyCode = ref.watch(defaultCurrencyProvider).code;
     final first = DateTime(month.year, month.month, 1);
     final monthEnd = DateTime(month.year, month.month + 1, 1);
     final now = DateTime.now();
@@ -233,17 +235,24 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
     var receiptCount = 0;
     var todaySpent = 0.0;
     var periodSpent = 0.0;
+    var otherCurrencyCount = 0;
 
     if (userId != null) {
       final receipts = await ref.watch(receiptRepositoryProvider).fetch(
             ReceiptFilter(from: rangeStart, to: rangeEnd),
           );
+      final inDefaultCurrency = receipts
+          .where((receipt) => receipt.currency == currencyCode)
+          .toList(growable: false);
       for (final receipt in receipts) {
         final date = receipt.purchasedAt;
-        if (!date.isBefore(first) && date.isBefore(monthEnd)) {
-          spent += receipt.totalAmount;
-          receiptCount += 1;
+        final inMonth = !date.isBefore(first) && date.isBefore(monthEnd);
+        if (inMonth && receipt.currency != currencyCode) {
+          otherCurrencyCount += 1;
         }
+        if (!inMonth || receipt.currency != currencyCode) continue;
+        spent += receipt.totalAmount;
+        receiptCount += 1;
         if (date.year == now.year &&
             date.month == now.month &&
             date.day == now.day) {
@@ -251,8 +260,8 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
         }
       }
       if (period != null) {
-        // Receipts and receiptless payments alike count towards the period.
-        periodSpent = receipts.totalInPeriod(period);
+        // Only the default currency feeds the pay-period remaining budget.
+        periodSpent = inDefaultCurrency.totalInPeriod(period);
       }
     }
 
@@ -283,6 +292,7 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
       periodDaysElapsed: periodDaysElapsed,
       periodBudget: periodBudget,
       periodSpent: period == null ? null : periodSpent,
+      otherCurrencyCount: otherCurrencyCount,
     );
   },
 );

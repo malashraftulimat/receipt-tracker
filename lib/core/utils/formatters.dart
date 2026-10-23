@@ -43,7 +43,7 @@ String _groupDigits(String digits) {
 /// is whole, but still show it when the receipt carries a decimal value.
 String formatMoney(
   num amount, {
-  String currency = 'JPY',
+  String currency = kFallbackCurrencyCode,
   bool withSymbol = true,
 }) {
   final c = _displayCurrency(currency);
@@ -75,13 +75,15 @@ String formatCurrencyAmount(
 }) =>
     formatMoney(amount, currency: currency.code, withSymbol: withSymbol);
 
-/// `¥1,234` (JPY is displayed without decimals unless the value has a
-/// fractional part).
+/// Formats a JPY amount (no decimals unless the value is fractional).
 String formatYen(num amount, {bool withSymbol = true}) =>
-    formatMoney(amount, currency: 'JPY', withSymbol: withSymbol);
+    formatMoney(amount, currency: kFallbackCurrencyCode, withSymbol: withSymbol);
 
-/// Compact label for charts, e.g. `¥1.2万` / `$1.2M`.
-String formatCompactMoney(num amount, {String currency = 'JPY'}) {
+/// Compact label for charts, e.g. 1.2万 / 1.2M.
+String formatCompactMoney(
+  num amount, {
+  String currency = kFallbackCurrencyCode,
+}) {
   final c = _displayCurrency(currency);
   final format = NumberFormat.compactCurrency(
     locale: _dateLanguage,
@@ -99,11 +101,12 @@ String formatCompactYen(num amount) => formatCompactMoney(amount);
 ///
 /// Editable text always uses Western digits and `,` grouping so that the
 /// parser accepts it on every platform, independent of the display locale.
-String formatAmountDigits(num amount) {
+String formatAmountDigits(num amount, {int decimalDigits = 2}) {
   final value = amount.toDouble();
   final whole = value == value.roundToDouble();
-  final fixed =
-      whole ? value.abs().round().toString() : value.abs().toStringAsFixed(2);
+  final fixed = whole
+      ? value.abs().round().toString()
+      : value.abs().toStringAsFixed(decimalDigits);
   final parts = fixed.split('.');
   final grouped = _groupDigits(parts[0]);
   final number = parts.length > 1 ? '$grouped.${parts[1]}' : grouped;
@@ -153,15 +156,15 @@ String? _normalizeNumberInput(String input) {
   return text;
 }
 
-/// Parses user input such as `¥1,234`, `12.50` or `１２３４` into a decimal
-/// amount. Currency-agnostic and decimal-aware.
+/// Parses user input such as `1,234`, `12.50` or full-width digits into a
+/// decimal amount. Currency-agnostic and decimal-aware.
 double? parseAmountInput(String input) {
   final normalized = _normalizeNumberInput(input);
   if (normalized == null) return null;
   return double.tryParse(normalized);
 }
 
-/// Parses user input such as `¥1,234` or `１２３４` into an integer value.
+/// Parses user input such as `1,234` or full-width digits into an integer.
 int? parseYenInput(String input) {
   final normalized = _normalizeNumberInput(input);
   if (normalized == null) return null;

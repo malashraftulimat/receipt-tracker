@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/localization/currencies.dart';
+import '../../core/settings/currency_provider.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/language_switcher.dart';
@@ -20,6 +22,7 @@ import '../../domain/parser/category_guesser.dart';
 import '../../domain/parser/receipt_parser.dart';
 import 'widgets/item_editor_section.dart';
 import '../dashboard/analytics_provider.dart';
+import '../settings/widgets/currency_picker.dart';
 import '../../core/localization/localization.dart';
 
 /// Arguments passed through `context.push('/review', extra: ...)`.
@@ -107,9 +110,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final draft = _initial;
 
     _merchant = TextEditingController(text: draft?.merchant ?? '');
-    _currency = TextEditingController(
-      text: (draft?.currency ?? 'JPY').toUpperCase(),
-    );
+    final parsedCurrency = widget.args.parsed?.currency?.trim();
+    final initialCurrency = existing?.currency ??
+        (parsedCurrency != null && parsedCurrency.isNotEmpty
+            ? parsedCurrency.toUpperCase()
+            : ref.read(defaultCurrencyProvider).code);
+    _currency = TextEditingController(text: initialCurrency.toUpperCase());
     _total = TextEditingController(
       text: (draft?.totalAmount ?? 0) > 0
           ? formatAmountDigits(draft!.totalAmount)
@@ -199,6 +205,17 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     if (itemsTotal > 0) {
       _total.text = formatAmountDigits(itemsTotal);
     }
+  }
+
+  String get _currencyCode => currencyOrDefault(_currency.text).code;
+
+  Future<void> _pickCurrency() async {
+    final picked = await showCurrencyPicker(
+      context,
+      selected: currencyOrDefault(_currency.text),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _currency.text = picked.code);
   }
 
   /// Suggests categories from item names / merchant when none is chosen.
@@ -399,9 +416,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
     final draft = ReceiptDraft(
       merchant: _merchant.text,
-      currency: _currency.text.trim().isEmpty
-          ? 'JPY'
-          : _currency.text.trim().toUpperCase(),
+      currency: _currencyCode,
       purchasedAt: _purchasedAt,
       totalAmount: parseAmountInput(_total.text) ?? 0,
       subtotalAmount: parseAmountInput(_subtotal.text),
@@ -634,9 +649,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           totalAmount: parseAmountInput(_total.text) ?? 0,
           taxTotal: (parseAmountInput(_tax8.text) ?? 0) +
               (parseAmountInput(_tax10.text) ?? 0),
-          currency: _currency.text.trim().isEmpty
-              ? 'JPY'
-              : _currency.text.trim().toUpperCase(),
+          currency: _currencyCode,
           onAdd: _addItem,
           onRemove: _removeItem,
           onChanged: () => setState(() {}),
@@ -855,21 +868,11 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         ),
         const SizedBox(height: 14),
         _Section(
-          title: '金額（税込）',
+          title: 'amount_tax_included',
           children: <Widget>[
-            TextFormField(
-              controller: _currency,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z]')),
-                LengthLimitingTextInputFormatter(3),
-              ],
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: context.tr('通貨（ISOコード）'),
-                hintText: 'JPY / USD / SAR / EUR',
-                prefixIcon: const Icon(Icons.currency_exchange_outlined),
-              ),
+            _CurrencySelector(
+              currency: currencyOrDefault(_currency.text),
+              onTap: _pickCurrency,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -884,8 +887,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   ?.copyWith(fontWeight: FontWeight.w700),
               decoration: InputDecoration(
                 labelText: context.tr('total_amount'),
-                prefixText:
-                    '${currencySymbol(_currency.text.trim().isEmpty ? 'JPY' : _currency.text)} ',
+                prefixText: '${currencyOrDefault(_currency.text).symbol} ',
                 prefixIcon: const Icon(Icons.payments_outlined),
               ),
               validator: (value) {
@@ -905,7 +907,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   child: _AmountField(
                     controller: _subtotal,
                     label: 'subtotal_tax_excluded',
-                    currency: _currency.text,
+                    currency: _currencyCode,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -913,7 +915,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   child: _AmountField(
                     controller: _tax8,
                     label: '消費税 8%（任意）',
-                    currency: _currency.text,
+                    currency: _currencyCode,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -921,7 +923,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                   child: _AmountField(
                     controller: _tax10,
                     label: '消費税 10%（任意）',
-                    currency: _currency.text,
+                    currency: _currencyCode,
                   ),
                 ),
               ],
@@ -932,9 +934,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               tax10: parseAmountInput(_tax10.text),
               subtotal: parseAmountInput(_subtotal.text),
               total: parseAmountInput(_total.text),
-              currency: _currency.text.trim().isEmpty
-                  ? 'JPY'
-                  : _currency.text.trim().toUpperCase(),
+              currency: _currencyCode,
             ),
           ],
         ),
@@ -1082,11 +1082,71 @@ class _Section extends StatelessWidget {
   }
 }
 
+class _CurrencySelector extends StatelessWidget {
+  const _CurrencySelector({required this.currency, required this.onTap});
+
+  final Currency currency;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: <Widget>[
+              SizedBox(
+                width: 34,
+                child: Text(
+                  currency.symbol,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      currency.name(context.l10n.language),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    Text(
+                      '${currency.code} · ${currency.symbol}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AmountField extends StatelessWidget {
   const _AmountField({
     required this.controller,
     required this.label,
-    this.currency = 'JPY',
+    this.currency = kFallbackCurrencyCode,
   });
 
   final TextEditingController controller;
@@ -1104,8 +1164,7 @@ class _AmountField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         isDense: true,
-        prefixText:
-            '${currencySymbol(currency.trim().isEmpty ? 'JPY' : currency)} ',
+        prefixText: '${currencyOrDefault(currency).symbol} ',
       ),
     );
   }
@@ -1117,7 +1176,7 @@ class _TaxSummary extends StatelessWidget {
     required this.tax10,
     required this.subtotal,
     required this.total,
-    this.currency = 'JPY',
+    this.currency = kFallbackCurrencyCode,
   });
 
   final double? tax8;
@@ -1136,7 +1195,13 @@ class _TaxSummary extends StatelessWidget {
       final expected = subtotal! + taxTotal;
       if ((expected - total!).abs() > 0.011) {
         messages.add(
-          '小計 + 消費税 = ${formatMoney(expected, currency: currency)} と合計 ${formatMoney(total!, currency: currency)} が一致しません。',
+          context.tr(
+            'review.subtotal_tax_mismatch',
+            params: <String, Object?>{
+              'expected': formatMoney(expected, currency: currency),
+              'total': formatMoney(total!, currency: currency),
+            },
+          ),
         );
       }
     }

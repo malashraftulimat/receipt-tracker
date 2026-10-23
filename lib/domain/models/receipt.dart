@@ -1,3 +1,4 @@
+import '../../core/localization/currencies.dart';
 import 'category.dart';
 import 'payment_method.dart';
 import 'pay_cycle.dart';
@@ -35,7 +36,7 @@ class Receipt {
     required this.purchasedAt,
     required this.totalAmount,
     this.merchant,
-    this.currency = 'JPY',
+    this.currency = kFallbackCurrencyCode,
     this.subtotalAmount,
     this.tax8Amount,
     this.tax10Amount,
@@ -157,7 +158,7 @@ class Receipt {
       merchant: json['merchant'] as String?,
       currency: (json['currency'] as String?)?.trim().isNotEmpty == true
           ? json['currency'].toString().trim().toUpperCase()
-          : 'JPY',
+          : kFallbackCurrencyCode,
       purchasedAt: _parseDate(json['purchased_at']) ?? DateTime.now(),
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
       subtotalAmount: (json['subtotal_amount'] as num?)?.toDouble(),

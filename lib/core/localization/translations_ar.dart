@@ -22,6 +22,7 @@ const Map<String, String> kArabicTranslations = <String, String>{
   'allow_camera_access_for_this_site_in_your_br': 'اسمح باستخدام الكاميرا لهذا الموقع من إعدادات المتصفح أو الجهاز،\nثم اضغط «إعادة محاولة الكاميرا».\nيمكنك أيضاً اختيار صورة لـ OCR.',
   'amount': 'المبلغ',
   'amount_breakdown': 'تفصيل المبلغ',
+  'amount_tax_included': 'المبلغ (شامل الضريبة)',
   'amount_tax_included_jpy': 'المبلغ (شامل الضريبة، ين)',
   'analysing': 'جارٍ التحليل…',
   'analysing_receipt': 'جارٍ تحليل الإيصال…',

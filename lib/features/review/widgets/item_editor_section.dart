@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/localization/currencies.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/category.dart';
@@ -80,7 +81,7 @@ class ItemEditorSection extends StatelessWidget {
     required this.categories,
     required this.totalAmount,
     required this.taxTotal,
-    this.currency = 'JPY',
+    this.currency = kFallbackCurrencyCode,
     required this.onAdd,
     required this.onRemove,
     required this.onChanged,

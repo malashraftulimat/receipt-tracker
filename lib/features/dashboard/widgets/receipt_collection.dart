@@ -6,6 +6,7 @@ import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/press_scale.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/settings/currency_provider.dart';
 import '../../../data/providers.dart';
 import '../../../domain/models/receipt.dart';
 import '../../../domain/models/receipt_filter.dart';
@@ -20,6 +21,7 @@ class ReceiptCollection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncReceipts = ref.watch(receiptsProvider);
     final filter = ref.watch(receiptFilterProvider);
+    final currencyCode = ref.watch(defaultCurrencyProvider).code;
 
     return asyncReceipts.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -33,12 +35,16 @@ class ReceiptCollection extends ConsumerWidget {
           children: <Widget>[
             _SummaryStrip(
               receipts: receipts,
+              currencyCode: currencyCode,
               onRefresh: () => ref.invalidate(receiptsProvider),
             ),
             Expanded(
               child: filter.view == ReceiptViewMode.grid
                   ? _ReceiptGrid(receipts: receipts)
-                  : _GroupedReceiptList(receipts: receipts),
+                  : _GroupedReceiptList(
+                      receipts: receipts,
+                      currencyCode: currencyCode,
+                    ),
             ),
           ],
         );
@@ -52,44 +58,72 @@ class ReceiptCollection extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _SummaryStrip extends StatelessWidget {
-  const _SummaryStrip({required this.receipts, required this.onRefresh});
+  const _SummaryStrip({
+    required this.receipts,
+    required this.currencyCode,
+    required this.onRefresh,
+  });
 
   final List<Receipt> receipts;
+  final String currencyCode;
   final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    final total = receipts.fold<double>(0, (sum, r) => sum + r.totalAmount);
-    final average = total / receipts.length;
+    final matching = receipts
+        .where((receipt) => receipt.currency == currencyCode)
+        .toList(growable: false);
+    final total = matching.fold<double>(0, (sum, r) => sum + r.totalAmount);
+    final average = matching.isEmpty ? 0.0 : total / matching.length;
+    final otherCount = receipts.length - matching.length;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: AppPalette.card(context, accent: AppPalette.cyan),
-      child: Row(
-        children: <Widget>[
-          _SummaryValue(label: 'count', value: '${receipts.length}件'),
-          const SizedBox(width: 20),
-          _SummaryValue(
-            label: 'total',
-            value: formatYen(total),
-            accent: AppPalette.emerald,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: AppPalette.card(context, accent: AppPalette.cyan),
+          child: Row(
+            children: <Widget>[
+              _SummaryValue(label: 'count', value: '${matching.length}件'),
+              const SizedBox(width: 20),
+              _SummaryValue(
+                label: 'total',
+                value: formatMoney(total, currency: currencyCode),
+                accent: AppPalette.emerald,
+              ),
+              const SizedBox(width: 20),
+              _SummaryValue(
+                label: 'average',
+                value: formatMoney(average, currency: currencyCode),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: context.tr('refresh'),
+                visualDensity: VisualDensity.compact,
+                onPressed: onRefresh,
+                icon: const Icon(
+                  Icons.refresh,
+                  size: 18,
+                  color: AppPalette.cyan,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 20),
-          _SummaryValue(label: 'average', value: formatYen(average)),
-          const Spacer(),
-          IconButton(
-            tooltip: context.tr('refresh'),
-            visualDensity: VisualDensity.compact,
-            onPressed: onRefresh,
-            icon: const Icon(
-              Icons.refresh,
-              size: 18,
-              color: AppPalette.cyan,
+        ),
+        if (otherCount > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+            child: AppText(
+              'currency.other_note',
+              count: otherCount,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -151,9 +185,13 @@ class _ReceiptEntry extends _Entry {
 }
 
 class _GroupedReceiptList extends StatelessWidget {
-  const _GroupedReceiptList({required this.receipts});
+  const _GroupedReceiptList({
+    required this.receipts,
+    required this.currencyCode,
+  });
 
   final List<Receipt> receipts;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +201,9 @@ class _GroupedReceiptList extends StatelessWidget {
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
-        if (entry is _GroupHeader) return _HeaderTile(header: entry);
+        if (entry is _GroupHeader) {
+          return _HeaderTile(header: entry, currencyCode: currencyCode);
+        }
         final receipt = (entry as _ReceiptEntry).receipt;
         return ReceiptTile(
           receipt: receipt,
@@ -179,6 +219,7 @@ class _GroupedReceiptList extends StatelessWidget {
 
     final monthTotals = <String, double>{};
     for (final receipt in sorted) {
+      if (receipt.currency != currencyCode) continue;
       final key = '${receipt.purchasedAt.year}-${receipt.purchasedAt.month}';
       monthTotals[key] = (monthTotals[key] ?? 0) + receipt.totalAmount;
     }
@@ -218,9 +259,10 @@ class _GroupedReceiptList extends StatelessWidget {
 }
 
 class _HeaderTile extends StatelessWidget {
-  const _HeaderTile({required this.header});
+  const _HeaderTile({required this.header, required this.currencyCode});
 
   final _GroupHeader header;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -253,7 +295,7 @@ class _HeaderTile extends StatelessWidget {
               const Spacer(),
               if (header.total != null)
                 AppText(
-                  formatYen(header.total!),
+                  formatMoney(header.total!, currency: currencyCode),
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: AppPalette.emerald,
                     fontWeight: FontWeight.w700,

@@ -1,3 +1,4 @@
+import '../../core/localization/currencies.dart';
 import '../parser/receipt_parser.dart';
 import 'payment_method.dart';
 import 'receipt.dart';
@@ -9,7 +10,7 @@ class ReceiptDraft {
   ReceiptDraft({
     this.id,
     this.merchant,
-    this.currency = 'JPY',
+    this.currency = kFallbackCurrencyCode,
     DateTime? purchasedAt,
     this.totalAmount = 0,
     this.subtotalAmount,
@@ -72,7 +73,7 @@ class ReceiptDraft {
         : parsed.barcodeId;
     return ReceiptDraft(
       merchant: parsed.merchant,
-      currency: (parsed.currency ?? 'JPY').toUpperCase(),
+      currency: (parsed.currency ?? kFallbackCurrencyCode).toUpperCase(),
       purchasedAt: parsed.purchasedAt,
       totalAmount: parsed.totalAmount ?? 0,
       subtotalAmount: parsed.subtotalAmount,
@@ -140,7 +141,9 @@ class ReceiptDraft {
   Map<String, dynamic> toRow({bool includeItems = false}) => <String, dynamic>{
         'merchant': (merchant ?? '').trim().isEmpty ? null : merchant!.trim(),
         'currency':
-            currency.trim().isEmpty ? 'JPY' : currency.trim().toUpperCase(),
+            currency.trim().isEmpty
+                ? kFallbackCurrencyCode
+                : currency.trim().toUpperCase(),
         'purchased_at': purchasedAt.toUtc().toIso8601String(),
         'total_amount': totalAmount,
         'subtotal_amount': subtotalAmount,

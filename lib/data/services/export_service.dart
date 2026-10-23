@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../../core/localization/currencies.dart';
 import '../../domain/models/receipt.dart';
 import 'file_saver_stub.dart'
     if (dart.library.io) 'file_saver_io.dart'
@@ -17,6 +18,7 @@ class ExportService {
     '時刻',
     '店舗',
     'カテゴリ',
+    '通貨',
     '合計(税込)',
     '小計(税抜)',
     '消費税8%',
@@ -39,18 +41,19 @@ class ExportService {
         '${_two(date.hour)}:${_two(date.minute)}',
         receipt.displayMerchant,
         receipt.displayCategory,
-        _amount(receipt.totalAmount),
-        _amount(receipt.subtotalAmount),
-        _amount(receipt.tax8Amount),
-        _amount(receipt.tax10Amount),
-        _amount(receipt.tax8ItemsTotal),
-        _amount(receipt.tax10ItemsTotal),
+        receipt.currency,
+        _amount(receipt.totalAmount, receipt.currency),
+        _amount(receipt.subtotalAmount, receipt.currency),
+        _amount(receipt.tax8Amount, receipt.currency),
+        _amount(receipt.tax10Amount, receipt.currency),
+        _amount(receipt.tax8ItemsTotal, receipt.currency),
+        _amount(receipt.tax10ItemsTotal, receipt.currency),
         receipt.dueDate == null
             ? ''
             : '${receipt.dueDate!.year}-${_two(receipt.dueDate!.month)}-'
                 '${_two(receipt.dueDate!.day)}',
         receipt.pointBrand ?? '',
-        _amount(receipt.pointAmount),
+        receipt.pointAmount?.toString() ?? '',
         receipt.barcodeId ?? '',
         receipt.note ?? '',
       ]);
@@ -78,7 +81,13 @@ class ExportService {
 
   static String _two(int value) => value.toString().padLeft(2, '0');
 
-  static String _amount(num? value) => value == null ? '' : value.toString();
+  /// Numeric amount with the receipt currency's decimal digits and no
+  /// grouping, so spreadsheets parse it as a number.
+  static String _amount(num? value, String currency) {
+    if (value == null) return '';
+    final digits = currencyOrDefault(currency).decimalDigits;
+    return value.toStringAsFixed(digits);
+  }
 
   static String _escape(String value) {
     if (value.contains(',') || value.contains('"') || value.contains('\n')) {

@@ -1,5 +1,6 @@
-// ISO 4217 currency catalog with localized names.
+// ISO 4217 currency catalog — the single source of currency data.
 // Currency names are localized data (ja / en / ar), like the message maps.
+// Do not hardcode currency symbols or decimal digits anywhere else.
 
 import '../localization/app_language.dart';
 
@@ -41,9 +42,17 @@ class Currency {
   String toString() => code;
 }
 
+/// Code used when no currency was stored (old documents).
+const String kFallbackCurrencyCode = 'JPY';
+
+/// JPY for documents and users that never chose a currency.
 const Currency kFallbackCurrency = Currency(
-  code: 'JPY', symbol: '¥', decimalDigits: 0,
-  nameJa: '日本円', nameEn: 'Japanese Yen', nameAr: 'ين ياباني',
+  code: 'JPY',
+  symbol: '¥',
+  decimalDigits: 0,
+  nameJa: '日本円',
+  nameEn: 'Japanese Yen',
+  nameAr: 'ين ياباني',
 );
 
 const List<Currency> kCurrencies = <Currency>[
@@ -298,7 +307,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'CLF',
     symbol: 'CLF',
-    decimalDigits: 4,
+    decimalDigits: 2,
     nameJa: 'チリUF',
     nameEn: 'Chilean Unit of Account (UF)',
     nameAr: 'وحدة حساب تشيلي',
@@ -1250,7 +1259,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'UYW',
     symbol: 'UYW',
-    decimalDigits: 4,
+    decimalDigits: 2,
     nameJa: 'ウルグアイ賃金指数単位',
     nameEn: 'Uruguayan Nominal Wage Index Unit',
     nameAr: 'وحدة مؤشر الأجور الأوروغويانية',
@@ -1314,7 +1323,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XAG',
     symbol: 'Ag',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: '銀',
     nameEn: 'Silver',
     nameAr: 'فضة',
@@ -1322,7 +1331,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XAU',
     symbol: 'Au',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: '金',
     nameEn: 'Gold',
     nameAr: 'ذهب',
@@ -1330,7 +1339,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XBA',
     symbol: 'XBA',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: '欧州複合単位',
     nameEn: 'European Composite Unit',
     nameAr: 'وحدة مركبة أوروبية',
@@ -1338,7 +1347,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XBB',
     symbol: 'XBB',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: '欧州通貨単位',
     nameEn: 'European Monetary Unit',
     nameAr: 'وحدة نقدية أوروبية',
@@ -1346,7 +1355,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XBC',
     symbol: 'XBC',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: '欧州計算単位（XBC）',
     nameEn: 'European Unit of Account (XBC)',
     nameAr: 'وحدة حساب أوروبية (XBC)',
@@ -1354,7 +1363,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XBD',
     symbol: 'XBD',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: '欧州計算単位（XBD）',
     nameEn: 'European Unit of Account (XBD)',
     nameAr: 'وحدة حساب أوروبية (XBD)',
@@ -1368,9 +1377,17 @@ const List<Currency> kCurrencies = <Currency>[
     nameAr: 'دولار شرق الكاريبي',
   ),
   Currency(
+    code: 'XCG',
+    symbol: 'ƒ',
+    decimalDigits: 2,
+    nameJa: 'カリブ・ギルダー',
+    nameEn: 'Caribbean Guilder',
+    nameAr: 'غيلدر كاريبي',
+  ),
+  Currency(
     code: 'XDR',
     symbol: 'SDR',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: 'IMF特別引出権',
     nameEn: 'IMF Special Drawing Rights',
     nameAr: 'حقوق السحب الخاصة',
@@ -1386,7 +1403,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XPD',
     symbol: 'Pd',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: 'パラジウム',
     nameEn: 'Palladium',
     nameAr: 'بلاديوم',
@@ -1402,7 +1419,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XPT',
     symbol: 'Pt',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: 'プラチナ',
     nameEn: 'Platinum',
     nameAr: 'بلاتين',
@@ -1410,7 +1427,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XSU',
     symbol: 'XSU',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: 'スクレ',
     nameEn: 'Sucre',
     nameAr: 'سوكري',
@@ -1418,7 +1435,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XTS',
     symbol: 'XTS',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: 'テスト用通貨コード',
     nameEn: 'Testing Currency Code',
     nameAr: 'رمز عملة اختباري',
@@ -1426,7 +1443,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XUA',
     symbol: 'XUA',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: 'アフリカ開発銀行計算単位',
     nameEn: 'ADB Unit of Account',
     nameAr: 'وحدة حساب بنك التنمية الإفريقي',
@@ -1434,7 +1451,7 @@ const List<Currency> kCurrencies = <Currency>[
   Currency(
     code: 'XXX',
     symbol: 'XXX',
-    decimalDigits: 0,
+    decimalDigits: 2,
     nameJa: '通貨なし',
     nameEn: 'No Currency',
     nameAr: 'بدون عملة',
@@ -1473,6 +1490,7 @@ const List<Currency> kCurrencies = <Currency>[
   ),
 ];
 
+/// Codes shown in the “Common” group at the top of the picker.
 const List<String> kCommonCurrencyCodes = <String>[
   'JPY',
   'USD',
@@ -1486,6 +1504,14 @@ const List<String> kCommonCurrencyCodes = <String>[
   'TRY',
   'CNY',
   'KRW',
+  'SOS',
+  'BRL',
+  'INR',
+  'AUD',
+  'CAD',
+  'CHF',
+  'MXN',
+  'ZAR',
 ];
 
 Currency? currencyByCode(String? code) {
@@ -1497,7 +1523,7 @@ Currency? currencyByCode(String? code) {
   return null;
 }
 
-/// Resolves a stored code, falling back to JPY for old documents.
+/// Resolves a stored code; missing values fall back to JPY (old documents).
 Currency currencyOrDefault(String? code) =>
     currencyByCode(code) ?? kFallbackCurrency;
 
@@ -1505,3 +1531,62 @@ List<Currency> commonCurrencies() => <Currency>[
   for (final code in kCommonCurrencyCodes)
     if (currencyByCode(code) != null) currencyByCode(code)!,
 ];
+
+/// Resolves a printed currency symbol to its ISO code.
+String? currencyCodeForSymbol(String symbol) =>
+    kCurrencySymbolToCode[symbol.trim()];
+
+// ---------------------------------------------------------------------------
+// Printed-symbol helpers used by the OCR parser.
+// Kept here so no other file hardcodes yen / dollar / Arabic currency words.
+// ---------------------------------------------------------------------------
+
+const String kYenSymbol = '¥';
+const String kCurrencySymbolChars = '¥￥\$€£₩₹﷼円元';
+const String kCurrencyPrefixSymbolPattern = r'[¥￥$€£₩₹﷼]';
+const String kCurrencySymbolPattern = r'[¥￥$€£₩₹﷼円元]';
+const String kCurrencySuffixPattern = r'(?:円|元|جنيه|ريال|دينار|درهم)';
+const String kCurrencyAmountPrefixPattern = r'[¥￥$€£₩₹﷼]?';
+
+const Map<String, String> kCurrencySymbolToCode = <String, String>{
+  '¥': 'JPY',
+  'د.إ': 'AED',
+  'د.ب': 'BHD',
+  'د.أ': 'JOD',
+  'د.ك': 'KWD',
+  'ر.س': 'SAR',
+  'ر.ق': 'QAR',
+  'د.ت': 'TND',
+  'د.ج': 'DZD',
+  'د.م.': 'MAD',
+  'د.ل': 'LYD',
+  'ع.د': 'IQD',
+  'ل.س': 'SYP',
+  'ج.م': 'EGP',
+  'ج.س.': 'SDG',
+  '￥': 'JPY',
+  '円': 'JPY',
+  '\$': 'USD',
+  '€': 'EUR',
+  '£': 'GBP',
+  '₩': 'KRW',
+  '₹': 'INR',
+  '﷼': 'SAR',
+  '元': 'CNY',
+  'ريال': 'SAR',
+  'درهم': 'AED',
+  'جنيه': 'EGP',
+  'دينار': 'KWD',
+  '฿': 'THB',
+  '₫': 'VND',
+  '₽': 'RUB',
+  '₺': 'TRY',
+  '₪': 'ILS',
+  '₱': 'PHP',
+  'Rp': 'IDR',
+  'RM': 'MYR',
+};
+
+/// ISO codes recognized in printed receipt text.
+const String kCurrencyCodePattern =
+    r'\b(AED|AFN|ALL|AMD|ANG|AOA|ARS|AUD|AWG|AZN|BAM|BBD|BDT|BGN|BHD|BIF|BMD|BND|BOB|BOV|BRL|BSD|BTN|BWP|BYN|BZD|CAD|CDF|CHE|CHF|CHW|CLF|CLP|CNY|COP|COU|CRC|CUP|CVE|CZK|DJF|DKK|DOP|DZD|EGP|ERN|ETB|EUR|FJD|FKP|GBP|GEL|GHS|GIP|GMD|GNF|GTQ|GYD|HKD|HNL|HTG|HUF|IDR|ILS|INR|IQD|IRR|ISK|JMD|JOD|JPY|KES|KGS|KHR|KMF|KPW|KRW|KWD|KYD|KZT|LAK|LBP|LKR|LRD|LSL|LYD|MAD|MDL|MGA|MKD|MMK|MNT|MOP|MRU|MUR|MVR|MWK|MXN|MXV|MYR|MZN|NAD|NGN|NIO|NOK|NPR|NZD|OMR|PAB|PEN|PGK|PHP|PKR|PLN|PYG|QAR|RON|RSD|RUB|RWF|SAR|SBD|SCR|SDG|SEK|SGD|SHP|SLE|SOS|SRD|SSP|STN|SVC|SYP|SZL|THB|TJS|TMT|TND|TOP|TRY|TTD|TWD|TZS|UAH|UGX|USD|USN|UYI|UYU|UYW|UZS|VED|VES|VND|VUV|WST|XAF|XAG|XAU|XBA|XBB|XBC|XBD|XCD|XCG|XDR|XOF|XPD|XPF|XPT|XSU|XTS|XUA|XXX|YER|ZAR|ZMW|ZWG)\b';

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/localization/currencies.dart';
+import '../../core/localization/localization.dart';
+import '../../core/settings/currency_provider.dart';
 import '../../core/settings/pay_cycle_provider.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
@@ -11,7 +14,6 @@ import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
 import '../../domain/models/monthly_budget.dart';
 import '../../domain/models/pay_cycle.dart';
-import '../../core/localization/localization.dart';
 
 /// Income / savings goal / fixed expenses for a month + live pacing.
 class BudgetPage extends ConsumerStatefulWidget {
@@ -59,11 +61,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
           await ref.read(budgetRepositoryProvider).fetchMonth(_month);
       if (!mounted) return;
       final config = ref.read(payCycleProvider);
+      final digits = ref.read(defaultCurrencyProvider).decimalDigits;
       setState(() {
         _budgetId = budget?.id;
-        _salary.text = _formatInput(_incomePerCycle(budget, config));
-        _savings.text = _formatInput(budget?.savingsGoal);
-        _fixed.text = _formatInput(budget?.fixedExpenses);
+        _salary.text = _formatInput(_incomePerCycle(budget, config), digits);
+        _savings.text = _formatInput(budget?.savingsGoal, digits);
+        _fixed.text = _formatInput(budget?.fixedExpenses, digits);
         _loading = false;
       });
     } catch (error) {
@@ -80,15 +83,17 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   /// The stored value is reused when the plan was saved with the same cycle,
   /// otherwise the monthly income is converted back (e.g. after switching from
   /// monthly to weekly pay in Settings).
-  int _incomePerCycle(MonthlyBudget? budget, PayCycleConfig config) {
+  num _incomePerCycle(MonthlyBudget? budget, PayCycleConfig config) {
     if (budget == null) return 0;
     final stored = budget.incomePerCycle;
     if (stored != null && budget.payCycle == config.cycle) return stored;
     return config.perCycleEquivalent(budget.salary, _month);
   }
 
-  String _formatInput(int? value) =>
-      (value == null || value == 0) ? '' : formatAmountDigits(value);
+  String _formatInput(num? value, int decimalDigits) =>
+      (value == null || value == 0)
+          ? ''
+          : formatAmountDigits(value, decimalDigits: decimalDigits);
 
   String _incomeLabel(PayCycle cycle) => switch (cycle) {
         PayCycle.daily => 'daily_income_net',
@@ -118,15 +123,15 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
 
     try {
       final config = ref.read(payCycleProvider);
-      final incomePerCycle = parseYenInput(_salary.text) ?? 0;
+      final incomePerCycle = parseAmountInput(_salary.text) ?? 0;
       final budget = MonthlyBudget(
         id: _budgetId,
         month: _month,
-        // Monthly figure used by analytics; the typed amount is kept verbatim
-        // so daily / weekly plans survive round-trips without rounding drift.
+        // Monthly figure used for pacing; the typed per-cycle amount is kept
+        // verbatim so daily / weekly plans survive round-trips.
         salary: config.monthlyEquivalent(incomePerCycle, _month),
-        savingsGoal: parseYenInput(_savings.text) ?? 0,
-        fixedExpenses: parseYenInput(_fixed.text) ?? 0,
+        savingsGoal: parseAmountInput(_savings.text) ?? 0,
+        fixedExpenses: parseAmountInput(_fixed.text) ?? 0,
         payCycle: config.cycle,
         incomePerCycle: incomePerCycle,
       );
@@ -155,6 +160,7 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     final theme = Theme.of(context);
     final summaryAsync = ref.watch(budgetSummaryProvider(_month));
     final config = ref.watch(payCycleProvider);
+    final currency = ref.watch(defaultCurrencyProvider);
 
     // Keep the form in sync when the salary cycle changes in Settings.
     ref.listen<PayCycleConfig>(payCycleProvider, (previous, next) {
@@ -221,17 +227,19 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                     label: _incomeLabel(config.cycle),
                     hint: _incomeHint(config.cycle),
                     icon: Icons.work_outline,
+                    symbol: currency.symbol,
+                    decimalDigits: currency.decimalDigits,
                   ),
                   if (!config.isMonthly) ...<Widget>[
                     const SizedBox(height: 6),
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _salary,
                       builder: (context, value, _) {
-                        final perCycle = parseYenInput(value.text) ?? 0;
+                        final perCycle = parseAmountInput(value.text) ?? 0;
                         final monthly =
                             config.monthlyEquivalent(perCycle, _month);
                         return AppText(
-                          '月換算: ${formatYen(monthly)}'
+                          '月換算: ${formatMoney(monthly, currency: currency.code)}'
                           '（この月の日数で計算）',
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -246,6 +254,8 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                     label: 'savings_goal',
                     hint: 'e_g_30_000',
                     icon: Icons.savings_outlined,
+                    symbol: currency.symbol,
+                    decimalDigits: currency.decimalDigits,
                   ),
                   const SizedBox(height: 12),
                   _MoneyField(
@@ -253,6 +263,8 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                     label: 'fixed_expenses_rent_utilities_subscriptions',
                     hint: 'e_g_80_000',
                     icon: Icons.home_outlined,
+                    symbol: currency.symbol,
+                    decimalDigits: currency.decimalDigits,
                   ),
                   const SizedBox(height: 6),
                   AppText(
@@ -296,7 +308,10 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
             error: (error, _) => _SummaryCard(
               error: error.toString(),
             ),
-            data: (summary) => _SummaryCard(summary: summary),
+            data: (summary) => _SummaryCard(
+              summary: summary,
+              currencyCode: currency.code,
+            ),
           ),
           const SizedBox(height: 14),
           Container(
@@ -365,25 +380,31 @@ class _MoneyField extends StatelessWidget {
     required this.label,
     required this.hint,
     required this.icon,
+    required this.symbol,
+    required this.decimalDigits,
   });
 
   final TextEditingController controller;
   final String label;
   final String hint;
   final IconData icon;
+  final String symbol;
+  final int decimalDigits;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
-      keyboardType: TextInputType.number,
+      keyboardType: TextInputType.numberWithOptions(
+        decimal: decimalDigits > 0,
+      ),
       inputFormatters: <TextInputFormatter>[
-        FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
       ],
       decoration: InputDecoration(
         labelText: context.tr(label),
         hintText: context.tr(hint),
-        prefixText: '¥ ',
+        prefixText: '$symbol ',
         prefixIcon: Icon(icon),
       ),
     );
@@ -391,10 +412,15 @@ class _MoneyField extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({this.summary, this.error});
+  const _SummaryCard({
+    this.summary,
+    this.error,
+    this.currencyCode = kFallbackCurrencyCode,
+  });
 
   final BudgetSummary? summary;
   final String? error;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -478,7 +504,7 @@ class _SummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           AppText(
-            formatYen(data.periodRemaining.abs()),
+            formatMoney(data.periodRemaining.abs(), currency: currencyCode),
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
               color: data.periodRemaining < 0
@@ -509,8 +535,8 @@ class _SummaryCard extends StatelessWidget {
           BudgetGradientBar(value: data.periodProgress, height: 11),
           const SizedBox(height: 6),
           AppText(
-            '支出 ${formatYen(data.cycleSpent)} / 自由枠 '
-            '${formatYen(data.cycleBudget)} '
+            '支出 ${formatMoney(data.cycleSpent, currency: currencyCode)} / 自由枠 '
+            '${formatMoney(data.cycleBudget, currency: currencyCode)} '
             '(${(data.periodProgress * 100).clamp(0, 999).toStringAsFixed(0)}%)',
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -521,13 +547,13 @@ class _SummaryCard extends StatelessWidget {
               Expanded(
                 child: _Metric(
                   label: 'per_day',
-                  value: formatYen(data.dailyAllowance),
+                  value: formatMoney(data.dailyAllowance, currency: currencyCode),
                 ),
               ),
               Expanded(
                 child: _Metric(
                   label: 'today_s_spending',
-                  value: formatYen(data.todaySpent),
+                  value: formatMoney(data.todaySpent, currency: currencyCode),
                 ),
               ),
               Expanded(
@@ -546,6 +572,16 @@ class _SummaryCard extends StatelessWidget {
               height: 1.5,
             ),
           ),
+          if (data.otherCurrencyCount > 0) ...<Widget>[
+            const SizedBox(height: 8),
+            AppText(
+              'currency.other_note',
+              count: data.otherCurrencyCount,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -556,12 +592,12 @@ class _SummaryCard extends StatelessWidget {
       return '予算を超えています。残り日数は ${data.periodDaysRemaining} 日です。';
     }
     if (data.periodVelocityDelta > 0) {
-      return '計画より ${formatYen(data.periodVelocityDelta)} 多く使っています。'
+      return '計画より ${formatMoney(data.periodVelocityDelta, currency: currencyCode)} 多く使っています。'
           '残り ${data.periodDaysRemaining} 日、'
-          '1日 ${formatYen(data.dailyAllowance)} が目安です。';
+          '1日 ${formatMoney(data.dailyAllowance, currency: currencyCode)} が目安です。';
     }
-    return '計画より ${formatYen(-data.periodVelocityDelta)} 節約できています。'
-        'このペースなら貯蓄目標 ${formatYen(data.budget?.savingsGoal ?? 0)} に届きます。';
+    return '計画より ${formatMoney(-data.periodVelocityDelta, currency: currencyCode)} 節約できています。'
+        'このペースなら貯蓄目標 ${formatMoney(data.budget?.savingsGoal ?? 0, currency: currencyCode)} に届きます。';
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/localization.dart';
+import '../../core/settings/currency_provider.dart';
 import '../../core/settings/pay_cycle_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/formatters.dart';
@@ -14,6 +15,7 @@ import '../../data/services/export_service.dart';
 import '../../data/services/ocr/ai_receipt_ocr_service.dart';
 import '../../domain/models/pay_cycle.dart';
 import '../../domain/models/receipt_filter.dart';
+import 'widgets/currency_picker.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -162,6 +164,8 @@ class SettingsPage extends ConsumerWidget {
           const _AiKeyCard(),
           const SizedBox(height: 14),
           const _PayCycleCard(),
+          const SizedBox(height: 14),
+          const _CurrencyCard(),
           const SizedBox(height: 14),
           _Card(
             title: 'appearance',
@@ -400,6 +404,62 @@ class _PayCycleCard extends ConsumerWidget {
         AppText(
           'settings.salary_monthly_help',
           style: labelStyle,
+        ),
+      ],
+    );
+  }
+}
+
+/// Default currency for new receipts and budget amounts.
+class _CurrencyCard extends ConsumerWidget {
+  const _CurrencyCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final currency = ref.watch(defaultCurrencyProvider);
+    final language = context.l10n.language;
+
+    return _Card(
+      title: 'currency.title',
+      children: <Widget>[
+        AppText(
+          'currency.help',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: CircleAvatar(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.12),
+            child: Text(
+              currency.symbol,
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          title: Text(currency.name(language)),
+          subtitle: Text(
+            '${currency.code} · ${currency.symbol}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () async {
+            final picked = await showCurrencyPicker(
+              context,
+              selected: currency,
+            );
+            if (picked == null) return;
+            await ref
+                .read(defaultCurrencyProvider.notifier)
+                .setCurrency(picked);
+          },
         ),
       ],
     );

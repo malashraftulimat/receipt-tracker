@@ -21,13 +21,13 @@ class MonthlyBudget {
   final DateTime month;
 
   /// 手取りの月収（[incomePerCycle] を月換算した値）.
-  final int salary;
+  final num salary;
 
   /// 毎月の貯蓄目標.
-  final int savingsGoal;
+  final num savingsGoal;
 
   /// 家賃・光熱費・サブスクなど固定費の合計.
-  final int fixedExpenses;
+  final num fixedExpenses;
 
   final String? note;
 
@@ -38,10 +38,10 @@ class MonthlyBudget {
   ///
   /// [salary] はこれを月換算した値なので、日払い・週払いでも丸め誤差なく
   /// 入力した金額をそのまま再表示できる。
-  final int? incomePerCycle;
+  final num? incomePerCycle;
 
   /// 自由に使える金額 = 給与 - 貯蓄目標 - 固定費.
-  int get disposableIncome => salary - savingsGoal - fixedExpenses;
+  num get disposableIncome => salary - savingsGoal - fixedExpenses;
 
   bool get isConfigured => salary > 0;
 
@@ -54,12 +54,12 @@ class MonthlyBudget {
       id: json['id'] as String?,
       userId: json['user_id'] as String?,
       month: DateTime(parsedMonth.toLocal().year, parsedMonth.toLocal().month),
-      salary: (json['salary'] as num?)?.toInt() ?? 0,
-      savingsGoal: (json['savings_goal'] as num?)?.toInt() ?? 0,
-      fixedExpenses: (json['fixed_expenses'] as num?)?.toInt() ?? 0,
+      salary: (json['salary'] as num?) ?? 0,
+      savingsGoal: (json['savings_goal'] as num?) ?? 0,
+      fixedExpenses: (json['fixed_expenses'] as num?) ?? 0,
       note: json['note'] as String?,
       payCycle: _parsePayCycle(json['pay_cycle']),
-      incomePerCycle: (json['income_per_cycle'] as num?)?.toInt(),
+      incomePerCycle: json['income_per_cycle'] as num?,
     );
   }
 
@@ -87,12 +87,12 @@ class MonthlyBudget {
   }
 
   MonthlyBudget copyWith({
-    int? salary,
-    int? savingsGoal,
-    int? fixedExpenses,
+    num? salary,
+    num? savingsGoal,
+    num? fixedExpenses,
     String? note,
     PayCycle? payCycle,
-    int? incomePerCycle,
+    num? incomePerCycle,
   }) {
     return MonthlyBudget(
       id: id,
@@ -133,6 +133,7 @@ class BudgetSummary {
     this.periodDaysElapsed,
     this.periodBudget,
     this.periodSpent,
+    this.otherCurrencyCount = 0,
   });
 
   final DateTime month;
@@ -160,6 +161,10 @@ class BudgetSummary {
 
   /// Spending inside the current pay period.
   final double? periodSpent;
+
+  /// Receipts in this month that use a different currency and are excluded
+  /// from the totals above.
+  final int otherCurrencyCount;
 
   /// True when this month or the current pay period has a plan.
   bool get configured => (budget?.isConfigured ?? false) || cycleBudget != 0;

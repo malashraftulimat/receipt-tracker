@@ -63,10 +63,7 @@ void main() {
 
     test('explicit Currency object formatting', () {
       final kwd = currencyByCode('KWD')!;
-      expect(
-        formatCurrencyAmount(1234.567, currency: kwd),
-        'د.ك1,234.567',
-      );
+      expect(formatCurrencyAmount(1234.567, currency: kwd), 'د.ك1,234.567');
       expect(
         formatCurrencyAmount(1234.567, currency: kwd, withSymbol: false),
         '1,234.567',
@@ -80,9 +77,44 @@ void main() {
 
       Intl.defaultLocale = 'ar';
       expect(_plain(formatMoney(1234.5, currency: 'USD')), r'1,234.50 $');
-      expect(_plain(formatMoney(1234.567, currency: 'KWD')),
-          '1,234.567 د.ك');
+      expect(_plain(formatMoney(1234.567, currency: 'KWD')), '1,234.567 د.ك');
       expect(_plain(formatMoney(1234, currency: 'JPY')), '1,234 ¥');
+    });
+  });
+
+  group('required currency examples', () {
+    test('JPY 1080 renders with the yen symbol and no decimals', () {
+      expect(formatMoney(1080, currency: 'JPY'), '¥1,080');
+    });
+
+    test('USD 12.5 renders two decimals', () {
+      expect(formatMoney(12.5, currency: 'USD'), r'$12.50');
+    });
+
+    test('KWD 3.250 renders three decimals', () {
+      expect(formatMoney(3.25, currency: 'KWD'), 'د.ك3.250');
+    });
+
+    test('SOS uses its own symbol, not yen', () {
+      final value = formatMoney(1000, currency: 'SOS');
+      expect(value, contains('Sh'));
+      expect(value, contains('1,000.00'));
+      expect(value, isNot(contains('¥')));
+    });
+
+    test('Arabic / RTL output keeps the currency symbol and decimals', () {
+      Intl.defaultLocale = 'ar';
+      final usd = _plain(formatMoney(12.5, currency: 'USD'));
+      final kwd = _plain(formatMoney(3.25, currency: 'KWD'));
+      expect(usd, contains(r'$'));
+      expect(usd, contains('12.50'));
+      expect(kwd, contains('3.250'));
+      expect(kwd, contains('د.ك'));
+    });
+
+    test('XCG is available with the guilder symbol', () {
+      expect(currencyByCode('XCG')?.symbol, 'ƒ');
+      expect(formatMoney(10, currency: 'XCG'), contains('ƒ'));
     });
   });
 

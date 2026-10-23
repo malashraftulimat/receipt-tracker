@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import '../../core/localization/currencies.dart';
+
 /// One parsed line item (before the user edits it).
 class ParsedItem {
   const ParsedItem({
@@ -28,7 +30,7 @@ class ParsedCoupon {
     this.discountAmountOrPercent,
   });
 
-  /// Coupon title exactly as printed (e.g. 「次回使える500円クーポン」).
+  /// Coupon title exactly as printed (including any amount wording).
   final String name;
 
   /// First day the coupon can be used; null when valid immediately.
@@ -244,14 +246,13 @@ class ReceiptParser {
 
   bool _looksLikeAddress(String line) => _addressMask.hasMatch(line);
   static final RegExp _amountPattern = RegExp(
-    r'[¥￥$€£₩₹﷼]?\s*(\d{1,3}(?:[,\.]\d{3})+|\d+)'
-    r'(?:([.,])(\d{1,2}))?\s*(?:円|元|جنيه|ريال|دينار|درهم)?',
+    '$kCurrencyAmountPrefixPattern'
+    r'\s*(\d{1,3}(?:[,\.]\d{3})+|\d+)'
+    r'(?:([.,])(\d{1,2}))?\s*'
+    '$kCurrencySuffixPattern?',
   );
 
-  static final RegExp _currencyCodeMask = RegExp(
-    r'\b(JPY|USD|EUR|GBP|CNY|KRW|INR|SAR|AED|EGP|TRY|THB|VND|AUD|CAD|CHF|'
-    r'TWD|HKD|SGD|BRL|MXN|RUB|IDR|MYR|PHP|NZD|QAR|KWD)\b',
-  );
+  static final RegExp _currencyCodeMask = RegExp(kCurrencyCodePattern);
 
   /// Main entry point.
   ///
@@ -410,7 +411,7 @@ class ReceiptParser {
   // -------------------------------------------------------------------------
 
   /// Full-width ASCII (U+FF01..U+FF5E) -> half-width, ideographic space -> ' ',
-  /// full-width yen sign -> '¥'.
+  /// full-width yen sign -> the canonical yen symbol.
   String _normalize(String input) {
     final buffer = StringBuffer();
     for (final rune in input.runes) {
@@ -419,7 +420,7 @@ class ReceiptParser {
       } else if (rune == 0x3000) {
         buffer.write(' ');
       } else if (rune == 0xFFE5) {
-        buffer.write('¥');
+        buffer.write(kYenSymbol);
       } else {
         buffer.writeCharCode(rune);
       }
@@ -483,7 +484,7 @@ class ReceiptParser {
       final value = double.tryParse(raw);
       if (value == null) continue;
 
-      final hasCurrency = RegExp(r'[¥￥$€£₩₹﷼円元]').hasMatch(token) ||
+      final hasCurrency = RegExp(kCurrencySymbolPattern).hasMatch(token) ||
           _currencyCodeMask.hasMatch(masked);
       final before = match.start > 0 ? masked[match.start - 1] : ' ';
       final after = match.end < masked.length ? masked[match.end] : ' ';
@@ -509,30 +510,9 @@ class ReceiptParser {
     final code = _currencyCodeMask.firstMatch(upper);
     if (code != null) return code.group(1);
 
-    const symbols = <String, String>{
-      '¥': 'JPY',
-      '￥': 'JPY',
-      '円': 'JPY',
-      r'$': 'USD',
-      '€': 'EUR',
-      '£': 'GBP',
-      '₩': 'KRW',
-      '₹': 'INR',
-      '﷼': 'SAR',
-      'د.إ': 'AED',
-      '元': 'CNY',
-      '฿': 'THB',
-      '₫': 'VND',
-      '₽': 'RUB',
-      '₺': 'TRY',
-    };
-    for (final entry in symbols.entries) {
+    for (final entry in kCurrencySymbolToCode.entries) {
       if (text.contains(entry.key)) return entry.value;
     }
-    if (text.contains('ريال')) return 'SAR';
-    if (text.contains('درهم')) return 'AED';
-    if (text.contains('جنيه')) return 'EGP';
-    if (text.contains('دينار')) return 'KWD';
     return null;
   }
 
@@ -603,7 +583,7 @@ class ReceiptParser {
       if (rate == null && line.contains('軽減')) rate = 8;
 
       if (mentionsTax && values.length >= 2) {
-        // e.g. "8%対象 ¥1,000 消費税 ¥74"
+        // e.g. "8% taxable 1,000, tax 74"
         _assignBase(tax, rate, _maxAmount(values));
         _assignTax(
           tax,
@@ -680,7 +660,10 @@ class ReceiptParser {
     if (candidate.isEmpty) return null;
 
     // Pure numbers / symbols.
-    if (RegExp(r'^[\d\s¥￥,.\-:/*#|]+$').hasMatch(candidate)) return null;
+    if (RegExp(r'^[\d\s' + kCurrencySymbolChars + r',.\-:/*#|]+$')
+        .hasMatch(candidate)) {
+      return null;
+    }
     // Dates and times are never merchants.
     if (_dateMask.hasMatch(candidate)) return null;
     if (RegExp(r'(令和|平成|昭和)\s*(\d{1,2}|元)\s*年').hasMatch(candidate)) {
@@ -852,8 +835,11 @@ class ReceiptParser {
   // Line items
   // -------------------------------------------------------------------------
 
-  static final RegExp _itemQtyTimes =
-      RegExp(r'(\d{1,3})\s*[×xX]\s*¥?\s*(\d{1,3}(?:,\d{3})+|\d+)');
+  static final RegExp _itemQtyTimes = RegExp(
+    r'(\d{1,3})\s*[×xX]\s*'
+    '$kCurrencyAmountPrefixPattern'
+    r'\s*(\d{1,3}(?:,\d{3})+|\d+)',
+  );
   static final RegExp _itemQtyPiece = RegExp(r'(\d{1,3})\s*(?:個|点|本|枚|袋|箱)');
   static final RegExp _itemNoise = RegExp(
     r'電話|TEL|住所|登録番号|レジ|担当|領収|レシート|ポイント|お預|お釣|釣銭|'
@@ -945,7 +931,7 @@ class ReceiptParser {
         name = name.replaceAll(marker, ' ');
       }
 
-      name = name.replaceAll(RegExp(r'[¥￥$€£₩₹﷼]'), ' ');
+      name = name.replaceAll(RegExp(kCurrencyPrefixSymbolPattern), ' ');
       name = name.replaceAll(RegExp(r'\d{1,3}(?:,\d{3})+|\d+'), ' ');
       name = name.replaceAll(RegExp(r'[×xX]'), ' ');
       name = name.replaceAll(RegExp(r'^[\s\-*:：.、|/]+'), '');

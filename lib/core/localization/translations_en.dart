@@ -22,6 +22,7 @@ const Map<String, String> kEnglishTranslations = <String, String>{
   'allow_camera_access_for_this_site_in_your_br': 'Allow camera access for this site in your browser or device settings,\nthen tap “Retry camera”.\nYou can also choose an image for OCR.',
   'amount': 'Amount',
   'amount_breakdown': 'Amount breakdown',
+  'amount_tax_included': 'Amount (tax included)',
   'amount_tax_included_jpy': 'Amount (tax included, JPY)',
   'analysing': 'Analysing…',
   'analysing_receipt': 'Analysing receipt…',

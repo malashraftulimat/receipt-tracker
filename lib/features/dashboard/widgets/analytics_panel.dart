@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/settings/currency_provider.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../analytics_provider.dart';
@@ -17,6 +18,7 @@ class AnalyticsPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(analyticsProvider);
     final theme = Theme.of(context);
+    final currencyCode = ref.watch(defaultCurrencyProvider).code;
 
     return async.when(
       loading: () => const Padding(
@@ -46,22 +48,32 @@ class AnalyticsPanel extends ConsumerWidget {
               children: <Widget>[
                 _Metric(
                   label: 'this_month_s_spending',
-                  value: formatYen(data.monthTotal),
+                  value: formatMoney(data.monthTotal, currency: currencyCode),
                   emphasized: true,
                 ),
                 _Metric(label: 'count', value: '${data.monthCount}件'),
-                _Metric(label: 'average', value: formatYen(data.average)),
+                _Metric(label: 'average', value: formatMoney(data.average, currency: currencyCode)),
                 _Metric(
                     label: '6_month_total',
-                    value: formatCompactYen(data.sixMonthTotal)),
+                    value: formatCompactMoney(data.sixMonthTotal, currency: currencyCode)),
               ],
             ),
+            if (data.otherCurrencyCount > 0) ...<Widget>[
+              const SizedBox(height: 8),
+              AppText(
+                'currency.other_note',
+                count: data.otherCurrencyCount,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             _ChartCard(
               title: 'last_6_months',
               child: SizedBox(
                 height: 168,
-                child: _MonthlyBarChart(data: data),
+                child: _MonthlyBarChart(data: data, currencyCode: currencyCode),
               ),
             ),
             const SizedBox(height: 14),
@@ -69,19 +81,22 @@ class AnalyticsPanel extends ConsumerWidget {
               title: 'by_category_this_month',
               child: data.slices.isEmpty
                   ? const _EmptyChart(message: 'no_data_for_this_month')
-                  : _CategoryBreakdown(data: data),
+                  : _CategoryBreakdown(data: data, currencyCode: currencyCode),
             ),
             const SizedBox(height: 14),
             _ChartCard(
               title: 'by_payment_method_this_month',
               child: data.paymentMethods.isEmpty
                   ? const _EmptyChart(message: 'no_data_for_this_month')
-                  : _PaymentMethodBreakdown(data: data),
+                  : _PaymentMethodBreakdown(
+                      data: data,
+                      currencyCode: currencyCode,
+                    ),
             ),
             const SizedBox(height: 14),
             _ChartCard(
               title: 'vs_last_month_cumulative',
-              child: _MonthComparison(data: data),
+              child: _MonthComparison(data: data, currencyCode: currencyCode),
             ),
             const SizedBox(height: 14),
             _ChartCard(
@@ -112,7 +127,7 @@ class AnalyticsPanel extends ConsumerWidget {
                                 ),
                                 const SizedBox(width: 8),
                                 AppText(
-                                  formatYen(merchant.amount),
+                                  formatMoney(merchant.amount, currency: currencyCode),
                                   style: theme.textTheme.bodySmall
                                       ?.copyWith(fontWeight: FontWeight.w700),
                                 ),
@@ -229,9 +244,10 @@ class _EmptyChart extends StatelessWidget {
 }
 
 class _MonthlyBarChart extends StatelessWidget {
-  const _MonthlyBarChart({required this.data});
+  const _MonthlyBarChart({required this.data, required this.currencyCode});
 
   final AnalyticsData data;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -249,7 +265,7 @@ class _MonthlyBarChart extends StatelessWidget {
           touchTooltipData: BarTouchTooltipData(
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               return BarTooltipItem(
-                formatYen(rod.toY),
+                formatMoney(rod.toY, currency: currencyCode),
                 TextStyle(
                   color: theme.colorScheme.onInverseSurface,
                   fontWeight: FontWeight.w600,
@@ -319,9 +335,10 @@ class _MonthlyBarChart extends StatelessWidget {
 }
 
 class _CategoryBreakdown extends StatelessWidget {
-  const _CategoryBreakdown({required this.data});
+  const _CategoryBreakdown({required this.data, required this.currencyCode});
 
   final AnalyticsData data;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -391,7 +408,7 @@ class _CategoryBreakdown extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     AppText(
-                      formatYen(slice.amount),
+                      formatMoney(slice.amount, currency: currencyCode),
                       style: theme.textTheme.bodySmall
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
@@ -406,9 +423,13 @@ class _CategoryBreakdown extends StatelessWidget {
 }
 
 class _PaymentMethodBreakdown extends StatelessWidget {
-  const _PaymentMethodBreakdown({required this.data});
+  const _PaymentMethodBreakdown({
+    required this.data,
+    required this.currencyCode,
+  });
 
   final AnalyticsData data;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -453,7 +474,7 @@ class _PaymentMethodBreakdown extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           AppText(
-                            formatYen(item.amount),
+                            formatMoney(item.amount, currency: currencyCode),
                             style: theme.textTheme.bodySmall
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
@@ -492,9 +513,10 @@ class _PaymentMethodBreakdown extends StatelessWidget {
 }
 
 class _MonthComparison extends StatelessWidget {
-  const _MonthComparison({required this.data});
+  const _MonthComparison({required this.data, required this.currencyCode});
 
   final AnalyticsData data;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -526,7 +548,7 @@ class _MonthComparison extends StatelessWidget {
               child: AppText(
                 data.previousMonthTotal == 0
                     ? 'no_data_for_last_month'
-                    : '先月より ${formatYen(data.momDelta.abs())} '
+                    : '先月より ${formatMoney(data.momDelta.abs(), currency: currencyCode)} '
                         '${increased ? '多い' : '少ない'}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,

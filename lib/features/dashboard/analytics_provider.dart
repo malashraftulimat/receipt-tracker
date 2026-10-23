@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/settings/currency_provider.dart';
 import '../../core/theme/app_palette.dart';
 import '../../data/providers.dart';
 import '../../domain/models/payment_method.dart';
@@ -67,6 +68,7 @@ class AnalyticsData {
     required this.sixMonthTotal,
     required this.topMerchants,
     this.paymentMethods = const <PaymentMethodTotal>[],
+    this.otherCurrencyCount = 0,
     this.previousMonthTotal = 0,
     this.previousMonthCount = 0,
     this.currentDaily = const <double>[],
@@ -82,6 +84,9 @@ class AnalyticsData {
 
   /// Current-month spend per payment method (cash, cards, e-money, ...).
   final List<PaymentMethodTotal> paymentMethods;
+
+  /// Current-month receipts excluded because they use another currency.
+  final int otherCurrencyCount;
 
   /// Month-over-month comparison (current vs previous month).
   final double previousMonthTotal;
@@ -114,6 +119,7 @@ class AnalyticsData {
     sixMonthTotal: 0,
     topMerchants: <MerchantTotal>[],
     paymentMethods: <PaymentMethodTotal>[],
+    otherCurrencyCount: 0,
   );
 }
 
@@ -121,14 +127,24 @@ class AnalyticsData {
 final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
   final userId = ref.watch(userIdProvider);
   if (userId == null) return AnalyticsData.empty;
+  final currencyCode = ref.watch(defaultCurrencyProvider).code;
 
   final now = DateTime.now();
   final start = DateTime(now.year, now.month - 5, 1);
   final end = DateTime(now.year, now.month + 1, 1);
 
-  final receipts = await ref.watch(receiptRepositoryProvider).fetch(
+  final allReceipts = await ref.watch(receiptRepositoryProvider).fetch(
         ReceiptFilter(from: start, to: end),
       );
+  final receipts = allReceipts
+      .where((receipt) => receipt.currency == currencyCode)
+      .toList(growable: false);
+  final otherCurrencyCount = allReceipts.where((receipt) {
+    final date = receipt.purchasedAt;
+    return receipt.currency != currencyCode &&
+        date.year == now.year &&
+        date.month == now.month;
+  }).length;
 
   // --- monthly trend ------------------------------------------------------
   final months = <MonthTotal>[];
@@ -255,6 +271,7 @@ final analyticsProvider = FutureProvider<AnalyticsData>((ref) async {
     sixMonthTotal: receipts.fold<double>(0, (sum, r) => sum + r.totalAmount),
     topMerchants: topMerchants.take(3).toList(growable: false),
     paymentMethods: paymentMethods,
+    otherCurrencyCount: otherCurrencyCount,
   );
 });
 

@@ -84,17 +84,17 @@ class PayCycleConfig {
       };
 
   /// Converts an amount received once per cycle into a monthly amount.
-  int monthlyEquivalent(int perCycle, DateTime month) {
+  num monthlyEquivalent(num perCycle, DateTime month) {
     if (perCycle == 0) return 0;
-    return (perCycle * periodsInMonth(month)).round();
+    return perCycle * periodsInMonth(month);
   }
 
   /// Converts a monthly amount into the amount received once per cycle.
-  int perCycleEquivalent(int monthly, DateTime month) {
+  num perCycleEquivalent(num monthly, DateTime month) {
     if (monthly == 0) return 0;
     final periods = periodsInMonth(month);
     if (periods <= 0) return monthly;
-    return (monthly / periods).round();
+    return monthly / periods;
   }
 
   /// Payday for [month], clamped to the length of that month.

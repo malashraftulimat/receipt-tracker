@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/localization/currencies.dart';
 import '../../core/localization/localization.dart';
+import '../../core/settings/currency_provider.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
@@ -15,6 +17,7 @@ import '../../domain/models/payment_method.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../dashboard/analytics_provider.dart';
+import '../settings/widgets/currency_picker.dart';
 
 /// Quick entry for expenses that have no receipt (rent, money lent to a
 /// friend, bank transfers, ...).
@@ -35,6 +38,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
   final _note = TextEditingController();
 
   late DateTime _date;
+  late Currency _currency;
   String? _categoryId;
   PaymentMethod? _method;
   bool _saving = false;
@@ -45,6 +49,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
     super.initState();
     final now = DateTime.now();
     _date = DateTime(now.year, now.month, now.day);
+    _currency = ref.read(defaultCurrencyProvider);
   }
 
   @override
@@ -93,6 +98,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
       final note = _note.text.trim();
       final draft = ReceiptDraft(
         purchasedAt: purchasedAt,
+        currency: _currency.code,
         totalAmount: parseAmountInput(_amount.text) ?? 0,
         categoryId: _categoryId,
         note: note.isEmpty ? null : note,
@@ -178,7 +184,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                           ?.copyWith(fontWeight: FontWeight.w700),
                       decoration: InputDecoration(
                         labelText: context.tr('amount'),
-                        prefixText: '¥ ',
+                        prefixText: '${_currency.symbol} ',
                         prefixIcon: const Icon(Icons.payments_outlined),
                       ),
                       validator: (value) {
@@ -194,6 +200,24 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showCurrencyPicker(
+                          context,
+                          selected: _currency,
+                        );
+                        if (picked != null) setState(() => _currency = picked);
+                      },
+                      icon: const Icon(Icons.currency_exchange_outlined,
+                          size: 18),
+                      label: Text(
+                        '${_currency.code} · '
+                        '${_currency.name(context.l10n.language)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(

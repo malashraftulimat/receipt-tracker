@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/settings/currency_provider.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/budget_gradient_bar.dart';
@@ -19,6 +20,7 @@ class BudgetCard extends ConsumerWidget {
     final now = DateTime.now();
     final month = DateTime(now.year, now.month);
     final asyncSummary = ref.watch(budgetSummaryProvider(month));
+    final currencyCode = ref.watch(defaultCurrencyProvider).code;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -115,7 +117,7 @@ class BudgetCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 AppText(
-                  formatYen(summary.periodRemaining.abs()),
+                  formatMoney(summary.periodRemaining.abs(), currency: currencyCode),
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: summary.periodRemaining < 0
@@ -132,13 +134,13 @@ class BudgetCard extends ConsumerWidget {
                 Row(
                   children: <Widget>[
                     AppText(
-                      '1日 ${formatYen(summary.dailyAllowance)}',
+                      '1日 ${formatMoney(summary.dailyAllowance, currency: currencyCode)}',
                       style: theme.textTheme.labelSmall
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 12),
                     AppText(
-                      '今日 ${formatYen(summary.todaySpent)}',
+                      '今日 ${formatMoney(summary.todaySpent, currency: currencyCode)}',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -152,6 +154,16 @@ class BudgetCard extends ConsumerWidget {
                     ),
                   ],
                 ),
+                if (summary.otherCurrencyCount > 0) ...<Widget>[
+                  const SizedBox(height: 6),
+                  AppText(
+                    'currency.other_note',
+                    count: summary.otherCurrencyCount,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ],
             ),
           );

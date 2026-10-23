@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/localization/currencies.dart';
 import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/receipt_item.dart';
@@ -7,7 +8,7 @@ import '../../../core/localization/localization.dart';
 
 /// Read-only item row used on the receipt detail screen.
 class ReceiptItemRow extends StatelessWidget {
-  const ReceiptItemRow({super.key, required this.item, this.currency = 'JPY'});
+  const ReceiptItemRow({super.key, required this.item, this.currency = kFallbackCurrencyCode});
 
   final ReceiptItem item;
   final String currency;

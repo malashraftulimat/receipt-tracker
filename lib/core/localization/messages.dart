@@ -22,6 +22,7 @@ const Map<String, String> kMessageKeys = <String, String>{
   'allow_camera_access_for_this_site_in_your_br': 'ブラウザまたは端末の設定でこのサイトのカメラ利用を許可し、\n「カメラを再試行」を押してください。\n許可できない場合も、画像を選択してOCRできます。',
   'amount': '金額',
   'amount_breakdown': '金額の内訳',
+  'amount_tax_included': '金額（税込）',
   'amount_tax_included_jpy': '金額（税込・円）',
   'analysing': '解析中…',
   'analysing_receipt': 'レシートを解析しています…',
