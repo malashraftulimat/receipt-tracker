@@ -1,48 +1,30 @@
 import 'package:intl/intl.dart';
 
-/// Currencies that are conventionally printed without a decimal part.
-const Set<String> _zeroDecimalCurrencies = <String>{
-  'JPY',
-  'KRW',
-  'VND',
-  'CLP',
-  'ISK',
-  'HUF',
-};
-
-const Map<String, String> _currencySymbols = <String, String>{
-  'JPY': '¥',
-  'USD': r'$',
-  'EUR': '€',
-  'GBP': '£',
-  'CNY': '¥',
-  'KRW': '₩',
-  'INR': '₹',
-  'SAR': '﷼',
-  'AED': 'د.إ',
-  'EGP': 'E£',
-  'TRY': '₺',
-  'THB': '฿',
-  'VND': '₫',
-  'RUB': '₽',
-  'AUD': r'A$',
-  'CAD': r'C$',
-  'CHF': 'CHF',
-  'TWD': r'NT$',
-  'HKD': r'HK$',
-  'SGD': r'S$',
-  'BRL': r'R$',
-  'MXN': r'MX$',
-  'IDR': 'Rp',
-  'MYR': 'RM',
-  'PHP': '₱',
-  'NZD': r'NZ$',
-};
+import '../localization/currencies.dart';
+import '../localization/date_patterns.dart';
 
 /// Symbol (or the ISO code itself when no symbol is known) for [currency].
 String currencySymbol(String currency) {
   final code = currency.trim().toUpperCase();
-  return _currencySymbols[code] ?? code;
+  return currencyByCode(code)?.symbol ?? code;
+}
+
+/// Resolves a stored code for display: missing/empty means the app default
+/// (JPY), while an unknown code keeps its own ISO code as the symbol so the
+/// amount is never silently re-labelled as yen.
+Currency _displayCurrency(String? currency) {
+  final code = currency?.trim().toUpperCase() ?? '';
+  final known = currencyByCode(code);
+  if (known != null) return known;
+  if (code.isEmpty) return kFallbackCurrency;
+  return Currency(
+    code: code,
+    symbol: code,
+    decimalDigits: 2,
+    nameJa: code,
+    nameEn: code,
+    nameAr: code,
+  );
 }
 
 String _groupDigits(String digits) {
@@ -54,7 +36,8 @@ String _groupDigits(String digits) {
   return buffer.toString();
 }
 
-/// Formats [amount] in [currency] (ISO 4217 code) with grouping and decimals.
+/// Formats [amount] in [currency] (ISO 4217 code) with locale-aware grouping,
+/// the currency's decimal digits and its localized symbol.
 ///
 /// Zero-decimal currencies (JPY, KRW, ...) omit the fraction when the amount
 /// is whole, but still show it when the receipt carries a decimal value.
@@ -63,51 +46,59 @@ String formatMoney(
   String currency = 'JPY',
   bool withSymbol = true,
 }) {
-  final code = currency.trim().toUpperCase();
+  final c = _displayCurrency(currency);
   final value = amount.toDouble();
   final hasFraction = (value - value.roundToDouble()).abs() > 1e-9;
-  final fractionDigits =
-      hasFraction ? 2 : (_zeroDecimalCurrencies.contains(code) ? 0 : 2);
-
-  final fixed = value.abs().toStringAsFixed(fractionDigits);
-  final parts = fixed.split('.');
-  final grouped = _groupDigits(parts[0]);
-  final number = parts.length > 1 ? '$grouped.${parts[1]}' : grouped;
-  final sign = value < 0 ? '-' : '';
-  if (!withSymbol) return '$sign$number';
-  final symbol = currencySymbol(code);
-  // Unknown currencies fall back to the ISO code, separated by a space.
-  final separator = symbol == code ? ' ' : '';
-  return '$sign$symbol$separator$number';
+  final digits = hasFraction && c.decimalDigits == 0 ? 2 : c.decimalDigits;
+  final locale = _dateLanguage;
+  final number = NumberFormat.decimalPatternDigits(
+    locale: locale,
+    decimalDigits: digits,
+  ).format(value);
+  if (!withSymbol) return number;
+  // Unknown codes fall back to the ISO code as the symbol, separated by a
+  // space so `XYZ 99.00` stays unambiguous.
+  final unknown = c.symbol == c.code;
+  if (unknown) return '${c.code} $number';
+  return NumberFormat.currency(
+    locale: locale,
+    symbol: c.symbol,
+    decimalDigits: digits,
+  ).format(value);
 }
+
+/// Formats [amount] using an explicit [Currency] object.
+String formatCurrencyAmount(
+  num amount, {
+  required Currency currency,
+  bool withSymbol = true,
+}) =>
+    formatMoney(amount, currency: currency.code, withSymbol: withSymbol);
 
 /// `¥1,234` (JPY is displayed without decimals unless the value has a
 /// fractional part).
 String formatYen(num amount, {bool withSymbol = true}) =>
     formatMoney(amount, currency: 'JPY', withSymbol: withSymbol);
 
-/// `1.2万円` style compact label for charts.
-String formatCompactYen(num amount) {
-  final value = amount.round();
-  if (value.abs() >= 10000) {
-    final language = _dateLanguage;
-    if (language == 'ja') {
-      final man = value / 10000;
-      final text = man.abs() >= 100
-          ? man.round().toString()
-          : man.toStringAsFixed(1).replaceAll(RegExp(r'\.0$'), '');
-      return '$text万円';
-    }
-    if (value.abs() >= 1000000) {
-      return '¥${(value / 1000000).toStringAsFixed(1)}M';
-    }
-    return '¥${(value / 1000).toStringAsFixed(0)}k';
-  }
-  return formatYen(value);
+/// Compact label for charts, e.g. `¥1.2万` / `$1.2M`.
+String formatCompactMoney(num amount, {String currency = 'JPY'}) {
+  final c = _displayCurrency(currency);
+  final format = NumberFormat.compactCurrency(
+    locale: _dateLanguage,
+    symbol: c.symbol,
+    decimalDigits: c.decimalDigits,
+  );
+  return format.format(amount);
 }
+
+/// Backwards-compatible JPY compact label for charts.
+String formatCompactYen(num amount) => formatCompactMoney(amount);
 
 /// Editable amount text without the currency symbol. Decimals are preserved
 /// only when they are non-zero so whole amounts stay easy to read.
+///
+/// Editable text always uses Western digits and `,` grouping so that the
+/// parser accepts it on every platform, independent of the display locale.
 String formatAmountDigits(num amount) {
   final value = amount.toDouble();
   final whole = value == value.roundToDouble();
@@ -182,38 +173,32 @@ int? parseYenInput(String input) {
 // ---------------------------------------------------------------------------
 // Dates — symbol data for ja / en / ar is loaded in main() via
 // initializeDateFormatting(). The active language comes from Intl.defaultLocale,
-// which is updated by the language provider.
+// which is updated by the language provider. Patterns live in date_patterns.dart.
 // ---------------------------------------------------------------------------
 
 String get _dateLanguage => Intl.defaultLocale ?? 'ja';
 
-bool get _isJapanese => _dateLanguage.startsWith('ja');
-bool get _isArabic => _dateLanguage.startsWith('ar');
-
-String formatDateJa(DateTime date) {
-  final pattern = _isJapanese
-      ? 'yyyy年M月d日(E)'
-      : (_isArabic ? 'EEEE، d MMMM y' : 'EEE, MMM d, y');
-  return DateFormat(pattern, _dateLanguage).format(date);
+String get _languageCode {
+  final locale = _dateLanguage.toLowerCase();
+  if (locale.startsWith('ar')) return 'ar';
+  if (locale.startsWith('en')) return 'en';
+  return 'ja';
 }
 
-String formatDateShortJa(DateTime date) {
-  final pattern = _isJapanese
-      ? 'yyyy/M/d(E)'
-      : (_isArabic ? 'd/M/y (EEE)' : 'M/d/yy (EEE)');
-  return DateFormat(pattern, _dateLanguage).format(date);
-}
+String _pattern(String key) =>
+    kDatePatterns[key]?[_languageCode] ?? kDatePatterns[key]!['ja']!;
 
-String formatMonthJa(DateTime date) {
-  final pattern = _isJapanese ? 'yyyy年M月' : (_isArabic ? 'MMMM y' : 'MMMM y');
-  return DateFormat(pattern, _dateLanguage).format(date);
-}
+String formatDateJa(DateTime date) =>
+    DateFormat(_pattern('full'), _dateLanguage).format(date);
 
-String formatDayJa(DateTime date) {
-  final pattern =
-      _isJapanese ? 'M月d日(E)' : (_isArabic ? 'EEEE، d MMMM' : 'EEE, MMM d');
-  return DateFormat(pattern, _dateLanguage).format(date);
-}
+String formatDateShortJa(DateTime date) =>
+    DateFormat(_pattern('short'), _dateLanguage).format(date);
+
+String formatMonthJa(DateTime date) =>
+    DateFormat(_pattern('month'), _dateLanguage).format(date);
+
+String formatDayJa(DateTime date) =>
+    DateFormat(_pattern('day'), _dateLanguage).format(date);
 
 String formatTimeJa(DateTime date) => DateFormat('HH:mm').format(date);
 
@@ -223,23 +208,25 @@ String formatTimeJa(DateTime date) => DateFormat('HH:mm').format(date);
 /// requested weekday without DST-sensitive duration math.
 String formatWeekdayJa(int weekday, {bool short = false}) {
   final date = DateTime(2026, 1, 4 + weekday.clamp(1, 7));
-  return DateFormat(short ? 'E' : 'EEEE', _dateLanguage).format(date);
+  return DateFormat(short ? _pattern('weekday_short') : _pattern('weekday_full'),
+          _dateLanguage)
+      .format(date);
 }
 
 String formatDateTimeJa(DateTime date) =>
     '${formatDateJa(date)} ${formatTimeJa(date)}';
 
 String formatYearJa(DateTime date) =>
-    DateFormat(_isJapanese ? 'yyyy年' : 'y', _dateLanguage).format(date);
+    DateFormat(_pattern('year'), _dateLanguage).format(date);
 
 String formatMonthShortJa(DateTime date) =>
-    DateFormat(_isJapanese ? 'M月' : 'MMM', _dateLanguage).format(date);
+    DateFormat(_pattern('month_short'), _dateLanguage).format(date);
 
 String formatRangeJa(DateTime start, DateTime endInclusive) {
   final sameDay = start.year == endInclusive.year &&
       start.month == endInclusive.month &&
       start.day == endInclusive.day;
   if (sameDay) return formatDateJa(start);
-  final separator = _isJapanese ? ' 〜 ' : ' – ';
+  final separator = _pattern('range_separator');
   return '${formatDateShortJa(start)}$separator${formatDateShortJa(endInclusive)}';
 }
