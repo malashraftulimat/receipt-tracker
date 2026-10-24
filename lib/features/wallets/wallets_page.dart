@@ -13,6 +13,7 @@ import '../../data/providers.dart';
 import '../../domain/models/exchange_rates.dart';
 import '../../domain/models/wallet.dart';
 import '../../domain/models/wallet_ledger.dart';
+import 'widgets/transfer_dialog.dart';
 import 'widgets/wallet_editor_dialog.dart';
 
 class WalletsPage extends ConsumerWidget {
@@ -26,6 +27,14 @@ class WalletsPage extends ConsumerWidget {
     );
   }
 
+  Future<void> _transfer(BuildContext context, WidgetRef ref) async {
+    final wallets = ref.read(walletsProvider).valueOrNull ?? const <Wallet>[];
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => TransferDialog(wallets: wallets),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final walletsAsync = ref.watch(walletsProvider);
@@ -33,6 +42,8 @@ class WalletsPage extends ConsumerWidget {
     final base = ref.watch(defaultCurrencyProvider).code;
     final knownWallets =
         ref.watch(walletsProvider).valueOrNull ?? const <Wallet>[];
+    final canTransfer =
+        knownWallets.where((wallet) => !wallet.archived).length >= 2;
     final needsFx = knownWallets.any(
       (wallet) => wallet.currency.trim().toUpperCase() != base.toUpperCase(),
     );
@@ -46,6 +57,12 @@ class WalletsPage extends ConsumerWidget {
           context,
           showLanguageLabel: context.isExpanded,
           actions: <Widget>[
+            if (canTransfer)
+              IconButton(
+                tooltip: context.tr('transfer'),
+                onPressed: () => _transfer(context, ref),
+                icon: const Icon(Icons.swap_horiz),
+              ),
             IconButton(
               tooltip: context.tr('add_wallet'),
               onPressed: () => _add(context, ref),

@@ -882,8 +882,13 @@ class _SummaryCard extends StatelessWidget {
           if (showPeriodRange) ...<Widget>[
             const SizedBox(height: 2),
             AppText(
-              '対象期間: '
-              '${formatRangeJa(data.periodStart!, addDays(data.periodEnd!, -1))}',
+              'budget.period_range',
+              params: <String, Object?>{
+                'range': formatRangeJa(
+                  data.periodStart!,
+                  addDays(data.periodEnd!, -1),
+                ),
+              },
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -893,9 +898,16 @@ class _SummaryCard extends StatelessWidget {
           BudgetGradientBar(value: data.periodProgress, height: 11),
           const SizedBox(height: 6),
           AppText(
-            '支出 ${formatMoney(data.cycleSpent, currency: currencyCode)} / 自由枠 '
-            '${formatMoney(data.cycleBudget, currency: currencyCode)} '
-            '(${(data.periodProgress * 100).clamp(0, 999).toStringAsFixed(0)}%)',
+            'budget.spent_of_allowance',
+            params: <String, Object?>{
+              'spent': formatMoney(data.cycleSpent, currency: currencyCode),
+              'allowance': formatMoney(
+                data.cycleBudget,
+                currency: currencyCode,
+              ),
+              'percent':
+                  (data.periodProgress * 100).clamp(0, 999).toStringAsFixed(0),
+            },
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),

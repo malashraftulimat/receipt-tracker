@@ -46,7 +46,8 @@ class WalletDetailPage extends ConsumerWidget {
       context: context,
       builder: (context) => TransferDialog(
         wallets: wallets,
-        initialFromId: wallet.id,
+        initialFromId: wallet.isCredit ? wallet.settlementWalletId : wallet.id,
+        initialToId: wallet.isCredit ? wallet.id : null,
       ),
     );
   }

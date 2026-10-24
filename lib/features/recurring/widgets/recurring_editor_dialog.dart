@@ -236,6 +236,7 @@ class _RecurringEditorDialogState extends ConsumerState<RecurringEditorDialog> {
                   wallets: wallets,
                   selectedId: _walletId,
                   currency: _currency.code,
+                  excludeCredit: !_direction.isExpense,
                   label: 'wallet_optional',
                   onChanged: (value) => setState(() => _walletId = value),
                 ),

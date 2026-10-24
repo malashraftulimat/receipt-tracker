@@ -118,6 +118,11 @@ void main() {
       expect(result.receiptNumber, '1234567890');
     });
 
+    test('reads a hyphenated receipt number without truncating at the first hyphen', () {
+      final result = parser.parse('店舗\n伝票番号 261-024-145-7457\n合計 980');
+      expect(result.receiptNumber, '2610241457457');
+    });
+
     test('reads qualified invoice registration numbers separately', () {
       final result = parser.parse('登録番号 T1234567890123\n合計 1,100');
       expect(result.registrationNumber, 'T1234567890123');

@@ -581,7 +581,13 @@ class ReceiptParser {
     final candidates = <double>[];
     for (final line in lines) {
       if (_isPaymentLine(line)) continue;
-      if (line.contains('対象') || line.contains('税率')) continue;
+      if (line.contains('対象') ||
+          line.contains('税率') ||
+          line.contains('伝票') ||
+          line.contains('レシート') ||
+          line.contains('番号')) {
+        continue;
+      }
       candidates.addAll(amountsIn(line).where((value) => value >= 1));
     }
     if (candidates.isEmpty) return null;
@@ -884,12 +890,12 @@ class ReceiptParser {
 
     final explicitReceiptLabel = RegExp(
       r'(?:レシート|伝票|領収書|受付|注文|オーダー|receipt|slip)\s*'
-      r'(?:No\.?|NO\.?|番号)\s*[:#]?\s*([0-9]{3,20})',
+      r'(?:No\.?|NO\.?|番号)\s*[:#]?\s*([0-9]+(?:[\-ー―][0-9]+)+|[0-9]{3,20})',
       caseSensitive: false,
     );
     final labelled = RegExp(
       r'(?:レシート|伝票|領収書|受付|注文|オーダー|バーコード|barcode)?\s*'
-      r'(?:No\.?|NO\.?|番号)\s*[:#]?\s*([0-9]{3,20})',
+      r'(?:No\.?|NO\.?|番号)\s*[:#]?\s*([0-9]+(?:[\-ー―][0-9]+)+|[0-9]{3,20})',
       caseSensitive: false,
     );
     for (var i = 0; i < lines.length; i++) {
@@ -899,7 +905,10 @@ class ReceiptParser {
       if (explicit != null) {
         final value = explicit.group(1);
         if (value != null) {
-          return ReceiptIdentity.normalizeReceiptNumber(value);
+          final digits = value.replaceAll(RegExp(r'[\-ー―]'), '');
+          if (digits.length >= 3) {
+            return ReceiptIdentity.normalizeReceiptNumber(digits);
+          }
         }
       }
       var underCoupon = false;
@@ -916,7 +925,10 @@ class ReceiptParser {
       if (match == null) continue;
       final value = match.group(1);
       if (value == null) continue;
-      return ReceiptIdentity.normalizeReceiptNumber(value);
+      final digits = value.replaceAll(RegExp(r'[\-ー―]'), '');
+      if (digits.length >= 3) {
+        return ReceiptIdentity.normalizeReceiptNumber(digits);
+      }
     }
     return null;
   }

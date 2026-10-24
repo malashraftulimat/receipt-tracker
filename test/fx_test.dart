@@ -1,4 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:receipt_tracker/data/services/fx/fx_service.dart';
 import 'package:receipt_tracker/data/services/fx/fx_store.dart';
 import 'package:receipt_tracker/domain/models/exchange_rates.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -113,6 +118,88 @@ void main() {
       });
       expect(withOverride.rateFor('USD', 'JPY'), 152);
       expect(withOverride.rateFor('EUR', 'JPY'), closeTo(160, 0.0001));
+    });
+  });
+
+  group('FxService HTTP & fallback', () {
+    test(
+      'reads Frankfurter v2 and supplements unserved currencies from open.er-api.com',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final client = MockClient((request) async {
+          if (request.url.host == 'api.frankfurter.dev') {
+            return http.Response(
+              jsonEncode(<Map<String, Object>>[
+                <String, Object>{'quote': 'USD', 'rate': 0.0066},
+              ]),
+              200,
+            );
+          }
+          if (request.url.host == 'open.er-api.com') {
+            return http.Response(
+              jsonEncode(<String, Object>{
+                'result': 'success',
+                'rates': <String, Object>{
+                  'USD': 0.0065,
+                  'SAR': 0.025,
+                },
+              }),
+              200,
+            );
+          }
+          return http.Response('not found', 404);
+        });
+
+        final service = FxService(client: client);
+        final loaded = await service.load(base: 'JPY');
+        expect(loaded.source, FxSource.frankfurter);
+        // Frankfurter wins for currencies it serves.
+        expect(loaded.rates['USD'], closeTo(0.0066, 1e-6));
+        // open.er-api.com fills in currencies Frankfurter does not serve.
+        expect(loaded.rates['SAR'], closeTo(0.025, 1e-6));
+      },
+    );
+
+    test(
+      'falls back to open.er-api.com when base currency is not on Frankfurter',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final client = MockClient((request) async {
+          if (request.url.host == 'api.frankfurter.dev') {
+            return http.Response('unserved currency', 404);
+          }
+          return http.Response(
+            jsonEncode(<String, Object>{
+              'result': 'success',
+              'rates': <String, Object>{
+                'JPY': 40.0,
+                'USD': 0.2666,
+              },
+            }),
+            200,
+          );
+        });
+
+        final service = FxService(client: client);
+        final loaded = await service.load(base: 'SAR');
+        expect(loaded.source, FxSource.erApi);
+        expect(loaded.rateFor('JPY', 'SAR'), closeTo(1 / 40.0, 1e-6));
+      },
+    );
+
+    test('uses stale cached snapshot when offline', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final stale = snapshot(
+        fetchedAt: DateTime.now().subtract(const Duration(hours: 12)),
+      );
+      await FxStore.writeCache(stale);
+
+      final client = MockClient((_) async => http.Response('offline', 503));
+      final service = FxService(client: client);
+      final loaded = await service.load(base: 'JPY');
+      expect(loaded.fromCache, isTrue);
+      expect(loaded.stale, isTrue);
+      expect(loaded.rateFor('USD', 'JPY'), closeTo(150, 0.0001));
     });
   });
 }

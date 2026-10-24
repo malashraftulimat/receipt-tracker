@@ -211,6 +211,7 @@ class _AddIncomePageState extends ConsumerState<AddIncomePage> {
                       wallets: wallets,
                       selectedId: _walletId,
                       currency: currency.code,
+                      excludeCredit: true,
                       label: 'wallet_optional',
                       onChanged: (value) => setState(() => _walletId = value),
                     ),

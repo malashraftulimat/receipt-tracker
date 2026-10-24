@@ -134,20 +134,35 @@ class BudgetCard extends ConsumerWidget {
                 Row(
                   children: <Widget>[
                     AppText(
-                      '1日 ${formatMoney(summary.dailyAllowance, currency: currencyCode)}',
+                      'budget.card_daily',
+                      params: <String, Object?>{
+                        'amount': formatMoney(
+                          summary.dailyAllowance,
+                          currency: currencyCode,
+                        ),
+                      },
                       style: theme.textTheme.labelSmall
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(width: 12),
                     AppText(
-                      '今日 ${formatMoney(summary.todaySpent, currency: currencyCode)}',
+                      'budget.card_today',
+                      params: <String, Object?>{
+                        'amount': formatMoney(
+                          summary.todaySpent,
+                          currency: currencyCode,
+                        ),
+                      },
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const Spacer(),
                     AppText(
-                      '貯蓄 ${(summary.savingsProgress * 100).round()}%',
+                      'budget.card_savings',
+                      params: <String, Object?>{
+                        'percent': (summary.savingsProgress * 100).round(),
+                      },
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

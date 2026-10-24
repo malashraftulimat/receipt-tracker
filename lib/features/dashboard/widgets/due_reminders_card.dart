@@ -46,7 +46,8 @@ class DueRemindersCard extends ConsumerWidget {
                 ),
                 const Spacer(),
                 AppText(
-                  '${receipts.length}件',
+                  'count.items',
+                  count: receipts.length,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -99,11 +100,12 @@ class _DueRow extends StatelessWidget {
             ? AppPalette.amber
             : AppPalette.cyan;
 
-    final label = days < 0
-        ? '${-days}日超過'
+    final labelId = days < 0
+        ? 'days.overdue'
         : days == 0
             ? 'paycycle.today'
-            : 'あと$days日';
+            : 'days.left';
+    final labelCount = days == 0 ? null : days.abs();
 
     return InkWell(
       borderRadius: BorderRadius.circular(10),
@@ -124,7 +126,11 @@ class _DueRow extends StatelessWidget {
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   AppText(
-                    '${formatDateShortJa(dueDate)} ・ ${formatMoney(amount, currency: currency)}',
+                    'due.date_amount',
+                    params: <String, Object?>{
+                      'date': formatDateShortJa(dueDate),
+                      'amount': formatMoney(amount, currency: currency),
+                    },
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -136,7 +142,8 @@ class _DueRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: AppPalette.tintedPill(color, radius: 8),
               child: AppText(
-                label,
+                labelId,
+                count: labelCount,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,

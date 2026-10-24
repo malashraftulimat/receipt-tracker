@@ -759,6 +759,7 @@ class _IncomeSourceEditorState extends State<_IncomeSourceEditor> {
                   wallets: widget.wallets,
                   selectedId: _walletId,
                   currency: widget.source?.currency ?? widget.currencyCode,
+                  excludeCredit: true,
                   label: 'wallet_destination_optional',
                   onChanged: (value) => setState(() => _walletId = value),
                 ),

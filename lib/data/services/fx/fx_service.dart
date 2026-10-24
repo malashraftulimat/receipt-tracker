@@ -69,7 +69,12 @@ class FxService {
   ) async {
     final frankfurter = await _fetchFrankfurter(base);
     if (frankfurter != null && frankfurter.isNotEmpty) {
-      return (rates: frankfurter, source: FxSource.frankfurter);
+      final erApi = await _fetchErApi(base);
+      final merged = <String, double>{
+        if (erApi != null) ...erApi,
+        ...frankfurter,
+      };
+      return (rates: merged, source: FxSource.frankfurter);
     }
     final erApi = await _fetchErApi(base);
     if (erApi != null && erApi.isNotEmpty) {

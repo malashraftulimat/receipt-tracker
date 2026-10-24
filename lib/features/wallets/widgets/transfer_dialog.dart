@@ -13,10 +13,12 @@ class TransferDialog extends ConsumerStatefulWidget {
     super.key,
     required this.wallets,
     this.initialFromId,
+    this.initialToId,
   });
 
   final List<Wallet> wallets;
   final String? initialFromId;
+  final String? initialToId;
 
   @override
   ConsumerState<TransferDialog> createState() => _TransferDialogState();
@@ -57,13 +59,22 @@ class _TransferDialogState extends ConsumerState<TransferDialog> {
     final now = DateTime.now();
     _date = DateTime(now.year, now.month, now.day);
     _fromId = widget.initialFromId;
+    _toId = widget.initialToId;
     if (_fromId == null || _find(_fromId) == null) {
-      _fromId = _wallets.isEmpty ? null : _wallets.first.id;
+      for (final wallet in _wallets) {
+        if (wallet.id != _toId) {
+          _fromId = wallet.id;
+          break;
+        }
+      }
     }
-    for (final wallet in _wallets) {
-      if (wallet.id != _fromId) {
-        _toId = wallet.id;
-        break;
+    if (_toId == null || _find(_toId) == null || _toId == _fromId) {
+      _toId = null;
+      for (final wallet in _wallets) {
+        if (wallet.id != _fromId) {
+          _toId = wallet.id;
+          break;
+        }
       }
     }
   }

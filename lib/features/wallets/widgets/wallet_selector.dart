@@ -17,6 +17,7 @@ class WalletSelector extends StatelessWidget {
     required this.onChanged,
     this.currency,
     this.allowNone = true,
+    this.excludeCredit = false,
     this.label = 'wallet',
   });
 
@@ -25,12 +26,14 @@ class WalletSelector extends StatelessWidget {
   final ValueChanged<String?> onChanged;
   final String? currency;
   final bool allowNone;
+  final bool excludeCredit;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     final matching = wallets
         .where((wallet) => !wallet.archived)
+        .where((wallet) => !excludeCredit || !wallet.isCredit)
         .where((wallet) =>
             currency == null ||
             wallet.currency.toUpperCase() == currency!.toUpperCase())

@@ -163,6 +163,29 @@ void main() {
       expect(Wallet.sanitizeLast4('12'), isNull);
     });
 
+    test('copyWith preserves and updates last4 and settlementWalletId', () {
+      final card = Wallet(
+        id: 'c1',
+        name: 'Card',
+        type: WalletType.credit,
+        currency: 'JPY',
+        last4: '4321',
+        settlementWalletId: 'bank1',
+        createdAt: created,
+        updatedAt: created,
+      );
+      final renamed = card.copyWith(name: 'Main Card');
+      expect(renamed.last4, '4321');
+      expect(renamed.settlementWalletId, 'bank1');
+
+      final updated = card.copyWith(
+        last4: '9876',
+        settlementWalletId: 'bank2',
+      );
+      expect(updated.last4, '9876');
+      expect(updated.settlementWalletId, 'bank2');
+    });
+
     test('old documents without new fields still load', () {
       final restored = Wallet.fromJson(<String, dynamic>{
         'id': 'old',
