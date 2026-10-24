@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/localization/currencies.dart';
 import '../../core/localization/localization.dart';
 import '../../core/settings/currency_provider.dart';
-import '../../core/settings/pay_cycle_provider.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/budget_gradient_bar.dart';
 import '../../core/widgets/language_switcher.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
+import '../../domain/models/income_source.dart';
 import '../../domain/models/monthly_budget.dart';
 import '../../domain/models/pay_cycle.dart';
 
@@ -25,7 +26,6 @@ class BudgetPage extends ConsumerStatefulWidget {
 
 class _BudgetPageState extends ConsumerState<BudgetPage> {
   final _formKey = GlobalKey<FormState>();
-  final _salary = TextEditingController();
   final _savings = TextEditingController();
   final _fixed = TextEditingController();
 
@@ -34,6 +34,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   bool _loading = true;
   bool _saving = false;
   String? _error;
+
+  /// Legacy plan amounts, used only when the user has no income sources (for
+  /// example after deleting every source).
+  double _fallbackSalary = 0;
+  PayCycle? _fallbackCycle;
+  num? _fallbackIncomePerCycle;
 
   @override
   void initState() {
@@ -45,7 +51,6 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
 
   @override
   void dispose() {
-    _salary.dispose();
     _savings.dispose();
     _fixed.dispose();
     super.dispose();
@@ -60,11 +65,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
       final budget =
           await ref.read(budgetRepositoryProvider).fetchMonth(_month);
       if (!mounted) return;
-      final config = ref.read(payCycleProvider);
       final digits = ref.read(defaultCurrencyProvider).decimalDigits;
       setState(() {
         _budgetId = budget?.id;
-        _salary.text = _formatInput(_incomePerCycle(budget, config), digits);
+        _fallbackSalary = (budget?.salary ?? 0).toDouble();
+        _fallbackCycle = budget?.payCycle;
+        _fallbackIncomePerCycle = budget?.incomePerCycle;
         _savings.text = _formatInput(budget?.savingsGoal, digits);
         _fixed.text = _formatInput(budget?.fixedExpenses, digits);
         _loading = false;
@@ -78,34 +84,19 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     }
   }
 
-  /// Income the user typed for the active cycle.
-  ///
-  /// The stored value is reused when the plan was saved with the same cycle,
-  /// otherwise the monthly income is converted back (e.g. after switching from
-  /// monthly to weekly pay in Settings).
-  num _incomePerCycle(MonthlyBudget? budget, PayCycleConfig config) {
-    if (budget == null) return 0;
-    final stored = budget.incomePerCycle;
-    if (stored != null && budget.payCycle == config.cycle) return stored;
-    return config.perCycleEquivalent(budget.salary, _month);
-  }
-
   String _formatInput(num? value, int decimalDigits) =>
       (value == null || value == 0)
           ? ''
           : formatAmountDigits(value, decimalDigits: decimalDigits);
 
-  String _incomeLabel(PayCycle cycle) => switch (cycle) {
-        PayCycle.daily => 'daily_income_net',
-        PayCycle.weekly => 'weekly_income_net',
-        PayCycle.monthly => 'monthly_income_net',
-      };
-
-  String _incomeHint(PayCycle cycle) => switch (cycle) {
-        PayCycle.daily => 'e_g_10_000',
-        PayCycle.weekly => 'e_g_50_000',
-        PayCycle.monthly => 'e_g_250_000',
-      };
+  /// Active source total for [month], or the legacy plan salary.
+  double _monthlyIncome(List<IncomeSource> sources) {
+    if (sources.isEmpty) return _fallbackSalary;
+    return sources.where((source) => source.active).fold<double>(0,
+        (sum, source) {
+      return sum + source.monthlyEquivalent(_month).toDouble();
+    });
+  }
 
   void _changeMonth(int delta) {
     setState(() {
@@ -122,18 +113,22 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     });
 
     try {
-      final config = ref.read(payCycleProvider);
-      final incomePerCycle = parseAmountInput(_salary.text) ?? 0;
+      final sources = ref.read(incomeSourcesProvider).valueOrNull ??
+          const <IncomeSource>[];
+      final defining = budgetDefiningSource(sources);
+      final config = ref.read(budgetPayCycleProvider);
+      final salary = _monthlyIncome(sources);
       final budget = MonthlyBudget(
         id: _budgetId,
         month: _month,
-        // Monthly figure used for pacing; the typed per-cycle amount is kept
-        // verbatim so daily / weekly plans survive round-trips.
-        salary: config.monthlyEquivalent(incomePerCycle, _month),
+        // Income comes from the source list; the stored salary/payCycle keeps
+        // the plan readable by older builds and is a fallback when the list is
+        // empty.
+        salary: salary,
         savingsGoal: parseAmountInput(_savings.text) ?? 0,
         fixedExpenses: parseAmountInput(_fixed.text) ?? 0,
-        payCycle: config.cycle,
-        incomePerCycle: incomePerCycle,
+        payCycle: defining?.cycle ?? _fallbackCycle ?? config.cycle,
+        incomePerCycle: defining?.amountPerCycle ?? _fallbackIncomePerCycle,
       );
       final saved = await ref.read(budgetRepositoryProvider).save(budget);
       if (!mounted) return;
@@ -159,13 +154,13 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final summaryAsync = ref.watch(budgetSummaryProvider(_month));
-    final config = ref.watch(payCycleProvider);
+    final config = ref.watch(budgetPayCycleProvider);
     final currency = ref.watch(defaultCurrencyProvider);
+    final sources =
+        ref.watch(incomeSourcesProvider).valueOrNull ?? const <IncomeSource>[];
+    final defining = budgetDefiningSource(sources);
+    final monthlyIncome = _monthlyIncome(sources);
 
-    // Keep the form in sync when the salary cycle changes in Settings.
-    ref.listen<PayCycleConfig>(payCycleProvider, (previous, next) {
-      if (previous?.cycle != next.cycle) _load();
-    });
 
     return Scaffold(
       appBar: AppBar(
@@ -203,51 +198,84 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    children: <Widget>[
-                      Icon(
-                        Icons.payments_outlined,
-                        size: 16,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: AppText(
-                          'you_can_change_the_salary_cycle_in_settings',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
+                  AppText(
+                    'income_sources_manage_in_settings',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  _MoneyField(
-                    controller: _salary,
-                    label: _incomeLabel(config.cycle),
-                    hint: _incomeHint(config.cycle),
-                    icon: Icons.work_outline,
-                    symbol: currency.symbol,
-                    decimalDigits: currency.decimalDigits,
-                  ),
-                  if (!config.isMonthly) ...<Widget>[
-                    const SizedBox(height: 6),
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _salary,
-                      builder: (context, value, _) {
-                        final perCycle = parseAmountInput(value.text) ?? 0;
-                        final monthly =
-                            config.monthlyEquivalent(perCycle, _month);
-                        return AppText(
-                          '月換算: ${formatMoney(monthly, currency: currency.code)}'
-                          '（この月の日数で計算）',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        );
-                      },
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Icon(
+                              Icons.account_balance_wallet_outlined,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: AppText(
+                                'income_sources',
+                                style: theme.textTheme.labelLarge
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => context.push('/settings'),
+                              child: const AppText('manage'),
+                            ),
+                          ],
+                        ),
+                        AppText(
+                          'income.monthly_equivalent_total',
+                          params: <String, Object?>{
+                            'amount': formatMoney(
+                              monthlyIncome,
+                              currency: currency.code,
+                            ),
+                          },
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        if (defining != null) ...<Widget>[
+                          const SizedBox(height: 4),
+                          AppText(
+                            'income.budget_source',
+                            params: <String, Object?>{
+                              'name': defining.name,
+                              'cycle': context.tr(defining.cycle.name),
+                              'amount': formatMoney(
+                                defining.amountPerCycle,
+                                currency: defining.currency,
+                              ),
+                            },
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                        if (sources.isEmpty) ...<Widget>[
+                          const SizedBox(height: 4),
+                          AppText(
+                            'no_income_sources',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   _MoneyField(
                     controller: _savings,
@@ -565,6 +593,23 @@ class _SummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          AppText(
+            'income.period_and_monthly',
+            params: <String, Object?>{
+              'period': formatMoney(
+                data.periodIncome,
+                currency: currencyCode,
+              ),
+              'monthly': formatMoney(
+                data.monthlyIncome,
+                currency: currencyCode,
+              ),
+            },
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
           AppText(
             _pacingMessage(data),
             style: theme.textTheme.bodySmall?.copyWith(

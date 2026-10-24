@@ -8,6 +8,9 @@ import '../core/settings/currency_provider.dart';
 import '../core/settings/pay_cycle_provider.dart';
 import '../domain/models/category.dart';
 import '../domain/models/coupon.dart';
+import '../domain/models/income_entry.dart';
+import '../domain/models/income_source.dart';
+import '../domain/models/income_summary.dart';
 import '../domain/models/monthly_budget.dart';
 import '../domain/models/payment_method.dart';
 import '../domain/models/pay_cycle.dart';
@@ -18,6 +21,7 @@ import 'repositories/auth_repository.dart';
 import 'repositories/budget_repository.dart';
 import 'repositories/category_repository.dart';
 import 'repositories/coupon_repository.dart';
+import 'repositories/income_repository.dart';
 import 'repositories/receipt_repository.dart';
 import 'services/coupons/coupon_reminder_service.dart';
 import 'services/ocr/ai_receipt_ocr_service.dart';
@@ -42,6 +46,14 @@ final categoryRepositoryProvider = Provider<CategoryRepository>(
 
 final budgetRepositoryProvider = Provider<BudgetRepository>(
   (ref) => BudgetRepository(),
+);
+
+final incomeSourceRepositoryProvider = Provider<IncomeSourceRepository>(
+  (ref) => IncomeSourceRepository(),
+);
+
+final incomeEntryRepositoryProvider = Provider<IncomeEntryRepository>(
+  (ref) => IncomeEntryRepository(),
 );
 
 final couponRepositoryProvider = Provider<CouponRepository>(
@@ -189,6 +201,115 @@ final budgetProvider = FutureProvider.family<MonthlyBudget?, DateTime>(
   },
 );
 
+/// Recurring income sources persisted in Firestore.
+///
+/// On first load an empty collection is seeded from the legacy single pay
+/// cycle + latest monthly plan (one source named "Main"). A marker document
+/// prevents re-seeding after the user deliberately deletes every source.
+class IncomeSourcesController extends AsyncNotifier<List<IncomeSource>> {
+  @override
+  Future<List<IncomeSource>> build() async {
+    final userId = ref.watch(userIdProvider);
+    if (userId == null) return const <IncomeSource>[];
+    final latest = await ref.watch(budgetRepositoryProvider).fetchLatest();
+    return ref.watch(incomeSourceRepositoryProvider).ensureSeeded(
+          legacyConfig: ref.read(payCycleProvider),
+          latestBudget: latest,
+          currency: ref.read(defaultCurrencyProvider).code,
+        );
+  }
+
+  Future<void> save(IncomeSource source) async {
+    final current = state.valueOrNull ?? const <IncomeSource>[];
+    final next = <IncomeSource>[...current];
+    final index = next.indexWhere((item) => item.id == source.id);
+    if (index >= 0) {
+      next[index] = source;
+    } else {
+      next.add(source);
+    }
+    if (source.definesBudgetPeriod) {
+      for (var i = 0; i < next.length; i++) {
+        next[i] = next[i].copyWith(
+          definesBudgetPeriod: next[i].id == source.id,
+        );
+      }
+    }
+    await _apply(normalizeBudgetPeriodFlag(next));
+  }
+
+  Future<void> delete(String id) async {
+    final current = state.valueOrNull ?? const <IncomeSource>[];
+    final next = normalizeBudgetPeriodFlag(
+      current.where((item) => item.id != id).toList(growable: false),
+    );
+    final previous = state;
+    state = AsyncData(next);
+    try {
+      final repository = ref.read(incomeSourceRepositoryProvider);
+      await repository.delete(id);
+      if (next.isNotEmpty) await repository.saveAll(next);
+    } catch (error, stack) {
+      state = previous;
+      Error.throwWithStackTrace(error, stack);
+    }
+  }
+
+  Future<void> setDefinesBudgetPeriod(String id) async {
+    final current = state.valueOrNull ?? const <IncomeSource>[];
+    await _apply(normalizeBudgetPeriodFlag(<IncomeSource>[
+      for (final item in current)
+        item.copyWith(definesBudgetPeriod: item.id == id),
+    ]));
+  }
+
+  Future<void> setActive(String id, bool active) async {
+    final current = state.valueOrNull ?? const <IncomeSource>[];
+    await _apply(<IncomeSource>[
+      for (final item in current)
+        item.id == id ? item.copyWith(active: active) : item,
+    ]);
+  }
+
+  Future<void> _apply(List<IncomeSource> next) async {
+    final previous = state;
+    state = AsyncData(next);
+    try {
+      await ref.read(incomeSourceRepositoryProvider).saveAll(next);
+    } catch (error, stack) {
+      state = previous;
+      Error.throwWithStackTrace(error, stack);
+    }
+  }
+}
+
+final incomeSourcesProvider =
+    AsyncNotifierProvider<IncomeSourcesController, List<IncomeSource>>(
+  IncomeSourcesController.new,
+);
+
+/// One-off income entries (newest first) used for period totals + autocomplete.
+final incomeEntriesProvider = FutureProvider<List<IncomeEntry>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <IncomeEntry>[];
+  return ref.watch(incomeEntryRepositoryProvider).fetchAll();
+});
+
+/// Distinct source texts typed before, newest first.
+final incomeSourceSuggestionsProvider = Provider<List<String>>((ref) {
+  final entries =
+      ref.watch(incomeEntriesProvider).valueOrNull ?? const <IncomeEntry>[];
+  return previousIncomeSources(entries);
+});
+
+/// Pay-cycle anchors for the budget period: the source flagged by the user,
+/// with the legacy local preference as a fallback when no source exists yet.
+final budgetPayCycleProvider = Provider<PayCycleConfig>((ref) {
+  final sources = ref.watch(incomeSourcesProvider).valueOrNull ??
+      const <IncomeSource>[];
+  return budgetDefiningSource(sources)?.config ?? ref.watch(payCycleProvider);
+});
+
 /// Plan + actual spending + pacing for a month, paced by the pay cycle.
 ///
 /// For the current month the summary also carries the **current pay period**
@@ -198,8 +319,12 @@ final budgetProvider = FutureProvider.family<MonthlyBudget?, DateTime>(
 final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
   (ref, month) async {
     final userId = ref.watch(userIdProvider);
-    final config = ref.watch(payCycleProvider);
+    final config = ref.watch(budgetPayCycleProvider);
     final currencyCode = ref.watch(defaultCurrencyProvider).code;
+    final sources =
+        ref.watch(incomeSourcesProvider).valueOrNull ?? const <IncomeSource>[];
+    final entries =
+        ref.watch(incomeEntriesProvider).valueOrNull ?? const <IncomeEntry>[];
     final first = DateTime(month.year, month.month, 1);
     final monthEnd = DateTime(month.year, month.month + 1, 1);
     final now = DateTime.now();
@@ -212,10 +337,32 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
       daysElapsed = daysInMonth;
     }
 
-    final budget = await ref.watch(budgetProvider(first).future);
+    final storedBudget = await ref.watch(budgetProvider(first).future);
 
     final isCurrentMonth = first.year == now.year && first.month == now.month;
     final period = isCurrentMonth ? config.periodFor(now) : null;
+    final incomePeriod = period ??
+        PayPeriod(start: first, end: monthEnd, cycle: config.cycle);
+    final income = summarizeIncome(
+      sources: sources,
+      entries: entries,
+      period: incomePeriod,
+      month: first,
+      currencyCode: currencyCode,
+    );
+
+    // Income sources are the source of truth for income; the stored plan's
+    // salary is only a fallback for documents saved before this feature.
+    MonthlyBudget? effectivePlan(MonthlyBudget? plan) {
+      if (plan == null || sources.isEmpty) return plan;
+      return plan.copyWith(
+        salary: income.monthlyEquivalent,
+        payCycle: config.cycle,
+        incomePerCycle: budgetDefiningSource(sources)?.amountPerCycle,
+      );
+    }
+
+    final budget = effectivePlan(storedBudget);
 
     // A monthly payday period that started last month (e.g. payday 25, today
     // Oct 3) was funded by last month's plan. Fall back to this month's plan
@@ -224,8 +371,10 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
     if (period != null && config.isMonthly) {
       final periodMonth = firstDayOfMonth(period.start);
       if (periodMonth != first) {
-        periodPlan =
-            await ref.watch(budgetProvider(periodMonth).future) ?? budget;
+        periodPlan = effectivePlan(
+              await ref.watch(budgetProvider(periodMonth).future),
+            ) ??
+            budget;
       }
     }
 
@@ -299,6 +448,10 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
       periodBudget: periodBudget,
       periodSpent: period == null ? null : periodSpent,
       otherCurrencyCount: otherCurrencyCount,
+      monthlyIncome: income.monthlyEquivalent,
+      scheduledPeriodIncome: income.scheduledInPeriod,
+      oneOffPeriodIncome: income.oneOffInPeriod,
+      otherCurrencyIncomeCount: income.otherCurrencyCount,
     );
   },
 );

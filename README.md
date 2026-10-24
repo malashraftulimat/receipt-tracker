@@ -135,6 +135,19 @@ users/{userId}/budgets/{yyyy-MM}
   salary (monthly equivalent), savings_goal, fixed_expenses,
   pay_cycle (daily/weekly/monthly), income_per_cycle, note,
   month, updated_at
+
+users/{userId}/income_sources/{sourceId}
+  name, cycle (daily/weekly/monthly),
+  weekly_start_weekday, monthly_pay_day,
+  amount_per_cycle, currency, wallet_id (null until Phase 2),
+  active, defines_budget_period (exactly one), created_at, updated_at
+
+users/{userId}/income_entries/{entryId}
+  amount, currency, received_at, source (free text),
+  note, wallet_id (null until Phase 2), created_at, updated_at
+
+users/{userId}/income_meta/state
+  income_sources_migrated (one-time legacy migration marker)
 ```
 
 **No image field is written.** Older documents that still contain
@@ -152,45 +165,64 @@ document, so a receipt + items are written atomically.
 | Area | Implemented |
 | --- | --- |
 | Auth | Firebase Email/Password, password reset, persistent sessions |
-| Sync | Firestore per-user receipts/items, categories and budgets (no photos) |
+| Sync | Firestore per-user receipts/items, categories, budgets, income sources and one-off income (no photos) |
 | Scan | Live 1D barcode (receipt-number duplicate guard), tap-to-focus web camera, device-camera input, AI extraction, auto-detect and long-receipt modes |
 | Parse | Gemini structured JSON (merchant, ISO/Reiwa date, total, subtotal, 8%/10% tax, receipt no. and registration no. separately, items), with parser fallback |
 | Review | In-memory image preview, editable extracted items directly below it, header, tax, category, payment method, due date, notes, warnings and duplicate banner |
 | Quick payment | Receiptless expense (rent, transfers, money lent) saved into the same collection as `source = manual`: amount, date, category, required payment method, note |
 | Coupons | Printed coupons extracted with name / validFrom / validUntil / discount, saved per receipt, daily reminders with **Mark as Used** / **Remind Tomorrow**, automatic expiry |
+| Income | Multiple recurring income sources (daily/weekly/monthly payday anchors), one source drives budget pacing, one-off **Add income** with free-text source autocomplete, monthly-equivalent totals |
 | Categorize | 8 seeded categories + custom categories with colour & icon |
 | Dashboard | Month/day grouping, list/grid views, monthly subtotals |
 | Search/Filter | Merchant/note/barcode search, category chips, payment-method filter, 今月/先月, custom ranges |
-| Budget | Daily / weekly / monthly salary cycle (with weekly weekday and monthly payday anchors), savings goal, fixed costs, remaining-per-pay-period pacing |
+| Budget | Income-source pay cycle (with weekly weekday and monthly payday anchors), savings goal, fixed costs, remaining-per-pay-period pacing, period income total |
 | Analytics | 6-month bars, category donut, payment-method breakdown, top merchants, monthly metrics (`fl_chart`) |
 | Languages | Browser / system language auto-detection, header switcher (visible on login & register too), Japanese / English / Arabic (RTL) |
 | Export | UTF-8 CSV for Excel / Numbers (no images) |
 
 ---
 
-## Budget & salary cycle
+## Income, budget & salary cycle
 
-### Daily / weekly / monthly salary
+### Multiple income sources
 
-Settings → **給与の受け取り方** lets each user pick how their salary arrives:
+Settings → **収入源 / Income sources** keeps a list of every way the user
+receives money. Each source has a free-text name, a cycle (daily / weekly /
+monthly), the matching payday anchor (weekday for weekly, day 1–28 or month end
+for monthly), the amount **per cycle**, an active switch and an optional
+destination wallet (Phase 2). Sources are stored in Firestore, so amounts and
+anchors sync across devices.
 
-- **日払い (daily)** — the plan is paced day by day; the dashboard shows
-  "今日の残り予算".
-- **週払い (weekly)** — a 7-day period starting on a chosen weekday
-  (default Monday); the dashboard shows "今週の残り予算".
-- **月払い (monthly)** — the calendar month by default, or any monthly payday
-  (1–28, or **月末** for the last day of each month).
+Exactly one source is flagged **defines the budget period** (default: the first
+source). Its payday anchor drives the current period and all existing pacing
+logic on the dashboard and budget page. The other active sources still count as
+income arriving on **their own paydays inside that period**. The app also shows
+the monthly-equivalent total across all active sources.
 
-Only the *pacing* changes: the budget form asks for the income **per cycle**
-("日収 / 週収 / 月収"), keeps the typed amount in `income_per_cycle` and stores
-the monthly equivalent in `salary`, so daily / weekly plans round-trip without
-rounding drift and older monthly plans keep working unchanged. Savings goal and
-fixed expenses stay monthly.
+When the feature is first opened for an existing account, the old single pay
+cycle is migrated into one source named **Main** (`income_sources/main`): the
+cycle and anchors come from the saved preference and the per-cycle amount comes
+from the latest budget plan. A marker in `income_meta/state` prevents an
+intentionally emptied list from being seeded again. Older budgets keep working;
+the budget page now derives income from the sources and keeps savings goal and
+fixed costs monthly.
+
+### One-off income
+
+The dashboard app-bar **収入を追加 / Add income** button (route `/income/new`)
+records income that is not part of a recurring source: amount, date, a free-text
+source (e.g. "sold an item", "Open Campus shift") and an optional note. Source
+texts autocomplete from previous entries (tap a suggestion or start typing). The
+entry is stored in `income_entries` and counted in the current period income;
+a destination wallet is added in Phase 2.
+
+Period income = recurring paydays inside the period + one-off entries inside
+the period. Amounts in another currency are excluded (and counted in a note)
+until conversion arrives in Phase 2.
 
 The dashboard card and the budget page show the amount left for the current pay
-period, its date range, and the per-day allowance for the days remaining until
-the next payday. The preference is stored in `SharedPreferences` (like the theme
-and language); the plan itself stays in Firestore per user.
+period, its date range, the per-day allowance for the days remaining until the
+next payday, and both the period income and the monthly-equivalent total.
 
 ### Quick payments (no receipt)
 
@@ -364,7 +396,9 @@ flutter test
 The parser tests cover Japanese dates (era/full/2-digit), total vs subtotal vs
 change amounts, 8%/10% tax lines, tax-inclusive bases, receipt vs registration
 numbers, coupon-number exclusion, duplicate fingerprints, the subtotal/tax item
-check and line-item extraction.
+check and line-item extraction. Income tests cover source JSON round-trips,
+monthly-equivalent conversion, paydays inside a period, the single budget-period
+flag, legacy migration, period income totals and free-text source suggestions.
 
 ---
 

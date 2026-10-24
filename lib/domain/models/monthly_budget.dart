@@ -134,6 +134,10 @@ class BudgetSummary {
     this.periodBudget,
     this.periodSpent,
     this.otherCurrencyCount = 0,
+    this.monthlyIncome = 0,
+    this.scheduledPeriodIncome = 0,
+    this.oneOffPeriodIncome = 0,
+    this.otherCurrencyIncomeCount = 0,
   });
 
   final DateTime month;
@@ -165,6 +169,23 @@ class BudgetSummary {
   /// Receipts in this month that use a different currency and are excluded
   /// from the totals above.
   final int otherCurrencyCount;
+
+  /// Monthly-equivalent total of all active income sources.
+  final double monthlyIncome;
+
+  /// Recurring income whose paydays fall inside the current pay period
+  /// (or the calendar month when no period applies).
+  final double scheduledPeriodIncome;
+
+  /// One-off income entries inside the same period/month.
+  final double oneOffPeriodIncome;
+
+  /// Income sources / one-off entries excluded because they use another
+  /// currency.
+  final int otherCurrencyIncomeCount;
+
+  /// Recurring + one-off income for the current period/month.
+  double get periodIncome => scheduledPeriodIncome + oneOffPeriodIncome;
 
   /// True when this month or the current pay period has a plan.
   bool get configured => (budget?.isConfigured ?? false) || cycleBudget != 0;

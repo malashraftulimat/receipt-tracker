@@ -8,6 +8,7 @@ import '../../features/budget/budget_page.dart';
 import '../../features/categories/categories_page.dart';
 import '../../features/coupons/coupons_page.dart';
 import '../../features/dashboard/dashboard_page.dart';
+import '../../features/income/add_income_page.dart';
 import '../../features/payments/add_payment_page.dart';
 import '../../features/receipts/receipt_detail_page.dart';
 import '../../features/review/review_page.dart';
@@ -102,6 +103,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/payment/new',
         name: 'addPayment',
         builder: (context, state) => const AddPaymentPage(),
+      ),
+      GoRoute(
+        path: '/income/new',
+        name: 'addIncome',
+        builder: (context, state) => const AddIncomePage(),
       ),
       GoRoute(
         path: '/review',

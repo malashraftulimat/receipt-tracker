@@ -54,6 +54,15 @@ void main() {
     );
   });
 
+  test('income source strings are translated', () {
+    expect(en.translate('add_income'), 'Add income');
+    expect(en.translate('income_sources'), 'Income sources');
+    expect(ar.translate('add_income'), 'إضافة دخل');
+    expect(ar.translate('income_sources'), 'مصادر الدخل');
+    expect(ja.translate('income_sources'), '収入源');
+    expect(ja.translate('save_anyway'), '重複でも保存');
+  });
+
   test('AI unavailable toast is localized', () {
     expect(
       en.translate('the_ai_service_is_getting_ready_please_try_a'),

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/localization.dart';
 import '../../core/settings/currency_provider.dart';
-import '../../core/settings/pay_cycle_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
@@ -13,6 +12,7 @@ import '../../data/providers.dart';
 import '../../data/services/ai_key_store.dart';
 import '../../data/services/export_service.dart';
 import '../../data/services/ocr/ai_receipt_ocr_service.dart';
+import '../../domain/models/income_source.dart';
 import '../../domain/models/pay_cycle.dart';
 import '../../domain/models/receipt_filter.dart';
 import 'widgets/currency_picker.dart';
@@ -163,7 +163,7 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 14),
           const _AiKeyCard(),
           const SizedBox(height: 14),
-          const _PayCycleCard(),
+          const _IncomeSourcesCard(),
           const SizedBox(height: 14),
           const _CurrencyCard(),
           const SizedBox(height: 14),
@@ -293,117 +293,503 @@ class SettingsPage extends ConsumerWidget {
   }
 }
 
-/// Daily / weekly / monthly salary — paces the budget on the dashboard.
-class _PayCycleCard extends ConsumerWidget {
-  const _PayCycleCard();
+/// Recurring income sources. Exactly one source anchors the budget period.
+class _IncomeSourcesCard extends ConsumerWidget {
+  const _IncomeSourcesCard();
+
+  Future<void> _edit(
+    BuildContext context,
+    WidgetRef ref, {
+    IncomeSource? source,
+    required List<IncomeSource> all,
+  }) async {
+    final currency = ref.read(defaultCurrencyProvider);
+    final result = await showDialog<IncomeSource>(
+      context: context,
+      builder: (context) => _IncomeSourceEditor(
+        source: source,
+        currencyCode: currency.code,
+        currencySymbol: currency.symbol,
+      ),
+    );
+    if (result == null) return;
+    final toSave = all.isEmpty
+        ? result.copyWith(definesBudgetPeriod: true)
+        : result;
+    try {
+      await ref.read(incomeSourcesProvider.notifier).save(toSave);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: AppText('income_source_saved')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: AppText('could_not_save: $error')),
+      );
+    }
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    IncomeSource source,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const AppText('delete_income_source'),
+        content: const AppText('delete_income_source_confirm'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const AppText('cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const AppText('delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(incomeSourcesProvider.notifier).delete(source.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: AppText('income_source_deleted')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: AppText('could_not_save: $error')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final config = ref.watch(payCycleProvider);
-    final controller = ref.read(payCycleProvider.notifier);
+    final sourcesAsync = ref.watch(incomeSourcesProvider);
+    final controller = ref.read(incomeSourcesProvider.notifier);
     final now = DateTime.now();
-    final period = config.periodFor(now);
     final labelStyle = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
 
     return _Card(
-      title: 'how_you_get_paid',
+      title: 'income_sources',
       children: <Widget>[
-        AppText(
-          'settings.pay_cycle_help',
-          style: labelStyle,
-        ),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SegmentedButton<PayCycle>(
-            segments: const <ButtonSegment<PayCycle>>[
-              ButtonSegment<PayCycle>(
-                value: PayCycle.daily,
-                label: AppText('daily'),
-                icon: Icon(Icons.today_outlined, size: 18),
-              ),
-              ButtonSegment<PayCycle>(
-                value: PayCycle.weekly,
-                label: AppText('weekly'),
-                icon: Icon(Icons.view_week_outlined, size: 18),
-              ),
-              ButtonSegment<PayCycle>(
-                value: PayCycle.monthly,
-                label: AppText('monthly'),
-                icon: Icon(Icons.calendar_month_outlined, size: 18),
-              ),
-            ],
-            selected: <PayCycle>{config.cycle},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) =>
-                controller.setCycle(selection.first),
+        AppText('income_sources_help', style: labelStyle),
+        const SizedBox(height: 8),
+        sourcesAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
-        ),
-        if (config.cycle == PayCycle.weekly) ...<Widget>[
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            initialValue: config.weeklyStartWeekday,
-            decoration: InputDecoration(
-              labelText: context.tr('payday_weekday'),
-              prefixIcon: const Icon(Icons.event_repeat_outlined),
-            ),
-            items: <DropdownMenuItem<int>>[
-              for (var day = DateTime.monday; day <= DateTime.sunday; day++)
-                DropdownMenuItem<int>(
-                  value: day,
-                  child: AppText(formatWeekdayJa(day)),
+          error: (error, _) => AppText(
+            'could_not_load_data: $error',
+            style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
+          ),
+          data: (sources) {
+            final monthly = sources
+                .where((source) => source.active)
+                .fold<double>(0, (sum, source) {
+              return sum + source.monthlyEquivalent(now).toDouble();
+            });
+            final defining = budgetDefiningSource(sources);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                AppText(
+                  'income.monthly_equivalent_total',
+                  params: <String, Object?>{
+                    'amount': formatMoney(
+                      monthly,
+                      currency: defining?.currency ??
+                          ref.read(defaultCurrencyProvider).code,
+                    ),
+                  },
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800),
                 ),
-            ],
-            onChanged: (value) {
-              if (value != null) controller.setWeeklyStartWeekday(value);
+                if (sources.isEmpty) ...<Widget>[
+                  const SizedBox(height: 6),
+                  AppText('no_income_sources', style: labelStyle),
+                ],
+                const SizedBox(height: 8),
+                for (final source in sources)
+                  _IncomeSourceTile(
+                    source: source,
+                    onDefine: () => controller.setDefinesBudgetPeriod(source.id),
+                    onActive: (active) =>
+                        controller.setActive(source.id, active),
+                    onEdit: () => _edit(
+                      context,
+                      ref,
+                      source: source,
+                      all: sources,
+                    ),
+                    onDelete: () => _delete(context, ref, source),
+                  ),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  onPressed: () => _edit(context, ref, all: sources),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const AppText('add_income_source'),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _IncomeSourceTile extends StatelessWidget {
+  const _IncomeSourceTile({
+    required this.source,
+    required this.onDefine,
+    required this.onActive,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final IncomeSource source;
+  final VoidCallback onDefine;
+  final ValueChanged<bool> onActive;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  String _paydayLabel(BuildContext context) => switch (source.cycle) {
+        PayCycle.daily => context.tr('income.every_day'),
+        PayCycle.weekly => context.tr(
+            'income.every_week_on',
+            params: <String, Object?>{
+              'weekday': formatWeekdayJa(source.weeklyStartWeekday),
             },
           ),
-        ],
-        if (config.cycle == PayCycle.monthly) ...<Widget>[
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            initialValue: config.monthlyPayDay,
-            decoration: InputDecoration(
-              labelText: context.tr('payday'),
-              prefixIcon: const Icon(Icons.pin_outlined),
+        PayCycle.monthly => source.monthlyPayDay >=
+                PayCycleConfig.endOfMonthPayDay
+            ? context.tr('income.every_month_end')
+            : context.tr(
+                'income.every_month_on',
+                params: <String, Object?>{'day': source.monthlyPayDay},
+              ),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final actionColor = theme.colorScheme.onSurfaceVariant;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(12),
+        border: source.definesBudgetPeriod
+            ? Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.6))
+            : null,
+      ),
+      child: Row(
+        children: <Widget>[
+          IconButton(
+            tooltip: context.tr('defines_budget_period'),
+            icon: Icon(
+              source.definesBudgetPeriod ? Icons.star : Icons.star_border,
+              color: source.definesBudgetPeriod
+                  ? theme.colorScheme.primary
+                  : actionColor,
+              size: 20,
             ),
-            items: <DropdownMenuItem<int>>[
-              for (var day = 1; day <= 28; day++)
-                DropdownMenuItem<int>(
-                  value: day,
-                  child: Text('$day'),
+            onPressed: onDefine,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                AppText(
+                  source.name,
+                  translate: false,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
-              const DropdownMenuItem<int>(
-                value: PayCycleConfig.endOfMonthPayDay,
-                child: AppText('end_of_month'),
+                AppText(
+                  'income.source_summary',
+                  params: <String, Object?>{
+                    'amount': formatMoney(
+                      source.amountPerCycle,
+                      currency: source.currency,
+                    ),
+                    'payday': _paydayLabel(context),
+                  },
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                if (!source.active)
+                  AppText(
+                    'inactive',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Switch(
+            value: source.active,
+            onChanged: onActive,
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'edit') onEdit();
+              if (value == 'delete') onDelete();
+            },
+            itemBuilder: (context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'edit',
+                child: AppText('edit'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'delete',
+                child: AppText('delete'),
               ),
             ],
-            onChanged: (value) {
-              if (value != null) controller.setMonthlyPayDay(value);
-            },
           ),
         ],
-        const SizedBox(height: 10),
-        AppText(
-          '今回の対象期間: '
-          '${formatRangeJa(period.start, period.endInclusive)}'
-          '（あと${period.daysRemainingOn(now)}日）',
-          style: labelStyle,
+      ),
+    );
+  }
+}
+
+class _IncomeSourceEditor extends StatefulWidget {
+  const _IncomeSourceEditor({
+    this.source,
+    required this.currencyCode,
+    required this.currencySymbol,
+  });
+
+  final IncomeSource? source;
+  final String currencyCode;
+  final String currencySymbol;
+
+  @override
+  State<_IncomeSourceEditor> createState() => _IncomeSourceEditorState();
+}
+
+class _IncomeSourceEditorState extends State<_IncomeSourceEditor> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _name;
+  late final TextEditingController _amount;
+  late PayCycle _cycle;
+  late int _weekday;
+  late int _monthlyDay;
+  late bool _active;
+  late bool _defines;
+
+  @override
+  void initState() {
+    super.initState();
+    final source = widget.source;
+    _name = TextEditingController(text: source?.name ?? '');
+    _amount = TextEditingController(
+      text: source == null
+          ? ''
+          : formatAmountDigits(source.amountPerCycle),
+    );
+    _cycle = source?.cycle ?? PayCycle.monthly;
+    _weekday = source?.weeklyStartWeekday ?? DateTime.monday;
+    _monthlyDay = source?.monthlyPayDay ?? 1;
+    _active = source?.active ?? true;
+    _defines = source?.definesBudgetPeriod ?? false;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _amount.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final now = DateTime.now();
+    final existing = widget.source;
+    Navigator.pop(
+      context,
+      IncomeSource(
+        id: existing?.id ?? now.microsecondsSinceEpoch.toString(),
+        name: _name.text.trim(),
+        cycle: _cycle,
+        weeklyStartWeekday: _weekday,
+        monthlyPayDay: _monthlyDay,
+        amountPerCycle: parseAmountInput(_amount.text) ?? 0,
+        currency: existing?.currency ?? widget.currencyCode,
+        walletId: existing?.walletId,
+        active: _active,
+        definesBudgetPeriod: _defines,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: AppText(
+        widget.source == null ? 'add_income_source' : 'edit_income_source',
+      ),
+      content: SizedBox(
+        width: 380,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                TextFormField(
+                  controller: _name,
+                  autofocus: widget.source == null,
+                  decoration: InputDecoration(
+                    labelText: context.tr('income_source_name'),
+                    hintText: context.tr('income_source_name_hint'),
+                    prefixIcon: const Icon(Icons.label_outline),
+                  ),
+                  validator: (value) => (value ?? '').trim().isEmpty
+                      ? context.tr('please_enter_a_name')
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _amount,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: context.tr('amount_per_cycle'),
+                    prefixText: '${widget.currencySymbol} ',
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                  ),
+                  validator: (value) {
+                    if ((value ?? '').trim().isEmpty) return null;
+                    if (parseAmountInput(value!) == null) {
+                      return context.tr('please_enter_a_number');
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<PayCycle>(
+                  segments: const <ButtonSegment<PayCycle>>[
+                    ButtonSegment<PayCycle>(
+                      value: PayCycle.daily,
+                      label: AppText('daily'),
+                    ),
+                    ButtonSegment<PayCycle>(
+                      value: PayCycle.weekly,
+                      label: AppText('weekly'),
+                    ),
+                    ButtonSegment<PayCycle>(
+                      value: PayCycle.monthly,
+                      label: AppText('monthly'),
+                    ),
+                  ],
+                  selected: <PayCycle>{_cycle},
+                  showSelectedIcon: false,
+                  onSelectionChanged: (selection) =>
+                      setState(() => _cycle = selection.first),
+                ),
+                if (_cycle == PayCycle.weekly) ...<Widget>[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: _weekday,
+                    decoration: InputDecoration(
+                      labelText: context.tr('payday_weekday'),
+                      prefixIcon: const Icon(Icons.event_repeat_outlined),
+                    ),
+                    items: <DropdownMenuItem<int>>[
+                      for (var day = DateTime.monday;
+                          day <= DateTime.sunday;
+                          day++)
+                        DropdownMenuItem<int>(
+                          value: day,
+                          child: AppText(formatWeekdayJa(day)),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => _weekday = value);
+                    },
+                  ),
+                ],
+                if (_cycle == PayCycle.monthly) ...<Widget>[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: _monthlyDay,
+                    decoration: InputDecoration(
+                      labelText: context.tr('payday'),
+                      prefixIcon: const Icon(Icons.pin_outlined),
+                    ),
+                    items: <DropdownMenuItem<int>>[
+                      for (var day = 1; day <= 28; day++)
+                        DropdownMenuItem<int>(
+                          value: day,
+                          child: Text('$day'),
+                        ),
+                      const DropdownMenuItem<int>(
+                        value: PayCycleConfig.endOfMonthPayDay,
+                        child: AppText('end_of_month'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _monthlyDay = value);
+                      }
+                    },
+                  ),
+                ],
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _active,
+                  onChanged: (value) => setState(() => _active = value),
+                  title: const AppText('active'),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _defines,
+                  onChanged: (value) =>
+                      setState(() => _defines = value ?? false),
+                  title: const AppText('defines_budget_period'),
+                  subtitle: AppText(
+                    'defines_budget_period_help',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        if (config.cycle != PayCycle.daily) ...<Widget>[
-          const SizedBox(height: 2),
-          AppText(
-            '次の支給日: ${formatDateShortJa(period.end)}',
-            style: labelStyle,
-          ),
-        ],
-        const SizedBox(height: 2),
-        AppText(
-          'settings.salary_monthly_help',
-          style: labelStyle,
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const AppText('cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const AppText('save'),
         ),
       ],
     );

@@ -48,6 +48,11 @@ class DashboardPage extends ConsumerWidget {
           showLanguageLabel: expanded,
           actions: <Widget>[
             IconButton(
+              tooltip: context.tr('add_income'),
+              onPressed: () => context.push('/income/new'),
+              icon: const Icon(Icons.savings_outlined),
+            ),
+            IconButton(
               tooltip: context.tr('add_payment'),
               onPressed: () => context.push('/payment/new'),
               icon: const Icon(Icons.add_card_outlined),

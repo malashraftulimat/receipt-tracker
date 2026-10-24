@@ -32,6 +32,18 @@ class BudgetRepository {
     });
   }
 
+  /// Most recently saved plan (used once to seed the first income source).
+  Future<MonthlyBudget?> fetchLatest() async {
+    final snapshot =
+        await _budgets.orderBy('month', descending: true).limit(1).get();
+    if (snapshot.docs.isEmpty) return null;
+    final doc = snapshot.docs.first;
+    return MonthlyBudget.fromJson(<String, dynamic>{
+      ...doc.data(),
+      'id': doc.id,
+    });
+  }
+
   Future<MonthlyBudget> save(MonthlyBudget budget) async {
     final first = DateTime(budget.month.year, budget.month.month, 1);
     final doc = _budgets.doc(_key(first));

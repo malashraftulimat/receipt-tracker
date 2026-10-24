@@ -154,11 +154,38 @@ class BudgetCard extends ConsumerWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 6),
+                AppText(
+                  'income.period_and_monthly',
+                  params: <String, Object?>{
+                    'period': formatMoney(
+                      summary.periodIncome,
+                      currency: currencyCode,
+                    ),
+                    'monthly': formatMoney(
+                      summary.monthlyIncome,
+                      currency: currencyCode,
+                    ),
+                  },
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 if (summary.otherCurrencyCount > 0) ...<Widget>[
                   const SizedBox(height: 6),
                   AppText(
                     'currency.other_note',
                     count: summary.otherCurrencyCount,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if (summary.otherCurrencyIncomeCount > 0) ...<Widget>[
+                  const SizedBox(height: 2),
+                  AppText(
+                    'income.other_currency_note',
+                    count: summary.otherCurrencyIncomeCount,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
