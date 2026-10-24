@@ -123,6 +123,7 @@ users/{userId}/receipts/{receiptId}
                   direct_debit / qr_emoney / ic_card /
                   convenience_store / other, optional),
   wallet_id (optional; null for old documents),
+  recurring_id (set when posted by a recurring transaction),
   items[], raw_ocr_text, source (barcode / ocr / manual),
   created_at, updated_at, ...
 
@@ -134,6 +135,7 @@ users/{userId}/coupons/{couponId}
 users/{userId}/categories/{categoryId}
 users/{userId}/budgets/{yyyy-MM}
   salary (monthly equivalent), savings_goal, fixed_expenses,
+  overall_limit, category_limits (map categoryId -> amount),
   pay_cycle (daily/weekly/monthly), income_per_cycle, note,
   month, updated_at
 
@@ -145,7 +147,9 @@ users/{userId}/income_sources/{sourceId}
 
 users/{userId}/income_entries/{entryId}
   amount, currency, received_at, source (free text),
-  note, wallet_id (optional), created_at, updated_at
+  note, wallet_id (optional),
+  recurring_id (set when posted by a recurring transaction),
+  created_at, updated_at
 
 users/{userId}/income_meta/state
   income_sources_migrated (one-time legacy migration marker)
@@ -170,6 +174,12 @@ users/{userId}/debts/{debtId}
   amount, currency, date, due_date (optional), note,
   wallet_id (optional), repayments[] (id, amount, date, wallet_id, note),
   status (open / partial / settled), created_at, updated_at
+
+users/{userId}/recurring_transactions/{recurringId}
+  name, direction (expense / income), amount, currency,
+  category_id, wallet_id, cycle (daily/weekly/monthly),
+  weekly_start_weekday, monthly_pay_day, start_date,
+  last_posted_at, active, note, created_at, updated_at
 ```
 
 **No image field is written.** Older documents that still contain
@@ -204,10 +214,11 @@ document, so a receipt + items are written atomically.
 | Categorize | 8 seeded categories + custom categories with colour & icon |
 | Dashboard | Month/day grouping, list/grid views, monthly subtotals |
 | Search/Filter | Merchant/note/barcode search, category chips, payment-method filter, 今月/先月, custom ranges |
-| Budget | Income-source pay cycle (with weekly weekday and monthly payday anchors), savings goal, fixed costs, remaining-per-pay-period pacing, period income total |
+| Budget | Income-source pay cycle, overall limit, per-category monthly limits with 80%/100% warnings, savings goal, fixed costs, remaining-per-pay-period pacing, per-wallet spending |
+| Recurring | Rent/subscriptions/fixed income posted automatically each cycle and included in the after-obligations number |
 | Analytics | 6-month bars, category donut, payment-method breakdown, top merchants, monthly metrics (`fl_chart`) |
 | Languages | Browser / system language auto-detection, header switcher (visible on login & register too), Japanese / English / Arabic (RTL) |
-| Export | UTF-8 CSV for Excel / Numbers (no images) |
+| Export | UTF-8 CSV for Excel / Numbers (no images); full CSV with wallets, transactions, income, debts and recurring |
 
 ---
 
@@ -361,6 +372,33 @@ this README are explicit about limits:
 - **Native app** — local notifications can be scheduled; scheduling card/debt
   reminders is left as a future enhancement. This build provides in-app
   reminders and `.ics` calendar export.
+
+### Budget limits, recurring transactions and full export
+
+The budget page supports an **overall monthly limit** and **per-category
+monthly limits** for every category (including custom categories). The overall
+limit replaces the disposable-income figure for pay-period pacing when set;
+otherwise the old income − savings − fixed-cost calculation is used. Each
+category shows a progress bar with a warning at **80%** and an over-limit state
+at **100%**. The page also shows **spending by wallet** for the selected month,
+with each amount in that wallet's currency and unassigned spending shown
+separately.
+
+**Recurring transactions** (Settings → 定期取引, route `/recurring`) post rent,
+subscriptions and fixed income automatically. Each item has a direction
+(expense/income), amount, currency, category, wallet, daily/weekly/monthly cycle
+and payday anchor, start date and active flag. On app launch/resume, due
+occurrences are written into the normal receipts or income collections with a
+`recurring_id`, and `last_posted_at` prevents posting the same cycle twice. The
+UI also has a **Post due now** action. Future recurring **expenses** due before
+the next payday are subtracted in the dashboard **After obligations** number;
+posted transactions already affect wallet balances, so they are not counted
+twice. Inactive recurring items are skipped.
+
+Settings → **Data** → **Export all data as CSV** writes one UTF-8 CSV with a
+`record_type` column containing wallets, transactions (receipts, income,
+transfers, adjustments) and definitions for income sources, debts, debt
+repayments and recurring transactions.
 
 ### Duplicate detection and amount checks
 
@@ -520,7 +558,9 @@ Wallet tests cover computed balances, cross-currency transfers, credit-card
 owed/available and due dates, include-in-total rules, the three dashboard totals
 and old documents. FX tests cover cached/manual/missing rates, conversion and
 the six-hour cache window. Debt tests cover repayment math, status transitions,
-wallet movements, reminder windows and `.ics` generation.
+wallet movements, reminder windows and `.ics` generation. Phase 4 tests cover
+budget limit parsing, the 80%/100% thresholds, per-wallet spending, recurring
+occurrence generation and the full CSV export.
 
 ---
 

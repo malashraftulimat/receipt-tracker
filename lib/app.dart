@@ -7,6 +7,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'data/providers.dart';
+import 'features/dashboard/analytics_provider.dart';
 
 class ReceiptTrackerApp extends ConsumerStatefulWidget {
   const ReceiptTrackerApp({super.key});
@@ -17,6 +18,8 @@ class ReceiptTrackerApp extends ConsumerStatefulWidget {
 
 class _ReceiptTrackerAppState extends ConsumerState<ReceiptTrackerApp>
     with WidgetsBindingObserver {
+  bool _postingRecurring = false;
+
   @override
   void initState() {
     super.initState();
@@ -24,7 +27,30 @@ class _ReceiptTrackerAppState extends ConsumerState<ReceiptTrackerApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Initialises notifications and applies queued notification actions.
       ref.read(couponReminderServiceProvider).start();
+      _postRecurring();
     });
+  }
+
+  Future<void> _postRecurring() async {
+    if (_postingRecurring || ref.read(userIdProvider) == null) return;
+    _postingRecurring = true;
+    try {
+      final result =
+          await ref.read(recurringPostingServiceProvider).postDue();
+      if (result.postedAnything) {
+        ref.invalidate(receiptsProvider);
+        ref.invalidate(walletReceiptsProvider);
+        ref.invalidate(incomeEntriesProvider);
+        ref.invalidate(recurringTransactionsProvider);
+        ref.invalidate(analyticsProvider);
+        final now = DateTime.now();
+        ref.invalidate(budgetSummaryProvider(DateTime(now.year, now.month)));
+      }
+    } catch (error) {
+      debugPrint('[Recurring] posting skipped: $error');
+    } finally {
+      _postingRecurring = false;
+    }
   }
 
   @override
@@ -46,6 +72,7 @@ class _ReceiptTrackerAppState extends ConsumerState<ReceiptTrackerApp>
     // Expire overdue coupons and refresh reminders when the app comes back.
     if (state == AppLifecycleState.resumed) {
       ref.read(couponReminderServiceProvider).sync();
+      _postRecurring();
     }
   }
 
@@ -57,6 +84,7 @@ class _ReceiptTrackerAppState extends ConsumerState<ReceiptTrackerApp>
     ref.listen(authStateProvider, (previous, next) {
       if (next.value != null) {
         ref.read(couponReminderServiceProvider).sync();
+        _postRecurring();
       }
     });
 

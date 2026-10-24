@@ -13,6 +13,7 @@ import '../../features/debts/debts_page.dart';
 import '../../features/income/add_income_page.dart';
 import '../../features/payments/add_payment_page.dart';
 import '../../features/receipts/receipt_detail_page.dart';
+import '../../features/recurring/recurring_page.dart';
 import '../../features/review/review_page.dart';
 import '../../features/scan/scan_page.dart';
 import '../../features/settings/rates_page.dart';
@@ -151,6 +152,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/debts',
         name: 'debts',
         builder: (context, state) => const DebtsPage(),
+      ),
+      GoRoute(
+        path: '/recurring',
+        name: 'recurring',
+        builder: (context, state) => const RecurringPage(),
       ),
       GoRoute(
         path: '/debt/:id',

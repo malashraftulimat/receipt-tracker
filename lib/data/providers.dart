@@ -20,10 +20,12 @@ import '../domain/models/payment_method.dart';
 import '../domain/models/pay_cycle.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
+import '../domain/models/recurring_transaction.dart';
 import '../domain/models/reminder.dart';
 import '../domain/models/wallet.dart';
 import '../domain/models/wallet_adjustment.dart';
 import '../domain/models/wallet_ledger.dart';
+import '../domain/models/wallet_spending.dart';
 import '../domain/models/wallet_transfer.dart';
 import '../domain/parser/receipt_parser.dart';
 import 'repositories/auth_repository.dart';
@@ -33,8 +35,10 @@ import 'repositories/coupon_repository.dart';
 import 'repositories/debt_repository.dart';
 import 'repositories/income_repository.dart';
 import 'repositories/receipt_repository.dart';
+import 'repositories/recurring_repository.dart';
 import 'repositories/wallet_repository.dart';
 import 'services/coupons/coupon_reminder_service.dart';
+import 'services/recurring_posting_service.dart';
 import 'services/ocr/ai_receipt_ocr_service.dart';
 import 'services/ocr/ocr_service.dart';
 import 'services/ocr/receipt_ocr_pipeline.dart';
@@ -77,6 +81,18 @@ final walletRepositoryProvider = Provider<WalletRepository>(
 
 final debtRepositoryProvider = Provider<DebtRepository>(
   (ref) => DebtRepository(),
+);
+
+final recurringRepositoryProvider = Provider<RecurringTransactionRepository>(
+  (ref) => RecurringTransactionRepository(),
+);
+
+final recurringPostingServiceProvider = Provider<RecurringPostingService>(
+  (ref) => RecurringPostingService(
+    recurring: ref.watch(recurringRepositoryProvider),
+    receipts: ref.watch(receiptRepositoryProvider),
+    incomes: ref.watch(incomeEntryRepositoryProvider),
+  ),
 );
 
 final walletTransferRepositoryProvider = Provider<WalletTransferRepository>(
@@ -387,6 +403,13 @@ final debtByIdProvider = Provider.family<Debt?, String>((ref, id) {
   return null;
 });
 
+final recurringTransactionsProvider =
+    FutureProvider<List<RecurringTransaction>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <RecurringTransaction>[];
+  return ref.watch(recurringRepositoryProvider).fetchAll();
+});
+
 /// Wallet balances derived from opening balances + transactions.
 final walletLedgerProvider = FutureProvider<WalletLedger>((ref) async {
   final wallets = await ref.watch(walletsProvider.future);
@@ -409,10 +432,26 @@ final walletAccountProvider = Provider.family<WalletAccount?, String>(
   (ref, id) => ref.watch(walletLedgerProvider).valueOrNull?.accountFor(id),
 );
 
+/// Spending in a calendar month grouped by wallet (for the budget page).
+final walletSpendingProvider =
+    FutureProvider.family<WalletSpending, DateTime>((ref, month) async {
+  final wallets = await ref.watch(walletsProvider.future);
+  final receipts = await ref.watch(walletReceiptsProvider.future);
+  final first = DateTime(month.year, month.month);
+  final end = DateTime(month.year, month.month + 1);
+  return spendingByWallet(
+    receipts: receipts,
+    wallets: wallets,
+    monthStart: first,
+    monthEnd: end,
+  );
+});
+
 /// The three dashboard totals in the display currency.
 final moneyTotalsProvider = FutureProvider<MoneyTotals>((ref) async {
   final ledger = await ref.watch(walletLedgerProvider.future);
   final debts = await ref.watch(debtsProvider.future);
+  final recurring = await ref.watch(recurringTransactionsProvider.future);
   final base = ref.watch(defaultCurrencyProvider).code;
   final needsFx = ledger.all.any(
         (account) =>
@@ -420,6 +459,9 @@ final moneyTotalsProvider = FutureProvider<MoneyTotals>((ref) async {
       ) ||
       debts.any(
         (debt) => debt.currency.trim().toUpperCase() != base.toUpperCase(),
+      ) ||
+      recurring.any(
+        (item) => item.currency.trim().toUpperCase() != base.toUpperCase(),
       );
   final fx = needsFx
       ? (await ref.watch(exchangeRatesProvider.future)).snapshot
@@ -432,6 +474,25 @@ final moneyTotalsProvider = FutureProvider<MoneyTotals>((ref) async {
   var debtsOwedToMe = 0.0;
   var debtsIOwe = 0.0;
   var missingDebtRates = 0;
+  var missingRecurringRates = 0;
+  var recurringDue = 0.0;
+
+  // Bills that have not posted yet but will be due before the next payday.
+  final now = DateTime.now();
+  final today = dateOnly(now);
+  final period = ref.watch(budgetPayCycleProvider).periodFor(now);
+  final through = addDays(period.end, -1);
+  for (final item in recurring) {
+    if (!item.active || !item.direction.isExpense) continue;
+    final occurrences = item.occurrencesBetween(today, through);
+    if (occurrences.isEmpty) continue;
+    final perOccurrence = fx.convert(item.amount, item.currency, base);
+    if (perOccurrence == null) {
+      missingRecurringRates += 1;
+      continue;
+    }
+    recurringDue += perOccurrence * occurrences.length;
+  }
   for (final debt in debts) {
     if (debt.outstanding <= 0) continue;
     final converted = fx.convert(debt.outstanding, debt.currency, base);
@@ -449,10 +510,11 @@ final moneyTotalsProvider = FutureProvider<MoneyTotals>((ref) async {
   return computeMoneyTotals(
     ledger: ledger,
     fx: fx,
-    asOf: DateTime.now(),
+    asOf: now,
     debtsOwedToMe: debtsOwedToMe,
     debtsIOwe: debtsIOwe,
-    extraMissingRateCount: missingDebtRates,
+    recurringDue: recurringDue,
+    extraMissingRateCount: missingDebtRates + missingRecurringRates,
   );
 });
 
@@ -629,6 +691,7 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
     var todaySpent = 0.0;
     var periodSpent = 0.0;
     var otherCurrencyCount = 0;
+    final categorySpent = <String, double>{};
 
     if (userId != null) {
       final receipts = await ref.watch(receiptRepositoryProvider).fetch(
@@ -645,6 +708,11 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
         }
         if (!inMonth || receipt.currency != currencyCode) continue;
         spent += receipt.totalAmount;
+        final categoryId = receipt.categoryId;
+        if (categoryId != null) {
+          categorySpent[categoryId] =
+              (categorySpent[categoryId] ?? 0) + receipt.totalAmount;
+        }
         receiptCount += 1;
         if (date.year == now.year &&
             date.month == now.month &&
@@ -662,12 +730,12 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
     int? periodDays;
     int? periodDaysElapsed;
     if (period != null && periodPlan != null) {
-      final disposable = periodPlan.disposableIncome.toDouble();
+      final monthlyLimit = periodPlan.monthlyLimit.toDouble();
       periodDays = period.days;
       periodDaysElapsed = period.daysElapsedOn(now);
       periodBudget = config.isMonthly
-          ? disposable
-          : disposable / config.periodsInMonth(first);
+          ? monthlyLimit
+          : monthlyLimit / config.periodsInMonth(first);
     }
 
     return BudgetSummary(
@@ -690,6 +758,7 @@ final budgetSummaryProvider = FutureProvider.family<BudgetSummary, DateTime>(
       scheduledPeriodIncome: income.scheduledInPeriod,
       oneOffPeriodIncome: income.oneOffInPeriod,
       otherCurrencyIncomeCount: income.otherCurrencyCount,
+      categorySpent: categorySpent,
     );
   },
 );

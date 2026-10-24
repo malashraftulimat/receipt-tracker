@@ -13,6 +13,7 @@ import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../data/services/ai_key_store.dart';
 import '../../data/services/export_service.dart';
+import '../../data/services/full_export_service.dart';
 import '../../data/services/ocr/ai_receipt_ocr_service.dart';
 import '../../domain/models/exchange_rates.dart';
 import '../../domain/models/income_source.dart';
@@ -63,6 +64,43 @@ class SettingsPage extends ConsumerWidget {
           ? ExportService.filenameForMonth(now)
           : ExportService.allFilename();
       final result = await ExportService.export(receipts, filename: filename);
+      messenger.showSnackBar(
+        SnackBar(content: AppText('CSVを書き出しました: $result')),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: AppText('書き出しに失敗しました: $error')),
+      );
+    }
+  }
+
+  Future<void> _exportFullCsv(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final wallets = await ref.read(walletsProvider.future);
+      final receipts = await ref.read(walletReceiptsProvider.future);
+      final sources = await ref.read(incomeSourcesProvider.future);
+      final entries = await ref.read(incomeEntriesProvider.future);
+      final transfers = await ref.read(walletTransfersProvider.future);
+      final adjustments = await ref.read(walletAdjustmentsProvider.future);
+      final debts = await ref.read(debtsProvider.future);
+      final recurring = await ref.read(recurringTransactionsProvider.future);
+      final categories = await ref.read(categoriesProvider.future);
+      final csv = FullExportService.buildCsv(
+        wallets: wallets,
+        receipts: receipts,
+        incomeSources: sources,
+        incomeEntries: entries,
+        transfers: transfers,
+        adjustments: adjustments,
+        debts: debts,
+        recurring: recurring,
+        categories: categories,
+      );
+      final result = await FullExportService.exportCsv(
+        csv,
+        filename: FullExportService.filename(),
+      );
       messenger.showSnackBar(
         SnackBar(content: AppText('CSVを書き出しました: $result')),
       );
@@ -176,6 +214,8 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 14),
           const _DebtsCard(),
           const SizedBox(height: 14),
+          const _RecurringCard(),
+          const SizedBox(height: 14),
           const _ExchangeRatesCard(),
           const SizedBox(height: 14),
           _Card(
@@ -274,6 +314,14 @@ class SettingsPage extends ConsumerWidget {
                 title: const AppText('settings.export_all_csv'),
                 subtitle: const AppText('combine_all_receipts_into_one_file'),
                 onTap: () => _exportCsv(context, ref, currentMonthOnly: false),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.dataset_outlined),
+                title: const AppText('settings.export_full_csv'),
+                subtitle: const AppText('settings.export_full_csv_help'),
+                onTap: () => _exportFullCsv(context, ref),
               ),
             ],
           ),
@@ -963,6 +1011,49 @@ class _DebtsCard extends ConsumerWidget {
             onPressed: () => context.push('/debts'),
             icon: const Icon(Icons.handshake_outlined, size: 18),
             label: const AppText('manage_debts'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Recurring transaction entry point.
+class _RecurringCard extends ConsumerWidget {
+  const _RecurringCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final items =
+        ref.watch(recurringTransactionsProvider).valueOrNull ?? const [];
+    final active = items.where((item) => item.active).length;
+    return _Card(
+      title: 'recurring',
+      children: <Widget>[
+        AppText(
+          'recurring.help',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.repeat),
+          title: AppText(
+            'recurring.active_count',
+            params: <String, Object?>{'count': active},
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/recurring'),
+        ),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/recurring'),
+            icon: const Icon(Icons.repeat, size: 18),
+            label: const AppText('manage_recurring'),
           ),
         ),
       ],

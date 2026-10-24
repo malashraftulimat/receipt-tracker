@@ -56,6 +56,7 @@ class Receipt {
     this.note,
     this.paymentMethod,
     this.walletId,
+    this.recurringId,
     this.source = ReceiptSource.manual,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
@@ -111,6 +112,9 @@ class Receipt {
 
   /// Optional wallet / payment source. Null for old documents.
   final String? walletId;
+
+  /// Set when this receipt was posted by a recurring transaction.
+  final String? recurringId;
 
   final ReceiptSource source;
   final String? rawOcrText;
@@ -208,6 +212,7 @@ class Receipt {
       note: json['note'] as String?,
       paymentMethod: PaymentMethod.tryParse(json['payment_method']),
       walletId: json['wallet_id'] as String?,
+      recurringId: json['recurring_id'] as String?,
       // Legacy image_base64 documents are tolerated but the photo is ignored.
       source: receiptSourceFromString(json['source'] as String?),
       rawOcrText: json['raw_ocr_text'] as String?,
@@ -262,6 +267,7 @@ class Receipt {
     String? note,
     PaymentMethod? paymentMethod,
     String? walletId,
+    String? recurringId,
     ReceiptSource? source,
     String? rawOcrText,
     List<ReceiptItem>? items,
@@ -292,6 +298,7 @@ class Receipt {
       note: note ?? this.note,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       walletId: walletId ?? this.walletId,
+      recurringId: recurringId ?? this.recurringId,
       source: source ?? this.source,
       rawOcrText: rawOcrText ?? this.rawOcrText,
       items: items ?? this.items,

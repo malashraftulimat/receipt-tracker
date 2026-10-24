@@ -12,6 +12,7 @@ class IncomeEntry {
     required this.source,
     this.note,
     this.walletId,
+    this.recurringId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -31,8 +32,11 @@ class IncomeEntry {
 
   final String? note;
 
-  /// Destination wallet; `null` until wallets exist (Phase 2).
+  /// Destination wallet; `null` when unset.
   final String? walletId;
+
+  /// Set when this entry was posted by a recurring transaction.
+  final String? recurringId;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -49,6 +53,7 @@ class IncomeEntry {
       source: (json['source'] as String?)?.trim() ?? '',
       note: json['note'] as String?,
       walletId: json['wallet_id'] as String?,
+      recurringId: json['recurring_id'] as String?,
       createdAt: _parseDate(json['created_at']) ?? DateTime.now(),
       updatedAt: _parseDate(json['updated_at']) ?? DateTime.now(),
     );
@@ -61,6 +66,7 @@ class IncomeEntry {
         'source': source.trim(),
         'note': (note ?? '').trim().isEmpty ? null : note!.trim(),
         'wallet_id': walletId,
+        'recurring_id': recurringId,
       };
 
   static DateTime? _parseDate(Object? value) {

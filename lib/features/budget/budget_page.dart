@@ -12,9 +12,11 @@ import '../../core/widgets/budget_gradient_bar.dart';
 import '../../core/widgets/language_switcher.dart';
 import '../../core/utils/responsive.dart';
 import '../../data/providers.dart';
+import '../../domain/models/category.dart';
 import '../../domain/models/income_source.dart';
 import '../../domain/models/monthly_budget.dart';
 import '../../domain/models/pay_cycle.dart';
+import '../../domain/models/wallet.dart';
 
 /// Income / savings goal / fixed expenses for a month + live pacing.
 class BudgetPage extends ConsumerStatefulWidget {
@@ -26,8 +28,11 @@ class BudgetPage extends ConsumerStatefulWidget {
 
 class _BudgetPageState extends ConsumerState<BudgetPage> {
   final _formKey = GlobalKey<FormState>();
+  final _overall = TextEditingController();
   final _savings = TextEditingController();
   final _fixed = TextEditingController();
+  final Map<String, TextEditingController> _categoryLimitControllers =
+      <String, TextEditingController>{};
 
   late DateTime _month;
   String? _budgetId;
@@ -51,8 +56,12 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
 
   @override
   void dispose() {
+    _overall.dispose();
     _savings.dispose();
     _fixed.dispose();
+    for (final controller in _categoryLimitControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -64,13 +73,25 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
     try {
       final budget =
           await ref.read(budgetRepositoryProvider).fetchMonth(_month);
+      final categories = await ref.read(categoriesProvider.future);
       if (!mounted) return;
       final digits = ref.read(defaultCurrencyProvider).decimalDigits;
+      for (final category in categories) {
+        final controller = _categoryLimitControllers.putIfAbsent(
+          category.id,
+          () => TextEditingController(),
+        );
+        controller.text = _formatInput(
+          budget?.categoryLimits[category.id],
+          digits,
+        );
+      }
       setState(() {
         _budgetId = budget?.id;
         _fallbackSalary = (budget?.salary ?? 0).toDouble();
         _fallbackCycle = budget?.payCycle;
         _fallbackIncomePerCycle = budget?.incomePerCycle;
+        _overall.text = _formatInput(budget?.overallLimit, digits);
         _savings.text = _formatInput(budget?.savingsGoal, digits);
         _fixed.text = _formatInput(budget?.fixedExpenses, digits);
         _loading = false;
@@ -129,6 +150,21 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         fixedExpenses: parseAmountInput(_fixed.text) ?? 0,
         payCycle: defining?.cycle ?? _fallbackCycle ?? config.cycle,
         incomePerCycle: defining?.amountPerCycle ?? _fallbackIncomePerCycle,
+        overallLimit: parseAmountInput(_overall.text) ?? 0,
+        categoryLimits: <String, double>{
+          for (final category in (ref
+                  .read(categoriesProvider)
+                  .valueOrNull ??
+              const <ExpenseCategory>[]))
+            if ((parseAmountInput(
+                        _categoryLimitControllers[category.id]?.text ?? '',
+                      ) ??
+                    0) >
+                0)
+              category.id: parseAmountInput(
+                _categoryLimitControllers[category.id]?.text ?? '',
+              )!,
+        },
       );
       final saved = await ref.read(budgetRepositoryProvider).save(budget);
       if (!mounted) return;
@@ -160,7 +196,8 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
         ref.watch(incomeSourcesProvider).valueOrNull ?? const <IncomeSource>[];
     final defining = budgetDefiningSource(sources);
     final monthlyIncome = _monthlyIncome(sources);
-
+    final categories =
+        ref.watch(categoriesProvider).valueOrNull ?? const <ExpenseCategory>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -278,6 +315,22 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                   ),
                   const SizedBox(height: 12),
                   _MoneyField(
+                    controller: _overall,
+                    label: 'overall_budget_limit',
+                    hint: 'e_g_200_000',
+                    icon: Icons.stacked_line_chart_outlined,
+                    symbol: currency.symbol,
+                    decimalDigits: currency.decimalDigits,
+                  ),
+                  const SizedBox(height: 6),
+                  AppText(
+                    'overall_budget_limit_help',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _MoneyField(
                     controller: _savings,
                     label: 'savings_goal',
                     hint: 'e_g_30_000',
@@ -301,6 +354,62 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (categories.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 16),
+                    AppText(
+                      'budget.category_limits',
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    AppText(
+                      'budget.category_limits_help',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    for (final category in categories)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: <Widget>[
+                            Icon(
+                              category.iconData,
+                              size: 18,
+                              color: category.colorValue,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: AppText(category.name)),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 140,
+                              child: TextFormField(
+                                controller: _categoryLimitControllers
+                                    .putIfAbsent(
+                                  category.id,
+                                  () => TextEditingController(),
+                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                inputFormatters: <TextInputFormatter>[
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'[0-9.,]'),
+                                  ),
+                                ],
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  hintText: '0',
+                                  prefixText: '${currency.symbol} ',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                   if (_error != null) ...<Widget>[
                     const SizedBox(height: 12),
                     AppText(
@@ -342,6 +451,20 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
             ),
           ),
           const SizedBox(height: 14),
+          summaryAsync.maybeWhen(
+            data: (summary) => _CategoryLimitsCard(
+              summary: summary,
+              categories: categories,
+              currencyCode: currency.code,
+            ),
+            orElse: () => const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 14),
+          _WalletSpendingCard(
+            month: _month,
+            currencyCode: currency.code,
+          ),
+          const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -357,6 +480,213 @@ class _BudgetPageState extends ConsumerState<BudgetPage> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryLimitsCard extends StatelessWidget {
+  const _CategoryLimitsCard({
+    required this.summary,
+    required this.categories,
+    required this.currencyCode,
+  });
+
+  final BudgetSummary summary;
+  final List<ExpenseCategory> categories;
+  final String currencyCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final limits = summary.budget?.categoryLimits ?? const <String, double>{};
+    if (limits.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppPalette.card(context, accent: AppPalette.violet, radius: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          AppText(
+            'budget.category_limits',
+            style: theme.textTheme.labelLarge
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 10),
+          for (final category in categories)
+            if ((limits[category.id] ?? 0) > 0)
+              _CategoryLimitRow(
+                category: category,
+                spent: summary.categorySpent[category.id] ?? 0,
+                limit: limits[category.id]!,
+                currencyCode: currencyCode,
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryLimitRow extends StatelessWidget {
+  const _CategoryLimitRow({
+    required this.category,
+    required this.spent,
+    required this.limit,
+    required this.currencyCode,
+  });
+
+  final ExpenseCategory category;
+  final double spent;
+  final double limit;
+  final String currencyCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = limitStatus(spent, limit);
+    final color = switch (status) {
+      LimitStatus.none => theme.colorScheme.outline,
+      LimitStatus.ok => AppPalette.emerald,
+      LimitStatus.warning => AppPalette.amber,
+      LimitStatus.over => AppPalette.danger,
+    };
+    final percent = limit <= 0 ? 0 : (spent / limit * 100);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(category.iconData, size: 16, color: category.colorValue),
+              const SizedBox(width: 6),
+              Expanded(child: AppText(category.name)),
+              if (status == LimitStatus.warning || status == LimitStatus.over)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: AppPalette.tintedPill(color, radius: 8),
+                  child: AppText(
+                    status == LimitStatus.over
+                        ? 'budget.limit_over'
+                        : 'budget.limit_warning',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          LinearProgressIndicator(
+            value: (spent / limit).clamp(0.0, 1.0),
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(8),
+            backgroundColor:
+                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            color: color,
+          ),
+          const SizedBox(height: 4),
+          AppText(
+            'budget.category_limit_progress',
+            params: <String, Object?>{
+              'spent': formatMoney(spent, currency: currencyCode),
+              'limit': formatMoney(limit, currency: currencyCode),
+              'percent': percent.clamp(0, 999).toStringAsFixed(0),
+            },
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletSpendingCard extends ConsumerWidget {
+  const _WalletSpendingCard({
+    required this.month,
+    required this.currencyCode,
+  });
+
+  final DateTime month;
+  final String currencyCode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final spending = ref.watch(walletSpendingProvider(month)).valueOrNull;
+    final wallets = ref.watch(walletsProvider).valueOrNull ?? const <Wallet>[];
+    if (spending == null) return const SizedBox.shrink();
+    final rows = <(Wallet, double)>[];
+    for (final wallet in wallets) {
+      final amount = spending.byWallet[wallet.id] ?? 0;
+      if (amount > 0) rows.add((wallet, amount));
+    }
+    if (rows.isEmpty && spending.unassigned <= 0) {
+      return const SizedBox.shrink();
+    }
+    rows.sort((a, b) => b.$2.compareTo(a.$2));
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppPalette.card(context, accent: AppPalette.cyan, radius: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          AppText(
+            'budget.spending_by_wallet',
+            style: theme.textTheme.labelLarge
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          for (final row in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: <Widget>[
+                  Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 16,
+                    color: Color(row.$1.colorValue),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: AppText(
+                      row.$1.name,
+                      translate: false,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  AppText(
+                    formatMoney(row.$2, currency: row.$1.currency),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+          if (spending.unassigned > 0) ...<Widget>[
+            const SizedBox(height: 4),
+            AppText(
+              'budget.unassigned_spending',
+              params: <String, Object?>{
+                'amount': formatMoney(
+                  spending.unassigned,
+                  currency: currencyCode,
+                ),
+              },
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );

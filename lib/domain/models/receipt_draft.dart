@@ -31,6 +31,7 @@ class ReceiptDraft {
     this.note,
     this.paymentMethod,
     this.walletId,
+    this.recurringId,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
     this.source = ReceiptSource.manual,
@@ -69,6 +70,9 @@ class ReceiptDraft {
 
   /// Optional wallet / payment source chosen by the user.
   final String? walletId;
+
+  /// Set when this draft is posted by a recurring transaction.
+  final String? recurringId;
 
   final String? rawOcrText;
   final List<ReceiptItem> items;
@@ -150,6 +154,7 @@ class ReceiptDraft {
       note: receipt.note,
       paymentMethod: receipt.paymentMethod,
       walletId: receipt.walletId,
+      recurringId: receipt.recurringId,
       rawOcrText: receipt.rawOcrText,
       items: receipt.items,
       source: receipt.source,
@@ -193,6 +198,7 @@ class ReceiptDraft {
         'note': (note ?? '').trim().isEmpty ? null : note!.trim(),
         'payment_method': paymentMethod?.wireName,
         'wallet_id': walletId,
+        'recurring_id': recurringId,
         'source': source.name,
         'raw_ocr_text': rawOcrText,
         if (includeItems)

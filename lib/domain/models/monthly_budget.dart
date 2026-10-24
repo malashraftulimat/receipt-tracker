@@ -12,6 +12,8 @@ class MonthlyBudget {
     this.note,
     this.payCycle,
     this.incomePerCycle,
+    this.overallLimit,
+    this.categoryLimits = const <String, double>{},
   });
 
   final String? id;
@@ -40,10 +42,21 @@ class MonthlyBudget {
   /// 入力した金額をそのまま再表示できる。
   final num? incomePerCycle;
 
+  /// Optional user-set overall spending limit. When absent/zero the budget
+  /// falls back to [disposableIncome].
+  final num? overallLimit;
+
+  /// Optional monthly limit per category id.
+  final Map<String, double> categoryLimits;
+
   /// 自由に使える金額 = 給与 - 貯蓄目標 - 固定費.
   num get disposableIncome => salary - savingsGoal - fixedExpenses;
 
-  bool get isConfigured => salary > 0;
+  /// Overall monthly spending limit used for pacing.
+  num get monthlyLimit =>
+      (overallLimit ?? 0) > 0 ? overallLimit! : disposableIncome;
+
+  bool get isConfigured => salary > 0 || (overallLimit ?? 0) > 0;
 
   factory MonthlyBudget.fromJson(Map<String, dynamic> json) {
     final rawMonth = json['month'];
@@ -60,7 +73,21 @@ class MonthlyBudget {
       note: json['note'] as String?,
       payCycle: _parsePayCycle(json['pay_cycle']),
       incomePerCycle: json['income_per_cycle'] as num?,
+      overallLimit: json['overall_limit'] as num?,
+      categoryLimits: _parseLimits(json['category_limits']),
     );
+  }
+
+  static Map<String, double> _parseLimits(Object? raw) {
+    if (raw is! Map) return const <String, double>{};
+    final limits = <String, double>{};
+    for (final entry in raw.entries) {
+      final value = entry.value;
+      if (value is num && value > 0) {
+        limits[entry.key.toString()] = value.toDouble();
+      }
+    }
+    return limits;
   }
 
   static PayCycle? _parsePayCycle(Object? raw) {
@@ -79,6 +106,8 @@ class MonthlyBudget {
         'note': note,
         'pay_cycle': payCycle?.name,
         'income_per_cycle': incomePerCycle,
+        'overall_limit': overallLimit,
+        'category_limits': categoryLimits,
       };
 
   String get _monthIso {
@@ -93,6 +122,8 @@ class MonthlyBudget {
     String? note,
     PayCycle? payCycle,
     num? incomePerCycle,
+    num? overallLimit,
+    Map<String, double>? categoryLimits,
   }) {
     return MonthlyBudget(
       id: id,
@@ -104,6 +135,8 @@ class MonthlyBudget {
       note: note ?? this.note,
       payCycle: payCycle ?? this.payCycle,
       incomePerCycle: incomePerCycle ?? this.incomePerCycle,
+      overallLimit: overallLimit ?? this.overallLimit,
+      categoryLimits: categoryLimits ?? this.categoryLimits,
     );
   }
 }
@@ -138,6 +171,7 @@ class BudgetSummary {
     this.scheduledPeriodIncome = 0,
     this.oneOffPeriodIncome = 0,
     this.otherCurrencyIncomeCount = 0,
+    this.categorySpent = const <String, double>{},
   });
 
   final DateTime month;
@@ -184,8 +218,15 @@ class BudgetSummary {
   /// currency.
   final int otherCurrencyIncomeCount;
 
+  /// Spending in the selected calendar month, grouped by category id.
+  final Map<String, double> categorySpent;
+
   /// Recurring + one-off income for the current period/month.
   double get periodIncome => scheduledPeriodIncome + oneOffPeriodIncome;
+
+  /// Overall monthly spending limit (falls back to disposable income).
+  double get overallLimit =>
+      (budget?.monthlyLimit ?? 0).toDouble();
 
   /// True when this month or the current pay period has a plan.
   bool get configured => (budget?.isConfigured ?? false) || cycleBudget != 0;
@@ -307,4 +348,15 @@ class BudgetSummary {
         return 'over_budget_2';
     }
   }
+}
+
+/// Progress state of one category limit.
+enum LimitStatus { none, ok, warning, over }
+
+LimitStatus limitStatus(double spent, double limit) {
+  if (limit <= 0) return LimitStatus.none;
+  final ratio = spent / limit;
+  if (ratio >= 1) return LimitStatus.over;
+  if (ratio >= 0.8) return LimitStatus.warning;
+  return LimitStatus.ok;
 }
