@@ -352,7 +352,7 @@ class _DetailBody extends StatelessWidget {
               if (receipt.barcodeId != null) ...<Widget>[
                 const SizedBox(height: 14),
                 _InfoCard(
-                  title: 'barcode_invoice_number',
+                  title: 'receipt_number',
                   children: <Widget>[
                     Row(
                       children: <Widget>[
@@ -387,6 +387,42 @@ class _DetailBody extends StatelessWidget {
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: theme.colorScheme.error),
                       ),
+                  ],
+                ),
+              ],
+              if (receipt.invoiceRegistrationNumber != null) ...<Widget>[
+                const SizedBox(height: 14),
+                _InfoCard(
+                  title: 'invoice_registration_number',
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: SelectableText(
+                            receipt.invoiceRegistrationNumber!,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: context.tr('copy'),
+                          onPressed: () async {
+                            await Clipboard.setData(
+                              ClipboardData(
+                                text: receipt.invoiceRegistrationNumber!,
+                              ),
+                            );
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: AppText('copied')),
+                            );
+                          },
+                          icon: const Icon(Icons.copy_all_outlined, size: 18),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ],

@@ -28,7 +28,8 @@ class ExportService {
     '支払期限',
     'ポイント種別',
     'ポイント',
-    'バーコード',
+    'レシート番号',
+    '登録番号',
     'メモ',
   ];
 
@@ -55,6 +56,7 @@ class ExportService {
         receipt.pointBrand ?? '',
         receipt.pointAmount?.toString() ?? '',
         receipt.barcodeId ?? '',
+        receipt.invoiceRegistrationNumber ?? '',
         receipt.note ?? '',
       ]);
     }

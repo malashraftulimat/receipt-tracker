@@ -9,6 +9,8 @@ import 'package:http/http.dart' as http;
 import '../../../core/config/ai_config.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/redaction.dart';
+import '../../../domain/parser/receipt_amount_check.dart';
+import '../../../domain/parser/receipt_identity.dart';
 import '../../../domain/parser/receipt_parser.dart';
 import '../ai_key_store.dart';
 
@@ -75,9 +77,18 @@ Rules:
   only when a Japanese receipt prints the 8% / 10% consumption tax amount.
   For non-Japanese receipts, or when no tax amount is printed, return null.
   Never calculate them.
-- invoice_number is the Japanese qualified invoice registration number printed
-  as 登録番号 / T followed by 13 digits. Never use 伝票 No. for this field.
-  Normalise a full-width Ｔ to T. Otherwise null.
+- receipt_number is the receipt's own number: 伝票番号 / レシート番号 or the
+  receipt's own barcode. Return it exactly as printed (digits only when the
+  label is followed by digits). This identifies the purchase and is used for
+  duplicate detection. Never use the 登録番号, a coupon barcode, a coupon
+  "No.", 利用期限, or a phone number for this field. Use null when no receipt
+  number is printed.
+- registration_number is the Japanese qualified invoice registration number
+  printed as 登録番号 / T followed by 13 digits. Normalise a full-width Ｔ to T.
+  It identifies the business and repeats on every receipt from the same shop,
+  so keep it strictly separate from receipt_number. Otherwise null.
+- Ignore coupon barcodes and numbers printed under クーポン / 利用期限 / a
+  coupon block; they are not receipt numbers.
 - For Japanese receipts, do not treat address, phone (TEL / 〒), tax lines
   (消費税 / 対象税), subtotal, total, payment or change lines as items. The
   store is the header merchant, not 会計日, a date, or an address.
@@ -160,9 +171,16 @@ Rules:
         nullable: true,
         description: 'Optional printed tax-excluded 10% taxable subtotal.',
       ),
-      'invoice_number': Schema.string(
+      'receipt_number': Schema.string(
         nullable: true,
-        description: 'Qualified invoice number: T followed by 13 digits.',
+        description:
+            'Receipt / slip number or the receipt barcode; never the shop\'s '
+            'invoice registration number or a coupon barcode.',
+      ),
+      'registration_number': Schema.string(
+        nullable: true,
+        description:
+            'Qualified invoice registration number: T followed by 13 digits.',
       ),
       'suggested_category': Schema.enumString(
         enumValues: <String>[
@@ -253,7 +271,8 @@ Rules:
       'tax_10_amount',
       'tax_8_base',
       'tax_10_base',
-      'invoice_number',
+      'receipt_number',
+      'registration_number',
       'suggested_category',
       'coupon',
       'items',
@@ -804,7 +823,20 @@ Rules:
     final tax10 = _amount(json['tax_10_amount']);
     final tax8Base = _amount(json['tax_8_base']);
     final tax10Base = _amount(json['tax_10_base']);
-    final invoice = _invoiceNumber(json['invoice_number']);
+    // `invoice_number` is accepted for backwards compatibility with responses
+    // produced before receipt_number / registration_number were separated.
+    final legacyInvoice = _invoiceNumber(json['invoice_number']);
+    final rawReceiptNumber = _string(json['receipt_number']);
+    var registrationNumber =
+        _invoiceNumber(json['registration_number']) ?? legacyInvoice;
+    // If an older model puts the T-number in receipt_number, keep it as the
+    // registration number instead of using it as a duplicate key.
+    if (ReceiptIdentity.isInvoiceRegistrationNumber(rawReceiptNumber)) {
+      registrationNumber ??=
+          ReceiptIdentity.normalizeInvoiceRegistrationNumber(rawReceiptNumber);
+    }
+    final receiptNumber =
+        ReceiptIdentity.normalizeReceiptNumber(rawReceiptNumber);
     final suggestedCategory = _suggestedCategory(json['suggested_category']);
     final coupon = parseCoupon(json['coupon']);
     final items = _items(json['items']);
@@ -817,7 +849,12 @@ Rules:
         items.fold<double>(0, (sum, item) => sum + item.totalPrice);
     if (total != null &&
         items.isNotEmpty &&
-        (itemsTotal - total).abs() > 0.011) {
+        !itemsTotalMatchesReceipt(
+          itemsTotal: itemsTotal,
+          subtotalAmount: subtotal,
+          taxTotal: (tax8 ?? 0) + (tax10 ?? 0),
+          totalAmount: total,
+        )) {
       warnings.add('明細の合計がレシートの合計と一致しません。内容を確認してください');
     }
 
@@ -845,7 +882,8 @@ Rules:
       dueDate: null,
       pointBrand: null,
       pointAmount: null,
-      barcodeId: invoice,
+      receiptNumber: receiptNumber,
+      registrationNumber: registrationNumber,
       suggestedCategory: suggestedCategory,
       coupon: coupon,
       items: items,

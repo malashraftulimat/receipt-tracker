@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +21,7 @@ import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/models/receipt_item.dart';
 import '../../domain/parser/category_guesser.dart';
+import '../../domain/parser/receipt_amount_check.dart';
 import '../../domain/parser/receipt_parser.dart';
 import 'widgets/item_editor_section.dart';
 import '../dashboard/analytics_provider.dart';
@@ -69,6 +72,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   late final TextEditingController _tax8;
   late final TextEditingController _tax10;
   late final TextEditingController _barcode;
+  late final TextEditingController _registration;
   late final TextEditingController _note;
   late final TextEditingController _pointBrand;
   late final TextEditingController _pointAmount;
@@ -97,7 +101,13 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   bool _saving = false;
   bool _recognizing = false;
   String? _error;
-  String? _duplicateId;
+
+  /// Already-saved receipt that looks like the same purchase.
+  Receipt? _duplicate;
+
+  /// Set by “Save anyway” so an intentional duplicate can be stored.
+  bool _allowDuplicate = false;
+  Timer? _duplicateTimer;
 
   String? get _existingId => widget.args.existing?.id;
 
@@ -137,6 +147,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           : formatAmountDigits(draft!.tax10Amount!),
     );
     _barcode = TextEditingController(text: draft?.barcodeId ?? '');
+    _registration = TextEditingController(
+      text: draft?.invoiceRegistrationNumber ?? '',
+    );
     _note = TextEditingController(text: draft?.note ?? '');
     _pointBrand = TextEditingController(text: draft?.pointBrand ?? '');
     _pointAmount = TextEditingController(
@@ -168,6 +181,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   @override
   void dispose() {
+    _duplicateTimer?.cancel();
     _merchant.dispose();
     _currency.dispose();
     _total.dispose();
@@ -175,6 +189,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     _tax8.dispose();
     _tax10.dispose();
     _barcode.dispose();
+    _registration.dispose();
     _note.dispose();
     _pointBrand.dispose();
     _pointAmount.dispose();
@@ -208,6 +223,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   }
 
   String get _currencyCode => currencyOrDefault(_currency.text).code;
+
+  /// The item-sum check is recomputed live in [_TaxSummary] from the edited
+  /// rows, so the OCR-time copy of that warning is dropped here.
+  List<String> get _displayWarnings => _warnings
+      .where((warning) => !warning.contains('明細の合計'))
+      .toList(growable: false);
 
   Future<void> _pickCurrency() async {
     final picked = await showCurrencyPicker(
@@ -261,23 +282,44 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   // Duplicate guard
   // -------------------------------------------------------------------------
 
+  void _scheduleDuplicateCheck() {
+    _duplicateTimer?.cancel();
+    _duplicateTimer = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) _checkDuplicate();
+    });
+  }
+
   Future<void> _checkDuplicate() async {
-    final barcode = _barcode.text.trim();
-    if (barcode.isEmpty) {
-      if (mounted) setState(() => _duplicateId = null);
+    if (_allowDuplicate) return;
+    final receiptNumber = _barcode.text.trim();
+    final merchant = _merchant.text.trim();
+    final total = parseAmountInput(_total.text);
+    final hasFingerprint = merchant.isNotEmpty && total != null;
+    if (receiptNumber.isEmpty && !hasFingerprint) {
+      if (mounted && _duplicate != null) setState(() => _duplicate = null);
       return;
     }
     try {
-      final existingId =
-          await ref.read(receiptRepositoryProvider).findIdByBarcode(barcode);
+      final existing = await ref.read(receiptRepositoryProvider).findDuplicate(
+            receiptNumber: receiptNumber,
+            merchant: merchant,
+            purchasedAt: _purchasedAt,
+            totalAmount: total,
+            excludeId: _existingId,
+          );
       if (!mounted) return;
-      setState(() {
-        _duplicateId =
-            existingId == null || existingId == _existingId ? null : existingId;
-      });
+      setState(() => _duplicate = existing);
     } catch (_) {
       // Offline / permission errors are surfaced on save instead.
     }
+  }
+
+  void _saveAnyway() {
+    setState(() {
+      _allowDuplicate = true;
+      _duplicate = null;
+    });
+    _save();
   }
 
   // -------------------------------------------------------------------------
@@ -349,8 +391,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         _tax10Base = parsed.tax10Base ?? _tax10Base;
         _tax8ItemsTotal = parsed.tax8ItemsTotal;
         _tax10ItemsTotal = parsed.tax10ItemsTotal;
-        if (parsed.barcodeId != null && _barcode.text.trim().isEmpty) {
-          _barcode.text = parsed.barcodeId!;
+        if (parsed.receiptNumber != null && _barcode.text.trim().isEmpty) {
+          _barcode.text = parsed.receiptNumber!;
+        }
+        if (parsed.registrationNumber != null &&
+            _registration.text.trim().isEmpty) {
+          _registration.text = parsed.registrationNumber!;
         }
         _items
           ..clear()
@@ -391,7 +437,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_duplicateId != null) return;
+    if (_duplicate != null && !_allowDuplicate) return;
 
     final userId = ref.read(userIdProvider);
     if (userId == null) return;
@@ -431,6 +477,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       pointBrand: _pointBrand.text.trim().isEmpty ? null : _pointBrand.text,
       pointAmount: parseYenInput(_pointAmount.text),
       barcodeId: _barcode.text,
+      invoiceRegistrationNumber: _registration.text,
       categoryId: _categoryId,
       note: _note.text,
       paymentMethod: _paymentMethod,
@@ -450,7 +497,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           items: items,
         );
       } else {
-        saved = await repository.create(draft);
+        saved = await repository.create(
+          draft,
+          skipDuplicateCheck: _allowDuplicate,
+        );
       }
 
       // A coupon printed on a newly scanned receipt becomes a tracked coupon.
@@ -487,8 +537,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _duplicateId = error.existingId;
-        _error = 'a_receipt_with_the_same_barcode_is_already_r';
+        _duplicate = error.existing;
       });
     } catch (error) {
       if (!mounted) return;
@@ -589,7 +638,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           ),
           child: PressScale(
             child: FilledButton.icon(
-              onPressed: _saving || _duplicateId != null ? null : _save,
+              onPressed:
+                  _saving || (_duplicate != null && !_allowDuplicate)
+                      ? null
+                      : _save,
               style: FilledButton.styleFrom(
                 backgroundColor: AppPalette.emerald,
                 foregroundColor: AppPalette.backgroundDeep,
@@ -603,7 +655,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     )
                   : const Icon(Icons.check),
               label: AppText(
-                _duplicateId != null
+                _duplicate != null && !_allowDuplicate
                     ? 'cannot_save_duplicate_receipt'
                     : (_existingId == null ? 'save_2' : 'save_changes'),
               ),
@@ -629,17 +681,19 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        if (_warnings.isNotEmpty) ...<Widget>[
-          _WarningCard(warnings: _warnings),
+        if (_displayWarnings.isNotEmpty) ...<Widget>[
+          _WarningCard(warnings: _displayWarnings),
           const SizedBox(height: 12),
         ],
         if (_error != null) ...<Widget>[
           _ErrorCard(message: _error!),
           const SizedBox(height: 12),
         ],
-        if (_duplicateId != null) ...<Widget>[
+        if (_duplicate != null) ...<Widget>[
           _DuplicateCard(
-            onOpen: () => context.push('/receipt/$_duplicateId'),
+            existing: _duplicate!,
+            onOpen: () => context.push('/receipt/${_duplicate!.id}'),
+            onSaveAnyway: _saving ? null : _saveAnyway,
           ),
           const SizedBox(height: 12),
         ],
@@ -662,6 +716,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             TextFormField(
               controller: _merchant,
               textInputAction: TextInputAction.next,
+              onChanged: (_) => _scheduleDuplicateCheck(),
               decoration: InputDecoration(
                 labelText: context.tr('store_vendor'),
                 prefixIcon: const Icon(Icons.storefront_outlined),
@@ -696,18 +751,36 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             TextFormField(
               controller: _barcode,
               textInputAction: TextInputAction.next,
-              onChanged: (_) => _checkDuplicate(),
+              onChanged: (_) => _scheduleDuplicateCheck(),
               decoration: InputDecoration(
-                labelText: context.tr('barcode_invoice_number'),
-                prefixIcon: const Icon(Icons.qr_code_2),
+                labelText: context.tr('receipt_number'),
+                helperText: context.tr('receipt_number_helper'),
+                prefixIcon: const Icon(Icons.receipt_long_outlined),
                 suffixIcon: _barcode.text.isEmpty
                     ? null
                     : IconButton(
                         tooltip: context.tr('clear'),
                         onPressed: () {
                           _barcode.clear();
-                          _checkDuplicate();
+                          _scheduleDuplicateCheck();
                         },
+                        icon: const Icon(Icons.close, size: 18),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _registration,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: context.tr('invoice_registration_number'),
+                helperText: context.tr('invoice_registration_number_helper'),
+                prefixIcon: const Icon(Icons.business_outlined),
+                suffixIcon: _registration.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: context.tr('clear'),
+                        onPressed: () => setState(_registration.clear),
                         icon: const Icon(Icons.close, size: 18),
                       ),
               ),
@@ -877,6 +950,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _total,
+              onChanged: (_) => _scheduleDuplicateCheck(),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
@@ -934,6 +1008,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               tax10: parseAmountInput(_tax10.text),
               subtotal: parseAmountInput(_subtotal.text),
               total: parseAmountInput(_total.text),
+              itemsTotal: _items.fold<double>(
+                0,
+                (sum, item) => sum + item.totalValue,
+              ),
               currency: _currencyCode,
             ),
           ],
@@ -1023,6 +1101,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         _purchasedAt.minute,
       );
     });
+    _scheduleDuplicateCheck();
   }
 
   Future<void> _pickTime() async {
@@ -1041,6 +1120,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         picked.minute,
       );
     });
+    _scheduleDuplicateCheck();
   }
 }
 
@@ -1176,6 +1256,7 @@ class _TaxSummary extends StatelessWidget {
     required this.tax10,
     required this.subtotal,
     required this.total,
+    required this.itemsTotal,
     this.currency = kFallbackCurrencyCode,
   });
 
@@ -1183,6 +1264,7 @@ class _TaxSummary extends StatelessWidget {
   final double? tax10;
   final double? subtotal;
   final double? total;
+  final double itemsTotal;
   final String currency;
 
   @override
@@ -1207,6 +1289,27 @@ class _TaxSummary extends StatelessWidget {
     }
     if (total != null && taxTotal > total!) {
       messages.add('review.tax_exceeds_total');
+    }
+    if (itemsTotal > 0 &&
+        total != null &&
+        !itemsTotalMatchesReceipt(
+          itemsTotal: itemsTotal,
+          subtotalAmount: subtotal,
+          taxTotal: taxTotal,
+          totalAmount: total,
+        )) {
+      messages.add(
+        context.tr(
+          'review.items_total_mismatch',
+          params: <String, Object?>{
+            'items': formatMoney(itemsTotal, currency: currency),
+            'subtotal': subtotal == null
+                ? '—'
+                : formatMoney(subtotal!, currency: currency),
+            'total': formatMoney(total!, currency: currency),
+          },
+        ),
+      );
     }
 
     return Row(
@@ -1307,37 +1410,69 @@ class _ErrorCard extends StatelessWidget {
 }
 
 class _DuplicateCard extends StatelessWidget {
-  const _DuplicateCard({required this.onOpen});
+  const _DuplicateCard({
+    required this.existing,
+    required this.onOpen,
+    this.onSaveAnyway,
+  });
 
+  final Receipt existing;
   final VoidCallback onOpen;
+  final VoidCallback? onSaveAnyway;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onColor = theme.colorScheme.onErrorContainer;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: theme.colorScheme.errorContainer.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(
-            Icons.content_copy,
-            size: 18,
-            color: theme.colorScheme.onErrorContainer,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: AppText(
-              'this_barcode_is_already_registered_duplicate',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colorScheme.onErrorContainer,
+          Row(
+            children: <Widget>[
+              Icon(Icons.content_copy, size: 18, color: onColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: AppText(
+                  'duplicate_receipt_found',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: onColor,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-          TextButton(onPressed: onOpen, child: const AppText('open')),
+          const SizedBox(height: 6),
+          AppText(
+            'duplicate_existing_receipt',
+            params: <String, Object?>{
+              'merchant': existing.displayMerchant,
+              'date': formatDateJa(existing.purchasedAt),
+              'total': formatMoney(
+                existing.totalAmount,
+                currency: existing.currency,
+              ),
+            },
+            style: TextStyle(fontSize: 12, color: onColor),
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            children: <Widget>[
+              TextButton(onPressed: onOpen, child: const AppText('open')),
+              TextButton(
+                onPressed: onSaveAnyway,
+                child: const AppText('save_anyway'),
+              ),
+            ],
+          ),
         ],
       ),
     );

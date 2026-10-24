@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -167,7 +169,11 @@ final receiptsProvider = FutureProvider<List<Receipt>>((ref) async {
   final userId = ref.watch(userIdProvider);
   if (userId == null) return const <Receipt>[];
   final filter = ref.watch(receiptFilterProvider);
-  return ref.watch(receiptRepositoryProvider).fetch(filter);
+  final repository = ref.watch(receiptRepositoryProvider);
+  // One-time, non-blocking cleanup of legacy 登録番号 values stored as
+  // barcode_id. The read path already treats them correctly.
+  unawaited(repository.migrateLegacyInvoiceNumbers());
+  return repository.fetch(filter);
 });
 
 // ---------------------------------------------------------------------------

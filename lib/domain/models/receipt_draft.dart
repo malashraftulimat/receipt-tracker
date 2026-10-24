@@ -1,4 +1,5 @@
 import '../../core/localization/currencies.dart';
+import '../parser/receipt_identity.dart';
 import '../parser/receipt_parser.dart';
 import 'payment_method.dart';
 import 'receipt.dart';
@@ -25,6 +26,7 @@ class ReceiptDraft {
     this.pointBrand,
     this.pointAmount,
     this.barcodeId,
+    this.invoiceRegistrationNumber,
     this.categoryId,
     this.note,
     this.paymentMethod,
@@ -51,7 +53,13 @@ class ReceiptDraft {
   final DateTime? reminderAt;
   final String? pointBrand;
   final int? pointAmount;
+
+  /// The receipt's own number (伝票番号 / レシート番号 / barcode).
   final String? barcodeId;
+
+  /// 登録番号 (T + 13 digits), stored separately from [barcodeId].
+  final String? invoiceRegistrationNumber;
+
   final String? categoryId;
   final String? note;
 
@@ -68,9 +76,18 @@ class ReceiptDraft {
     String? barcodeId,
     ReceiptSource source = ReceiptSource.ocr,
   }) {
-    final resolvedBarcode = (barcodeId != null && barcodeId.trim().isNotEmpty)
-        ? barcodeId.trim()
-        : parsed.barcodeId;
+    // A scanned T-number is a registration number, not a receipt number.
+    var resolvedReceiptNumber = parsed.receiptNumber;
+    var resolvedRegistrationNumber = parsed.registrationNumber;
+    final scanned = (barcodeId ?? '').trim();
+    if (scanned.isNotEmpty) {
+      if (ReceiptIdentity.isInvoiceRegistrationNumber(scanned)) {
+        resolvedRegistrationNumber =
+            ReceiptIdentity.normalizeInvoiceRegistrationNumber(scanned);
+      } else {
+        resolvedReceiptNumber = scanned;
+      }
+    }
     return ReceiptDraft(
       merchant: parsed.merchant,
       currency: (parsed.currency ?? kFallbackCurrencyCode).toUpperCase(),
@@ -87,7 +104,8 @@ class ReceiptDraft {
       reminderAt: parsed.dueDate?.subtract(const Duration(days: 3)),
       pointBrand: parsed.pointBrand,
       pointAmount: parsed.pointAmount,
-      barcodeId: resolvedBarcode,
+      barcodeId: resolvedReceiptNumber,
+      invoiceRegistrationNumber: resolvedRegistrationNumber,
       rawOcrText: parsed.rawText,
       items: <ReceiptItem>[
         for (var i = 0; i < parsed.items.length; i++)
@@ -123,6 +141,7 @@ class ReceiptDraft {
       pointBrand: receipt.pointBrand,
       pointAmount: receipt.pointAmount,
       barcodeId: receipt.barcodeId,
+      invoiceRegistrationNumber: receipt.invoiceRegistrationNumber,
       categoryId: receipt.categoryId,
       note: receipt.note,
       paymentMethod: receipt.paymentMethod,
@@ -157,8 +176,14 @@ class ReceiptDraft {
         'reminder_at': reminderAt?.toUtc().toIso8601String(),
         'point_brand': pointBrand,
         'point_amount': pointAmount,
-        'barcode_id':
-            (barcodeId ?? '').trim().isEmpty ? null : barcodeId!.trim(),
+        // `barcode_id` is kept in sync for older builds that read it; the
+        // duplicate key for new builds is `receipt_number`.
+        'receipt_number': ReceiptIdentity.normalizeReceiptNumber(barcodeId),
+        'barcode_id': ReceiptIdentity.normalizeReceiptNumber(barcodeId),
+        'invoice_registration_number':
+            ReceiptIdentity.normalizeInvoiceRegistrationNumber(
+          invoiceRegistrationNumber,
+        ),
         'category_id': categoryId,
         'note': (note ?? '').trim().isEmpty ? null : note!.trim(),
         'payment_method': paymentMethod?.wireName,

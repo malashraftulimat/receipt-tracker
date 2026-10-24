@@ -13,8 +13,10 @@ Japanese paper receipts and invoices with a **dual scanner**:
   required.
 
 AI returns merchant, purchase date (including Reiwa dates converted to ISO),
-total, subtotal, 8%/10% tax, invoice number (T + 13 digits), line items and a
-suggested category that is auto-selected in the review form. The
+total, subtotal, 8%/10% tax, the receipt's own number (伝票番号 / レシート番号 /
+receipt barcode), the shop's qualified-invoice registration number
+(登録番号, T + 13 digits) as a separate field, line items and a suggested
+category that is auto-selected in the review form. The
 local parser is kept as the fallback and handles **store name, date/time**
 (`2026年10月19日`, `令和8年10月19日`, `R8.10.19`, `2026/10/19`), **total**
 (`合計`, `税込合計`, `¥`), **subtotal** (`小計`) and **consumption tax**
@@ -113,7 +115,10 @@ scanner falls back to on-device OCR.
 ```
 users/{userId}/receipts/{receiptId}
   merchant, purchased_at, total_amount, subtotal_amount,
-  tax_8_amount, tax_10_amount, barcode_id (invoice / reference no.),
+  tax_8_amount, tax_10_amount,
+  receipt_number (the receipt's own number; duplicate key),
+  invoice_registration_number (登録番号, T + 13 digits; never a duplicate key),
+  barcode_id (legacy mirror of receipt_number, read for old documents),
   payment_method (cash / credit_card / debit_card / bank_transfer /
                   direct_debit / qr_emoney / ic_card /
                   convenience_store / other, optional),
@@ -148,8 +153,8 @@ document, so a receipt + items are written atomically.
 | --- | --- |
 | Auth | Firebase Email/Password, password reset, persistent sessions |
 | Sync | Firestore per-user receipts/items, categories and budgets (no photos) |
-| Scan | Live 1D barcode (duplicate guard), tap-to-focus web camera, device-camera input, AI extraction, auto-detect and long-receipt modes |
-| Parse | Gemini structured JSON (merchant, ISO/Reiwa date, total, subtotal, 8%/10% tax, invoice no., items), with parser fallback |
+| Scan | Live 1D barcode (receipt-number duplicate guard), tap-to-focus web camera, device-camera input, AI extraction, auto-detect and long-receipt modes |
+| Parse | Gemini structured JSON (merchant, ISO/Reiwa date, total, subtotal, 8%/10% tax, receipt no. and registration no. separately, items), with parser fallback |
 | Review | In-memory image preview, editable extracted items directly below it, header, tax, category, payment method, due date, notes, warnings and duplicate banner |
 | Quick payment | Receiptless expense (rent, transfers, money lent) saved into the same collection as `source = manual`: amount, date, category, required payment method, note |
 | Coupons | Printed coupons extracted with name / validFrom / validUntil / discount, saved per receipt, daily reminders with **Mark as Used** / **Remind Tomorrow**, automatic expiry |
@@ -208,6 +213,33 @@ payment and other. Scanned receipts can set the same field in the review screen
 read back as unset. The dashboard shows a chip per list row, can filter by
 method, and analytics includes a current-month breakdown per method.
 
+### Duplicate detection and amount checks
+
+A Japanese receipt prints two different numbers that look similar:
+
+| Printed value | Example | Meaning |
+| --- | --- | --- |
+| 登録番号 / qualified invoice registration number | `T8012402001708` | Identifies the **business**. Repeats on every receipt from that shop. |
+| 伝票番号 / レシート番号 / receipt barcode | `0100000001` | Identifies **this purchase**. |
+
+The receipt number is the duplicate key and is stored in `receipt_number` (the
+legacy `barcode_id` field is still read and kept in sync for older builds). The
+registration number is stored separately in `invoice_registration_number` and
+is **never** used for duplicate detection. Legacy documents whose `barcode_id`
+is a `T` + 13 digit value are normalised on read and moved to the invoice field
+by a one-time, non-blocking migration.
+
+Coupon barcodes and `No.` values printed under クーポン / 利用期限 are ignored. If
+the receipt has no own number, the fallback fingerprint is **merchant +
+purchased_at to the minute + total**. When a duplicate is found, the review
+screen shows the existing receipt's merchant, date and total, with **Open** and
+**Save anyway** (false positives are allowed).
+
+Item totals are checked against the printed **tax-excluded subtotal** when one
+exists. A receipt is consistent when `sum(items) == subtotal`, when
+`sum(items) + tax == total`, or when the line prices are tax-included and
+`sum(items) == total`; the warning appears only when none of those match. This
+handles receipts such as items 170 + 41 = 211, tax 16, total 227.
 
 ---
 
@@ -330,8 +362,9 @@ flutter test
 ```
 
 The parser tests cover Japanese dates (era/full/2-digit), total vs subtotal vs
-change amounts, 8%/10% tax lines, tax-inclusive bases, reference numbers and
-line-item extraction.
+change amounts, 8%/10% tax lines, tax-inclusive bases, receipt vs registration
+numbers, coupon-number exclusion, duplicate fingerprints, the subtotal/tax item
+check and line-item extraction.
 
 ---
 
@@ -380,7 +413,9 @@ backend; reminders are fully local.
 5. **Long receipt** — multiple overlapping captures are merged by
    `ReceiptTextMerger` using the on-device/browser OCR path before parsing.
 6. **Review** — the captured photo is shown from memory above the editable
-   extracted item table; duplicate barcodes block saving.
+   extracted item table. A duplicate receipt number (or merchant + minute +
+   total) shows the existing receipt and blocks saving unless **Save anyway**
+   is chosen; 登録番号 values never block saving.
 7. **Save** — only receipt JSON + items are written to
    `users/{uid}/receipts/{receiptId}`. The in-memory image reference is dropped
    when the screen closes or the receipt is saved.

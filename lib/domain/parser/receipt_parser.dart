@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import '../../core/localization/currencies.dart';
+import 'receipt_amount_check.dart';
+import 'receipt_identity.dart';
 
 /// One parsed line item (before the user edits it).
 class ParsedItem {
@@ -71,7 +73,8 @@ class ParsedReceipt {
     this.dueDate,
     this.pointBrand,
     this.pointAmount,
-    this.barcodeId,
+    this.receiptNumber,
+    this.registrationNumber,
     this.suggestedCategory,
     this.coupon,
     this.items = const <ParsedItem>[],
@@ -103,7 +106,16 @@ class ParsedReceipt {
   final String? pointBrand;
   final int? pointAmount;
 
-  final String? barcodeId;
+  /// The receipt's own number (伝票番号 / レシート番号 / receipt barcode).
+  /// This is the duplicate key. Never a 登録番号.
+  final String? receiptNumber;
+
+  /// Japanese qualified-invoice registration number (登録番号, T + 13 digits).
+  /// Identifies the business and repeats on every receipt from that shop.
+  final String? registrationNumber;
+
+  /// Backwards-compatible alias for [receiptNumber].
+  String? get barcodeId => receiptNumber;
 
   /// Gemini-suggested seeded category name (e.g. 食費 / 交通費).
   final String? suggestedCategory;
@@ -125,7 +137,8 @@ class ParsedReceipt {
       merchant == null &&
       totalAmount == null &&
       purchasedAt == null &&
-      barcodeId == null;
+      receiptNumber == null &&
+      registrationNumber == null;
 
   double get overallConfidence {
     if (confidence.isEmpty) return 0;
@@ -290,12 +303,25 @@ class ReceiptParser {
     }
 
     // --- reference / barcode ------------------------------------------------
-    final barcodeId =
-        (scannedBarcode != null && scannedBarcode.trim().isNotEmpty)
-            ? scannedBarcode.trim()
-            : _detectReferenceNumber(lines);
-    if (barcodeId != null) {
-      confidence['barcode'] = scannedBarcode != null ? 1.0 : 0.5;
+    // 登録番号 (T + 13 digits) identifies the shop and repeats on every
+    // receipt. It is stored separately and never used as a duplicate key.
+    var registrationNumber = _detectInvoiceRegistrationNumber(lines);
+    var receiptNumber = _detectReceiptNumber(lines);
+    final scanned = (scannedBarcode ?? '').trim();
+    if (scanned.isNotEmpty) {
+      if (ReceiptIdentity.isInvoiceRegistrationNumber(scanned)) {
+        registrationNumber =
+            ReceiptIdentity.normalizeInvoiceRegistrationNumber(scanned);
+      } else {
+        receiptNumber = scanned;
+      }
+    }
+    if (receiptNumber != null) {
+      confidence['receiptNumber'] =
+          scanned.isNotEmpty ? 1.0 : 0.5;
+    }
+    if (registrationNumber != null) {
+      confidence['registrationNumber'] = scanned.isNotEmpty ? 1.0 : 0.6;
     }
 
     // --- amounts ------------------------------------------------------------
@@ -373,7 +399,12 @@ class ReceiptParser {
           0,
           (sum, item) => sum + item.totalPrice,
         );
-        if ((itemsSum - total).abs() > 0.011) {
+        if (!itemsTotalMatchesReceipt(
+          itemsTotal: itemsSum,
+          subtotalAmount: subtotal,
+          taxTotal: (tax8 ?? 0) + (tax10 ?? 0),
+          totalAmount: total,
+        )) {
           warnings.add('明細の合計がレシートの合計と一致しません。内容を確認してください');
         }
       }
@@ -398,7 +429,8 @@ class ReceiptParser {
       dueDate: dueDate,
       pointBrand: points?.brand,
       pointAmount: points?.amount,
-      barcodeId: barcodeId,
+      receiptNumber: receiptNumber,
+      registrationNumber: registrationNumber,
       items: items,
       rawText: rawText,
       warnings: warnings,
@@ -810,22 +842,60 @@ class ReceiptParser {
   // Reference / invoice numbers
   // -------------------------------------------------------------------------
 
-  String? _detectReferenceNumber(List<String> lines) {
-    // Prefer the qualified invoice registration number (登録番号) over the
-    // 伝票 No. printed on the same receipt.
+  /// Japanese qualified-invoice registration number (登録番号).
+  String? _detectInvoiceRegistrationNumber(List<String> lines) {
     final invoice = RegExp(r'[TＴ]\s*(\d{13})');
     for (final line in lines) {
       final match = invoice.firstMatch(line);
       if (match != null) return 'T${match.group(1)}';
     }
+    return null;
+  }
+
+  /// The receipt's own number, never the shop's 登録番号.
+  ///
+  /// Coupon barcodes (クーポン / 利用期限 / "No." printed under a coupon) are
+  /// ignored because they are not unique to this purchase.
+  String? _detectReceiptNumber(List<String> lines) {
+    const couponMarkers = <String>[
+      'クーポン',
+      '利用期限',
+      '有効期限',
+      '割引券',
+      '特典券',
+      '回数券',
+      'coupon',
+      'voucher',
+    ];
+    // Only a real coupon heading makes the following "No." line a coupon
+    // number. 利用期限 / 有効期限 can also precede unrelated lines.
+    const couponHeadings = <String>[
+      'クーポン',
+      '割引券',
+      '特典券',
+      '回数券',
+      'coupon',
+      'voucher',
+    ];
+    bool containsAny(String value, List<String> markers) {
+      final lower = value.toLowerCase();
+      return markers.any((marker) => lower.contains(marker));
+    }
 
     final labelled = RegExp(
-      r'(?:No\.?|NO\.?|番号|伝票)\s*[:#]?\s*([0-9]{4,20})',
+      r'(?:レシート|伝票|領収書|受付|注文|オーダー|バーコード|barcode)?\s*'
+      r'(?:No\.?|NO\.?|番号)\s*[:#]?\s*([0-9]{3,20})',
       caseSensitive: false,
     );
-    for (final line in lines) {
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      if (containsAny(line, couponMarkers)) continue;
+      if (i > 0 && containsAny(lines[i - 1], couponHeadings)) continue;
       final match = labelled.firstMatch(line);
-      if (match != null) return match.group(1);
+      if (match == null) continue;
+      final value = match.group(1);
+      if (value == null) continue;
+      return ReceiptIdentity.normalizeReceiptNumber(value);
     }
     return null;
   }

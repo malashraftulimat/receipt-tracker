@@ -110,17 +110,52 @@ void main() {
         '店舗\n合計 100',
         scannedBarcode: '4901234567894',
       );
-      expect(result.barcodeId, '4901234567894');
+      expect(result.receiptNumber, '4901234567894');
     });
 
     test('reads a receipt number from OCR text', () {
       final result = parser.parse('店舗\nレシートNo: 1234567890\n合計 980');
-      expect(result.barcodeId, '1234567890');
+      expect(result.receiptNumber, '1234567890');
     });
 
-    test('reads qualified invoice registration numbers', () {
+    test('reads qualified invoice registration numbers separately', () {
       final result = parser.parse('登録番号 T1234567890123\n合計 1,100');
-      expect(result.barcodeId, 'T1234567890123');
+      expect(result.registrationNumber, 'T1234567890123');
+      expect(result.receiptNumber, isNull);
+      expect(result.barcodeId, isNull);
+    });
+
+    test('keeps the receipt number and registration number apart', () {
+      final result = parser.parse('''
+店舗
+レシートNo: 0100000001
+登録番号 T1234567890123
+合計 980
+''');
+      expect(result.receiptNumber, '0100000001');
+      expect(result.registrationNumber, 'T1234567890123');
+    });
+
+    test('ignores coupon numbers printed under a coupon block', () {
+      final result = parser.parse('''
+店舗
+クーポン
+No.1234567890123
+利用期限 2026/11/30
+レシートNo: 00042
+合計 980
+''');
+      expect(result.receiptNumber, '00042');
+      expect(result.registrationNumber, isNull);
+    });
+
+    test('a scanned T-number is a registration number, not a receipt number', () {
+      final result = parser.parse(
+        '店舗\n合計 980',
+        scannedBarcode: 'T8012402001708',
+      );
+      expect(result.receiptNumber, isNull);
+      expect(result.registrationNumber, 'T8012402001708');
     });
   });
 
@@ -191,6 +226,48 @@ void main() {
 
   itemTests();
 
+  group('amount consistency', () {
+    test('accepts items that match the tax-excluded subtotal', () {
+      final result = parser.parse('''
+スーパー
+2026年10月19日
+商品A 170
+商品B 41
+小計 211
+消費税 16
+合計 227
+''');
+      expect(result.items.length, 2);
+      expect(
+        result.items.fold<double>(0, (sum, item) => sum + item.totalPrice),
+        211,
+      );
+      expect(result.subtotalAmount, 211);
+      expect(result.tax10Amount, 16);
+      expect(result.totalAmount, 227);
+      expect(
+        result.warnings.where((w) => w.contains('明細の合計')),
+        isEmpty,
+      );
+    });
+
+    test('warns when items match neither the subtotal nor the total', () {
+      final result = parser.parse('''
+スーパー
+2026年10月19日
+商品A 170
+商品B 20
+小計 211
+消費税 16
+合計 227
+''');
+      expect(
+        result.warnings.where((w) => w.contains('明細の合計')),
+        isNotEmpty,
+      );
+    });
+  });
+
   test('returns warnings when nothing can be parsed', () {
     final result = parser.parse('読み取り失敗');
     expect(result.totalAmount, isNull);
@@ -223,7 +300,8 @@ TEL 03-1234-5678
       final parsed = parser.parse(receipt);
       expect(parsed.merchant, 'ソニックストア株式会社東京店');
       expect(parsed.purchasedAt, DateTime(2025, 8, 26));
-      expect(parsed.barcodeId, 'T5010001238914');
+      expect(parsed.registrationNumber, 'T5010001238914');
+      expect(parsed.receiptNumber, '0100000001');
       expect(parsed.totalAmount, 1080);
       expect(parsed.subtotalAmount, 1000);
       expect(parsed.tax8Amount, 80);

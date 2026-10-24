@@ -1,4 +1,6 @@
 import '../../core/localization/currencies.dart';
+import '../../core/utils/barcode_utils.dart';
+import '../parser/receipt_identity.dart';
 import 'category.dart';
 import 'payment_method.dart';
 import 'pay_cycle.dart';
@@ -49,6 +51,7 @@ class Receipt {
     this.pointBrand,
     this.pointAmount,
     this.barcodeId,
+    this.invoiceRegistrationNumber,
     this.categoryId,
     this.note,
     this.paymentMethod,
@@ -89,8 +92,15 @@ class Receipt {
   final String? pointBrand;
   final int? pointAmount;
 
-  /// JAN-13 / Code 128 value or invoice reference number.
+  /// The receipt's own number (伝票番号 / レシート番号 / receipt barcode).
+  /// This is the duplicate key. Legacy documents stored it in `barcode_id`.
   final String? barcodeId;
+
+  /// Japanese qualified-invoice registration number (登録番号, T + 13 digits).
+  /// Identifies the business, repeats on every receipt from the shop, and is
+  /// never used for duplicate detection.
+  final String? invoiceRegistrationNumber;
+
   final String? categoryId;
   final String? note;
 
@@ -125,6 +135,9 @@ class Receipt {
 
   bool get hasTaxBreakdown => tax8Amount != null || tax10Amount != null;
 
+  /// The receipt's own number (alias used by newer code).
+  String? get receiptNumber => barcodeId;
+
   String get displayMerchant => (merchant == null || merchant!.trim().isEmpty)
       ? 'no_store_name'
       : merchant!.trim();
@@ -152,6 +165,19 @@ class Receipt {
       category =
           ExpenseCategory.fromJson(Map<String, dynamic>.from(rawCategory));
     }
+
+    // New documents store the two numbers separately. Legacy documents only
+    // have `barcode_id`; when that value is a 登録番号 it is moved to the
+    // invoice field so it can never be mistaken for a receipt number.
+    final rawReceiptNumber =
+        (json['receipt_number'] as String?) ?? (json['barcode_id'] as String?);
+    final rawInvoice = json['invoice_registration_number'] as String?;
+    final receiptNumber = ReceiptIdentity.normalizeReceiptNumber(rawReceiptNumber);
+    final invoiceRegistrationNumber = receiptsInvoiceRegistration(
+      rawInvoice,
+      legacyBarcode: rawReceiptNumber,
+    );
+
     return Receipt(
       id: json['id'] as String,
       userId: json['user_id'] as String,
@@ -172,7 +198,8 @@ class Receipt {
       reminderAt: _parseDate(json['reminder_at']),
       pointBrand: json['point_brand'] as String?,
       pointAmount: (json['point_amount'] as num?)?.toInt(),
-      barcodeId: json['barcode_id'] as String?,
+      barcodeId: receiptNumber,
+      invoiceRegistrationNumber: invoiceRegistrationNumber,
       categoryId: json['category_id'] as String?,
       note: json['note'] as String?,
       paymentMethod: PaymentMethod.tryParse(json['payment_method']),
@@ -184,6 +211,21 @@ class Receipt {
       category: category,
       items: _parseItems(json),
     );
+  }
+
+  /// Registration number from the new field, or a legacy `barcode_id` that is
+  /// actually a `T` + 13 digit value.
+  static String? receiptsInvoiceRegistration(
+    String? rawInvoice, {
+    String? legacyBarcode,
+  }) {
+    final explicit =
+        ReceiptIdentity.normalizeInvoiceRegistrationNumber(rawInvoice);
+    if (explicit != null) return explicit;
+    if (BarcodeUtils.looksLikeInvoiceRegistrationNumber(legacyBarcode)) {
+      return ReceiptIdentity.normalizeInvoiceRegistrationNumber(legacyBarcode);
+    }
+    return null;
   }
 
   static List<ReceiptItem> _parseItems(Map<String, dynamic> json) {
@@ -210,6 +252,7 @@ class Receipt {
     double? tax8Amount,
     double? tax10Amount,
     String? barcodeId,
+    String? invoiceRegistrationNumber,
     String? categoryId,
     String? note,
     PaymentMethod? paymentMethod,
@@ -237,6 +280,8 @@ class Receipt {
       pointBrand: pointBrand ?? this.pointBrand,
       pointAmount: pointAmount ?? this.pointAmount,
       barcodeId: barcodeId ?? this.barcodeId,
+      invoiceRegistrationNumber:
+          invoiceRegistrationNumber ?? this.invoiceRegistrationNumber,
       categoryId: categoryId ?? this.categoryId,
       note: note ?? this.note,
       paymentMethod: paymentMethod ?? this.paymentMethod,

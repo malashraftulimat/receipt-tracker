@@ -18,6 +18,7 @@ import '../../data/services/image_input.dart';
 import '../../data/services/ocr/ai_receipt_ocr_service.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
+import '../../domain/parser/receipt_identity.dart';
 import '../../domain/parser/receipt_parser.dart';
 import '../../domain/parser/receipt_text_merger.dart';
 import '../review/review_page.dart';
@@ -249,11 +250,18 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     session.setBarcode(value);
 
     if (ref.read(scanSessionProvider).mode == ScanMode.barcode) {
-      _openReview(
-        ReceiptDraft(barcodeId: value, source: ReceiptSource.barcode),
-        null,
-      );
+      _openReview(_barcodeDraft(value), null);
     }
+  }
+
+  /// A scanned T-number is the shop's 登録番号, not the receipt number.
+  ReceiptDraft _barcodeDraft(String value) {
+    final isInvoice = ReceiptIdentity.isInvoiceRegistrationNumber(value);
+    return ReceiptDraft(
+      barcodeId: isInvoice ? null : value,
+      invoiceRegistrationNumber: isInvoice ? value : null,
+      source: ReceiptSource.barcode,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -686,13 +694,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                       onUseBarcodeOnly: () {
                         final barcode = session.barcode;
                         if (barcode == null) return;
-                        _openReview(
-                          ReceiptDraft(
-                            barcodeId: barcode,
-                            source: ReceiptSource.barcode,
-                          ),
-                          null,
-                        );
+                        _openReview(_barcodeDraft(barcode), null);
                       },
                     ),
                   if (kIsWeb) ...<Widget>[

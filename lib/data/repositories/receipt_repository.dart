@@ -6,16 +6,20 @@ import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/models/receipt_filter.dart';
 import '../../domain/models/receipt_item.dart';
+import '../../domain/parser/receipt_identity.dart';
 
-/// Thrown when a receipt with the same barcode already exists.
+/// Thrown when the same receipt already exists.
 class DuplicateReceiptException implements Exception {
-  DuplicateReceiptException(this.barcode, {this.existingId});
+  DuplicateReceiptException({this.receiptNumber, this.existing});
 
-  final String barcode;
-  final String? existingId;
+  final String? receiptNumber;
+  final Receipt? existing;
+
+  String? get existingId => existing?.id;
 
   @override
-  String toString() => 'DuplicateReceiptException($barcode)';
+  String toString() =>
+      'DuplicateReceiptException(${receiptNumber ?? existing?.receiptNumber})';
 }
 
 /// Firestore receipts at `users/{userId}/receipts/{receiptId}`.
@@ -83,7 +87,10 @@ class ReceiptRepository {
       receipts = receipts.where((receipt) {
         return (receipt.merchant ?? '').toLowerCase().contains(term) ||
             (receipt.note ?? '').toLowerCase().contains(term) ||
-            (receipt.barcodeId ?? '').toLowerCase().contains(term);
+            (receipt.barcodeId ?? '').toLowerCase().contains(term) ||
+            (receipt.invoiceRegistrationNumber ?? '')
+                .toLowerCase()
+                .contains(term);
       }).toList(growable: false);
     }
 
@@ -96,19 +103,137 @@ class ReceiptRepository {
     return _fromDoc(doc, await _categoryMap());
   }
 
-  Future<String?> findIdByBarcode(String barcode) async {
-    final snapshot =
-        await _receipts.where('barcode_id', isEqualTo: barcode).limit(1).get();
-    if (snapshot.docs.isEmpty) return null;
-    return snapshot.docs.first.id;
+  Future<String?> findIdByBarcode(String barcode) async =>
+      (await findDuplicate(receiptNumber: barcode))?.id;
+
+  /// Finds an already-saved copy of the same purchase.
+  ///
+  /// The receipt's own number is the primary key. Legacy documents stored that
+  /// value in `barcode_id`, so both fields are checked. Any stored value that
+  /// looks like a 登録番号 (`T` + 13 digits) is ignored: it identifies the shop
+  /// and repeats on every receipt from that shop.
+  ///
+  /// When no receipt number exists, the fallback fingerprint is
+  /// merchant + purchased_at (to the minute) + total.
+  Future<Receipt?> findDuplicate({
+    String? receiptNumber,
+    String? merchant,
+    DateTime? purchasedAt,
+    double? totalAmount,
+    String? excludeId,
+  }) async {
+    final normalized = ReceiptIdentity.normalizeReceiptNumber(receiptNumber);
+    if (normalized != null) {
+      Map<String, ExpenseCategory>? categories;
+      for (final field in const <String>['receipt_number', 'barcode_id']) {
+        final snapshot = await _receipts
+            .where(field, isEqualTo: normalized)
+            .limit(5)
+            .get();
+        for (final doc in snapshot.docs) {
+          if (doc.id == excludeId) continue;
+          categories ??= await _categoryMap();
+          final receipt = _fromDoc(doc, categories);
+          // A legacy T-number stored in barcode_id is normalised into the
+          // invoice field by Receipt.fromJson and will not match here.
+          if (receipt.receiptNumber == normalized) return receipt;
+        }
+      }
+      // The receipt has its own number, so only that number is authoritative.
+      return null;
+    }
+
+    if ((merchant ?? '').trim().isEmpty ||
+        purchasedAt == null ||
+        totalAmount == null) {
+      return null;
+    }
+
+    final start = ReceiptIdentity.truncateToMinute(purchasedAt);
+    final end = start.add(const Duration(minutes: 1));
+    final snapshot = await _receipts
+        .where(
+          'purchased_at',
+          isGreaterThanOrEqualTo: start.toUtc().toIso8601String(),
+        )
+        .where(
+          'purchased_at',
+          isLessThan: end.toUtc().toIso8601String(),
+        )
+        .limit(20)
+        .get();
+    final categories = await _categoryMap();
+    for (final doc in snapshot.docs) {
+      if (doc.id == excludeId) continue;
+      final receipt = _fromDoc(doc, categories);
+      if (ReceiptIdentity.matchesFallback(
+        merchantA: merchant,
+        purchasedAtA: purchasedAt,
+        totalA: totalAmount,
+        merchantB: receipt.merchant,
+        purchasedAtB: receipt.purchasedAt,
+        totalB: receipt.totalAmount,
+      )) {
+        return receipt;
+      }
+    }
+    return null;
   }
 
-  Future<Receipt> create(ReceiptDraft draft) async {
-    final barcode = draft.barcodeId?.trim();
-    if (barcode != null && barcode.isNotEmpty) {
-      final existingId = await findIdByBarcode(barcode);
-      if (existingId != null) {
-        throw DuplicateReceiptException(barcode, existingId: existingId);
+  /// One-time cleanup: move legacy `barcode_id` values that are actually
+  /// 登録番号 (`T` + 13 digits) into `invoice_registration_number` so they can
+  /// never trigger a false duplicate warning.
+  static final Set<String> _invoiceMigrationUsers = <String>{};
+
+  Future<void> migrateLegacyInvoiceNumbers() async {
+    if (!_invoiceMigrationUsers.add(_userId)) return;
+    try {
+      // Keep the batch comfortably below Firestore's 500-write limit.
+      final snapshot = await _receipts.limit(400).get();
+      final batch = _db.batch();
+      var changed = false;
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final barcode = (data['barcode_id'] as String?)?.trim();
+        if (!ReceiptIdentity.isInvoiceRegistrationNumber(barcode)) continue;
+        if ((data['invoice_registration_number'] as String?)?.isNotEmpty ==
+            true) {
+          continue;
+        }
+        final normalized =
+            ReceiptIdentity.normalizeInvoiceRegistrationNumber(barcode);
+        if (normalized == null) continue;
+        batch.update(doc.reference, <String, dynamic>{
+          'invoice_registration_number': normalized,
+          'barcode_id': null,
+          'receipt_number': null,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        });
+        changed = true;
+      }
+      if (changed) await batch.commit();
+    } catch (_) {
+      // Offline / permission errors are harmless; the read path already
+      // normalises legacy values.
+    }
+  }
+
+  Future<Receipt> create(
+    ReceiptDraft draft, {
+    bool skipDuplicateCheck = false,
+  }) async {
+    if (!skipDuplicateCheck) {
+      final existing = await findDuplicate(
+        receiptNumber: draft.barcodeId,
+        merchant: draft.merchant,
+        purchasedAt: draft.purchasedAt,
+        totalAmount: draft.totalAmount,
+      );
+      if (existing != null) {
+        throw DuplicateReceiptException(
+          receiptNumber: draft.barcodeId,
+          existing: existing,
+        );
       }
     }
 
