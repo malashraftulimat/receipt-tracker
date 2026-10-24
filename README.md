@@ -164,6 +164,12 @@ users/{userId}/wallet_transfers/{transferId}
 
 users/{userId}/wallet_adjustments/{adjustmentId}
   wallet_id, amount, occurred_at, note, created_at, updated_at
+
+users/{userId}/debts/{debtId}
+  direction (i_lent / i_borrowed), counterparty (free text),
+  amount, currency, date, due_date (optional), note,
+  wallet_id (optional), repayments[] (id, amount, date, wallet_id, note),
+  status (open / partial / settled), created_at, updated_at
 ```
 
 **No image field is written.** Older documents that still contain
@@ -193,6 +199,8 @@ document, so a receipt + items are written atomically.
 | Credit cards | Limit + available at setup, computed owed/available, closing and due days, settlement wallet, next payment due |
 | Dashboard money | Available money / after obligations / net worth, with an expandable per-wallet list and card-due warning |
 | FX | Display-currency conversion via Frankfurter v2 with open.er-api.com fallback, ~6h local cache, offline reuse and per-pair manual overrides |
+| Debts | Money lent/borrowed, free-text person, partial repayments, optional wallet movements, open/partial/settled status, owed-to-me and I-owe totals |
+| Reminders | In-app credit-card and debt due reminders, plus `.ics` **Add to calendar** export |
 | Categorize | 8 seeded categories + custom categories with colour & icon |
 | Dashboard | Month/day grouping, list/grid views, monthly subtotals |
 | Search/Filter | Merchant/note/barcode search, category chips, payment-method filter, 今月/先月, custom ranges |
@@ -325,6 +333,34 @@ is cached locally for about six hours, reused offline, and the app shows
 over fetched/cached rates and is marked as manual. If a currency has no rate,
 its wallet is shown in its own currency, excluded from the converted total, and
 a visible note explains why — the app never guesses.
+
+### Debts and reminders
+
+Settings → **貸し借り / Debts** (route `/debts`) records money lent or borrowed
+with a free-text person name, amount, currency, date, optional due date and
+note. An optional wallet link records the money movement in that wallet's
+balance. Repayments are added one by one; each repayment can also link a wallet.
+Status is derived as **open → partial → settled** from the repaid amount, and a
+**Mark as settled** action can close the remaining balance without a payment.
+Debts never count in “available money”; outstanding balances are included in net
+worth (owed to me adds, I owe subtracts). The screen shows the two converted
+totals, filters by status and person, and keeps the repayment history.
+
+The dashboard shows an **in-app reminders card** for credit-card payment dates
+and debt due dates a few days before, on the day, and while overdue. Each item
+has **Add to calendar**, which exports an `.ics` file. The card's info dialog and
+this README are explicit about limits:
+
+- **Browser tab** — reminders appear only while the app is open; there are no
+  background notifications.
+- **Installed PWA** — closing the browser stops them. Web Push needs a separate
+  push service and permission; it is not promised by this build.
+- **iOS** — web push works only on iOS 16.4+ and only after adding the site to
+  the Home Screen.
+- **Android** — Chrome web push is available with permission and a push service.
+- **Native app** — local notifications can be scheduled; scheduling card/debt
+  reminders is left as a future enhancement. This build provides in-app
+  reminders and `.ics` calendar export.
 
 ### Duplicate detection and amount checks
 
@@ -483,7 +519,8 @@ flag, legacy migration, period income totals and free-text source suggestions.
 Wallet tests cover computed balances, cross-currency transfers, credit-card
 owed/available and due dates, include-in-total rules, the three dashboard totals
 and old documents. FX tests cover cached/manual/missing rates, conversion and
-the six-hour cache window.
+the six-hour cache window. Debt tests cover repayment math, status transitions,
+wallet movements, reminder windows and `.ics` generation.
 
 ---
 

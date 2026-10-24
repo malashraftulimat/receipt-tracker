@@ -12,6 +12,7 @@ import 'widgets/due_reminders_card.dart';
 import 'widgets/filter_bar.dart';
 import 'widgets/money_overview_card.dart';
 import 'widgets/receipt_collection.dart';
+import 'widgets/reminders_card.dart';
 import '../../core/localization/localization.dart';
 
 class DashboardPage extends ConsumerWidget {
@@ -112,6 +113,7 @@ class _MainPane extends StatelessWidget {
       children: <Widget>[
         MoneyOverviewCard(),
         BudgetCard(),
+        RemindersCard(),
         DueRemindersCard(),
         FilterBar(),
         Expanded(child: ReceiptCollection()),

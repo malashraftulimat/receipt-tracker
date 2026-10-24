@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'debt.dart';
 import 'income_entry.dart';
 import 'pay_cycle.dart';
 import 'receipt.dart';
@@ -116,6 +117,7 @@ WalletLedger buildWalletLedger({
   required Iterable<IncomeEntry> incomeEntries,
   required Iterable<WalletTransfer> transfers,
   required Iterable<WalletAdjustment> adjustments,
+  Iterable<Debt> debts = const <Debt>[],
 }) {
   final walletById = <String, Wallet>{
     for (final wallet in wallets) wallet.id: wallet,
@@ -218,6 +220,57 @@ WalletLedger buildWalletLedger({
         referenceId: adjustment.id,
       ),
     );
+  }
+
+  for (final debt in debts) {
+    final walletId = debt.walletId;
+    if (walletId != null) {
+      final wallet = walletById[walletId];
+      if (wallet != null &&
+          debt.currency.toUpperCase() == wallet.currency.toUpperCase()) {
+        add(
+          wallet,
+          WalletEntry(
+            kind: debt.direction.isLent
+                ? WalletEntryKind.expense
+                : WalletEntryKind.income,
+            date: debt.date,
+            signedAmount:
+                debt.direction.isLent ? -debt.amount : debt.amount,
+            title: debt.counterparty,
+            subtitle: debt.note?.trim(),
+            referenceId: debt.id,
+          ),
+        );
+      } else if (wallet != null) {
+        mismatched += 1;
+      }
+    }
+
+    for (final repayment in debt.repayments) {
+      final repaymentWalletId = repayment.walletId;
+      if (repaymentWalletId == null) continue;
+      final wallet = walletById[repaymentWalletId];
+      if (wallet == null) continue;
+      if (debt.currency.toUpperCase() != wallet.currency.toUpperCase()) {
+        mismatched += 1;
+        continue;
+      }
+      add(
+        wallet,
+        WalletEntry(
+          kind: debt.direction.isLent
+              ? WalletEntryKind.income
+              : WalletEntryKind.expense,
+          date: repayment.date,
+          signedAmount:
+              debt.direction.isLent ? repayment.amount : -repayment.amount,
+          title: debt.counterparty,
+          subtitle: repayment.note?.trim() ?? debt.note?.trim(),
+          referenceId: debt.id,
+        ),
+      );
+    }
   }
 
   final accounts = <String, WalletAccount>{};

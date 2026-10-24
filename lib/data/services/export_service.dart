@@ -73,6 +73,14 @@ class ExportService {
     return saver.saveExportedFile(bytes, filename, 'text/csv;charset=utf-8');
   }
 
+  /// Saves any generated file (CSV, ICS, ...) with the platform saver.
+  static Future<String> saveBytes(
+    Uint8List bytes,
+    String filename,
+    String mimeType,
+  ) =>
+      saver.saveExportedFile(bytes, filename, mimeType);
+
   static String filenameForMonth(DateTime month) =>
       'receipts_${month.year}-${_two(month.month)}.csv';
 

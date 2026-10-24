@@ -9,6 +9,7 @@ import '../core/settings/pay_cycle_provider.dart';
 import '../domain/models/app_user.dart';
 import '../domain/models/category.dart';
 import '../domain/models/coupon.dart';
+import '../domain/models/debt.dart';
 import '../domain/models/exchange_rates.dart';
 import '../domain/models/income_entry.dart';
 import '../domain/models/income_source.dart';
@@ -19,6 +20,7 @@ import '../domain/models/payment_method.dart';
 import '../domain/models/pay_cycle.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
+import '../domain/models/reminder.dart';
 import '../domain/models/wallet.dart';
 import '../domain/models/wallet_adjustment.dart';
 import '../domain/models/wallet_ledger.dart';
@@ -28,6 +30,7 @@ import 'repositories/auth_repository.dart';
 import 'repositories/budget_repository.dart';
 import 'repositories/category_repository.dart';
 import 'repositories/coupon_repository.dart';
+import 'repositories/debt_repository.dart';
 import 'repositories/income_repository.dart';
 import 'repositories/receipt_repository.dart';
 import 'repositories/wallet_repository.dart';
@@ -70,6 +73,10 @@ final couponRepositoryProvider = Provider<CouponRepository>(
 
 final walletRepositoryProvider = Provider<WalletRepository>(
   (ref) => WalletRepository(),
+);
+
+final debtRepositoryProvider = Provider<DebtRepository>(
+  (ref) => DebtRepository(),
 );
 
 final walletTransferRepositoryProvider = Provider<WalletTransferRepository>(
@@ -365,6 +372,21 @@ final walletAdjustmentsProvider =
   return ref.watch(walletAdjustmentRepositoryProvider).fetchAll();
 });
 
+final debtsProvider = FutureProvider<List<Debt>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <Debt>[];
+  return ref.watch(debtRepositoryProvider).fetchAll();
+});
+
+final debtByIdProvider = Provider.family<Debt?, String>((ref, id) {
+  final debts = ref.watch(debtsProvider).valueOrNull;
+  if (debts == null) return null;
+  for (final debt in debts) {
+    if (debt.id == id) return debt;
+  }
+  return null;
+});
+
 /// Wallet balances derived from opening balances + transactions.
 final walletLedgerProvider = FutureProvider<WalletLedger>((ref) async {
   final wallets = await ref.watch(walletsProvider.future);
@@ -372,12 +394,14 @@ final walletLedgerProvider = FutureProvider<WalletLedger>((ref) async {
   final income = await ref.watch(incomeEntriesProvider.future);
   final transfers = await ref.watch(walletTransfersProvider.future);
   final adjustments = await ref.watch(walletAdjustmentsProvider.future);
+  final debts = await ref.watch(debtsProvider.future);
   return buildWalletLedger(
     wallets: wallets,
     receipts: receipts,
     incomeEntries: income,
     transfers: transfers,
     adjustments: adjustments,
+    debts: debts,
   );
 });
 
@@ -388,10 +412,56 @@ final walletAccountProvider = Provider.family<WalletAccount?, String>(
 /// The three dashboard totals in the display currency.
 final moneyTotalsProvider = FutureProvider<MoneyTotals>((ref) async {
   final ledger = await ref.watch(walletLedgerProvider.future);
+  final debts = await ref.watch(debtsProvider.future);
   final base = ref.watch(defaultCurrencyProvider).code;
   final needsFx = ledger.all.any(
-    (account) =>
-        account.wallet.currency.trim().toUpperCase() != base.toUpperCase(),
+        (account) =>
+            account.wallet.currency.trim().toUpperCase() != base.toUpperCase(),
+      ) ||
+      debts.any(
+        (debt) => debt.currency.trim().toUpperCase() != base.toUpperCase(),
+      );
+  final fx = needsFx
+      ? (await ref.watch(exchangeRatesProvider.future)).snapshot
+      : FxSnapshot(
+          base: base,
+          rates: const <String, double>{},
+          fetchedAt: DateTime.now(),
+        );
+
+  var debtsOwedToMe = 0.0;
+  var debtsIOwe = 0.0;
+  var missingDebtRates = 0;
+  for (final debt in debts) {
+    if (debt.outstanding <= 0) continue;
+    final converted = fx.convert(debt.outstanding, debt.currency, base);
+    if (converted == null) {
+      missingDebtRates += 1;
+      continue;
+    }
+    if (debt.direction.isLent) {
+      debtsOwedToMe += converted;
+    } else {
+      debtsIOwe += converted;
+    }
+  }
+
+  return computeMoneyTotals(
+    ledger: ledger,
+    fx: fx,
+    asOf: DateTime.now(),
+    debtsOwedToMe: debtsOwedToMe,
+    debtsIOwe: debtsIOwe,
+    extraMissingRateCount: missingDebtRates,
+  );
+});
+
+/// Debt totals for the debt screen (converted to the display currency).
+final debtTotalsProvider = FutureProvider<DebtTotals>((ref) async {
+  final debts = await ref.watch(debtsProvider.future);
+  final base = ref.watch(defaultCurrencyProvider).code;
+  final needsFx = debts.any(
+    (debt) => debt.currency.trim().toUpperCase() != base.toUpperCase(),
   );
   final fx = needsFx
       ? (await ref.watch(exchangeRatesProvider.future)).snapshot
@@ -400,11 +470,74 @@ final moneyTotalsProvider = FutureProvider<MoneyTotals>((ref) async {
           rates: const <String, double>{},
           fetchedAt: DateTime.now(),
         );
-  return computeMoneyTotals(
-    ledger: ledger,
-    fx: fx,
-    asOf: DateTime.now(),
+  var owedToMe = 0.0;
+  var iOwe = 0.0;
+  var missing = 0;
+  for (final debt in debts) {
+    if (debt.outstanding <= 0) continue;
+    final converted = fx.convert(debt.outstanding, debt.currency, base);
+    if (converted == null) {
+      missing += 1;
+      continue;
+    }
+    if (debt.direction.isLent) {
+      owedToMe += converted;
+    } else {
+      iOwe += converted;
+    }
+  }
+  return DebtTotals(
+    owedToMe: owedToMe,
+    iOwe: iOwe,
+    missingRateCount: missing,
   );
+});
+
+/// In-app reminders for credit-card payments and debt due dates.
+final remindersProvider = FutureProvider<List<ReminderItem>>((ref) async {
+  final ledger = await ref.watch(walletLedgerProvider.future);
+  final debts = await ref.watch(debtsProvider.future);
+  final now = DateTime.now();
+  final reminders = <ReminderItem>[];
+
+  for (final account in ledger.all) {
+    final wallet = account.wallet;
+    if (wallet.archived || !wallet.isCredit || account.owed <= 0) continue;
+    final due = account.nextDueDate(asOf: now);
+    if (due == null || !isReminderActive(due, now)) continue;
+    reminders.add(
+      ReminderItem(
+        id: 'card_${wallet.id}',
+        kind: ReminderKind.creditCard,
+        title: wallet.name,
+        amount: account.owed,
+        currency: wallet.currency,
+        dueDate: due,
+        sourceId: wallet.id,
+      ),
+    );
+  }
+
+  for (final debt in debts) {
+    final due = debt.dueDate;
+    if (due == null || debt.outstanding <= 0) continue;
+    if (debt.status == DebtStatus.settled) continue;
+    if (!isReminderActive(due, now)) continue;
+    reminders.add(
+      ReminderItem(
+        id: 'debt_${debt.id}',
+        kind: ReminderKind.debt,
+        title: debt.counterparty,
+        amount: debt.outstanding,
+        currency: debt.currency,
+        dueDate: due,
+        sourceId: debt.id,
+      ),
+    );
+  }
+
+  reminders.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+  return reminders;
 });
 
 /// Pay-cycle anchors for the budget period: the source flagged by the user,

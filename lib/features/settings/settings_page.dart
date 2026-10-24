@@ -174,6 +174,8 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 14),
           const _WalletsCard(),
           const SizedBox(height: 14),
+          const _DebtsCard(),
+          const SizedBox(height: 14),
           const _ExchangeRatesCard(),
           const SizedBox(height: 14),
           _Card(
@@ -911,6 +913,56 @@ class _WalletsCard extends ConsumerWidget {
             onPressed: () => context.push('/wallets'),
             icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
             label: const AppText('manage_wallets'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Debt totals + entry point.
+class _DebtsCard extends ConsumerWidget {
+  const _DebtsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final totals = ref.watch(debtTotalsProvider).valueOrNull;
+    final base = ref.watch(defaultCurrencyProvider);
+    return _Card(
+      title: 'debts',
+      children: <Widget>[
+        AppText(
+          'debt.help',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.call_received_outlined),
+          title: const AppText('owed_to_me'),
+          trailing: AppText(
+            formatMoney(totals?.owedToMe ?? 0, currency: base.code),
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.call_made_outlined),
+          title: const AppText('i_owe'),
+          trailing: AppText(
+            formatMoney(totals?.iOwe ?? 0, currency: base.code),
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/debts'),
+            icon: const Icon(Icons.handshake_outlined, size: 18),
+            label: const AppText('manage_debts'),
           ),
         ),
       ],

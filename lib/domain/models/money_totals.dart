@@ -56,11 +56,12 @@ MoneyTotals computeMoneyTotals({
   double recurringDue = 0,
   double debtsOwedToMe = 0,
   double debtsIOwe = 0,
+  int extraMissingRateCount = 0,
 }) {
   var available = 0.0;
   var cardOwed = 0.0;
   var netWorth = 0.0;
-  var missingRates = 0;
+  var missingRates = extraMissingRateCount;
   DateTime? nextCardDue;
   var nextCardAmount = 0.0;
 
