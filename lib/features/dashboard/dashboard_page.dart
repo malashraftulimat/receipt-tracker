@@ -10,6 +10,7 @@ import 'widgets/analytics_panel.dart';
 import 'widgets/budget_card.dart';
 import 'widgets/due_reminders_card.dart';
 import 'widgets/filter_bar.dart';
+import 'widgets/money_overview_card.dart';
 import 'widgets/receipt_collection.dart';
 import '../../core/localization/localization.dart';
 
@@ -109,6 +110,7 @@ class _MainPane extends StatelessWidget {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        MoneyOverviewCard(),
         BudgetCard(),
         DueRemindersCard(),
         FilterBar(),

@@ -145,7 +145,7 @@ class IncomeEntryRepository {
   CollectionReference<Map<String, dynamic>> get _entries =>
       _db.collection('users').doc(_userId).collection('income_entries');
 
-  Future<List<IncomeEntry>> fetchAll({int limit = 500}) async {
+  Future<List<IncomeEntry>> fetchAll({int limit = 5000}) async {
     final snapshot = await _entries
         .orderBy('received_at', descending: true)
         .limit(limit)

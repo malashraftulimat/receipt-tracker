@@ -3,19 +3,26 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../domain/models/app_user.dart';
 import '../core/settings/currency_provider.dart';
+import '../core/settings/exchange_rates_provider.dart';
 import '../core/settings/pay_cycle_provider.dart';
+import '../domain/models/app_user.dart';
 import '../domain/models/category.dart';
 import '../domain/models/coupon.dart';
+import '../domain/models/exchange_rates.dart';
 import '../domain/models/income_entry.dart';
 import '../domain/models/income_source.dart';
 import '../domain/models/income_summary.dart';
+import '../domain/models/money_totals.dart';
 import '../domain/models/monthly_budget.dart';
 import '../domain/models/payment_method.dart';
 import '../domain/models/pay_cycle.dart';
 import '../domain/models/receipt.dart';
 import '../domain/models/receipt_filter.dart';
+import '../domain/models/wallet.dart';
+import '../domain/models/wallet_adjustment.dart';
+import '../domain/models/wallet_ledger.dart';
+import '../domain/models/wallet_transfer.dart';
 import '../domain/parser/receipt_parser.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/budget_repository.dart';
@@ -23,6 +30,7 @@ import 'repositories/category_repository.dart';
 import 'repositories/coupon_repository.dart';
 import 'repositories/income_repository.dart';
 import 'repositories/receipt_repository.dart';
+import 'repositories/wallet_repository.dart';
 import 'services/coupons/coupon_reminder_service.dart';
 import 'services/ocr/ai_receipt_ocr_service.dart';
 import 'services/ocr/ocr_service.dart';
@@ -58,6 +66,19 @@ final incomeEntryRepositoryProvider = Provider<IncomeEntryRepository>(
 
 final couponRepositoryProvider = Provider<CouponRepository>(
   (ref) => CouponRepository(),
+);
+
+final walletRepositoryProvider = Provider<WalletRepository>(
+  (ref) => WalletRepository(),
+);
+
+final walletTransferRepositoryProvider = Provider<WalletTransferRepository>(
+  (ref) => WalletTransferRepository(),
+);
+
+final walletAdjustmentRepositoryProvider =
+    Provider<WalletAdjustmentRepository>(
+  (ref) => WalletAdjustmentRepository(),
 );
 
 /// Coupon persistence + daily local reminders.
@@ -292,7 +313,7 @@ final incomeSourcesProvider =
 final incomeEntriesProvider = FutureProvider<List<IncomeEntry>>((ref) async {
   final userId = ref.watch(userIdProvider);
   if (userId == null) return const <IncomeEntry>[];
-  return ref.watch(incomeEntryRepositoryProvider).fetchAll();
+  return ref.watch(incomeEntryRepositoryProvider).fetchAll(limit: 5000);
 });
 
 /// Distinct source texts typed before, newest first.
@@ -300,6 +321,90 @@ final incomeSourceSuggestionsProvider = Provider<List<String>>((ref) {
   final entries =
       ref.watch(incomeEntriesProvider).valueOrNull ?? const <IncomeEntry>[];
   return previousIncomeSources(entries);
+});
+
+// ---------------------------------------------------------------------------
+// Wallets, transactions and display-currency totals
+// ---------------------------------------------------------------------------
+
+final walletsProvider = FutureProvider<List<Wallet>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <Wallet>[];
+  return ref.watch(walletRepositoryProvider).fetchAll();
+});
+
+final walletByIdProvider = Provider.family<Wallet?, String>((ref, id) {
+  final wallets = ref.watch(walletsProvider).valueOrNull;
+  if (wallets == null) return null;
+  for (final wallet in wallets) {
+    if (wallet.id == id) return wallet;
+  }
+  return null;
+});
+
+/// All receipts, independent of the dashboard filter, for balance maths.
+final walletReceiptsProvider = FutureProvider<List<Receipt>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <Receipt>[];
+  return ref
+      .watch(receiptRepositoryProvider)
+      .fetch(const ReceiptFilter(), limit: 5000);
+});
+
+final walletTransfersProvider =
+    FutureProvider<List<WalletTransfer>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <WalletTransfer>[];
+  return ref.watch(walletTransferRepositoryProvider).fetchAll();
+});
+
+final walletAdjustmentsProvider =
+    FutureProvider<List<WalletAdjustment>>((ref) async {
+  final userId = ref.watch(userIdProvider);
+  if (userId == null) return const <WalletAdjustment>[];
+  return ref.watch(walletAdjustmentRepositoryProvider).fetchAll();
+});
+
+/// Wallet balances derived from opening balances + transactions.
+final walletLedgerProvider = FutureProvider<WalletLedger>((ref) async {
+  final wallets = await ref.watch(walletsProvider.future);
+  final receipts = await ref.watch(walletReceiptsProvider.future);
+  final income = await ref.watch(incomeEntriesProvider.future);
+  final transfers = await ref.watch(walletTransfersProvider.future);
+  final adjustments = await ref.watch(walletAdjustmentsProvider.future);
+  return buildWalletLedger(
+    wallets: wallets,
+    receipts: receipts,
+    incomeEntries: income,
+    transfers: transfers,
+    adjustments: adjustments,
+  );
+});
+
+final walletAccountProvider = Provider.family<WalletAccount?, String>(
+  (ref, id) => ref.watch(walletLedgerProvider).valueOrNull?.accountFor(id),
+);
+
+/// The three dashboard totals in the display currency.
+final moneyTotalsProvider = FutureProvider<MoneyTotals>((ref) async {
+  final ledger = await ref.watch(walletLedgerProvider.future);
+  final base = ref.watch(defaultCurrencyProvider).code;
+  final needsFx = ledger.all.any(
+    (account) =>
+        account.wallet.currency.trim().toUpperCase() != base.toUpperCase(),
+  );
+  final fx = needsFx
+      ? (await ref.watch(exchangeRatesProvider.future)).snapshot
+      : FxSnapshot(
+          base: base,
+          rates: const <String, double>{},
+          fetchedAt: DateTime.now(),
+        );
+  return computeMoneyTotals(
+    ledger: ledger,
+    fx: fx,
+    asOf: DateTime.now(),
+  );
 });
 
 /// Pay-cycle anchors for the budget period: the source flagged by the user,

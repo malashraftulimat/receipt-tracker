@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/localization/localization.dart';
 import '../../core/settings/currency_provider.dart';
+import '../../core/settings/exchange_rates_provider.dart';
 import '../../core/theme/theme_mode_provider.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/responsive.dart';
@@ -12,8 +14,11 @@ import '../../data/providers.dart';
 import '../../data/services/ai_key_store.dart';
 import '../../data/services/export_service.dart';
 import '../../data/services/ocr/ai_receipt_ocr_service.dart';
+import '../../domain/models/exchange_rates.dart';
 import '../../domain/models/income_source.dart';
 import '../../domain/models/pay_cycle.dart';
+import '../../domain/models/wallet.dart';
+import '../wallets/widgets/wallet_selector.dart';
 import '../../domain/models/receipt_filter.dart';
 import 'widgets/currency_picker.dart';
 
@@ -167,6 +172,10 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 14),
           const _CurrencyCard(),
           const SizedBox(height: 14),
+          const _WalletsCard(),
+          const SizedBox(height: 14),
+          const _ExchangeRatesCard(),
+          const SizedBox(height: 14),
           _Card(
             title: 'appearance',
             children: <Widget>[
@@ -304,12 +313,15 @@ class _IncomeSourcesCard extends ConsumerWidget {
     required List<IncomeSource> all,
   }) async {
     final currency = ref.read(defaultCurrencyProvider);
+    final wallets =
+        ref.read(walletsProvider).valueOrNull ?? const <Wallet>[];
     final result = await showDialog<IncomeSource>(
       context: context,
       builder: (context) => _IncomeSourceEditor(
         source: source,
         currencyCode: currency.code,
         currencySymbol: currency.symbol,
+        wallets: wallets,
       ),
     );
     if (result == null) return;
@@ -572,11 +584,13 @@ class _IncomeSourceEditor extends StatefulWidget {
     this.source,
     required this.currencyCode,
     required this.currencySymbol,
+    required this.wallets,
   });
 
   final IncomeSource? source;
   final String currencyCode;
   final String currencySymbol;
+  final List<Wallet> wallets;
 
   @override
   State<_IncomeSourceEditor> createState() => _IncomeSourceEditorState();
@@ -591,6 +605,7 @@ class _IncomeSourceEditorState extends State<_IncomeSourceEditor> {
   late int _monthlyDay;
   late bool _active;
   late bool _defines;
+  String? _walletId;
 
   @override
   void initState() {
@@ -607,6 +622,7 @@ class _IncomeSourceEditorState extends State<_IncomeSourceEditor> {
     _monthlyDay = source?.monthlyPayDay ?? 1;
     _active = source?.active ?? true;
     _defines = source?.definesBudgetPeriod ?? false;
+    _walletId = source?.walletId;
   }
 
   @override
@@ -630,7 +646,7 @@ class _IncomeSourceEditorState extends State<_IncomeSourceEditor> {
         monthlyPayDay: _monthlyDay,
         amountPerCycle: parseAmountInput(_amount.text) ?? 0,
         currency: existing?.currency ?? widget.currencyCode,
-        walletId: existing?.walletId,
+        walletId: _walletId,
         active: _active,
         definesBudgetPeriod: _defines,
         createdAt: existing?.createdAt ?? now,
@@ -687,6 +703,14 @@ class _IncomeSourceEditorState extends State<_IncomeSourceEditor> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 12),
+                WalletSelector(
+                  wallets: widget.wallets,
+                  selectedId: _walletId,
+                  currency: widget.source?.currency ?? widget.currencyCode,
+                  label: 'wallet_destination_optional',
+                  onChanged: (value) => setState(() => _walletId = value),
                 ),
                 const SizedBox(height: 12),
                 SegmentedButton<PayCycle>(
@@ -846,6 +870,129 @@ class _CurrencyCard extends ConsumerWidget {
                 .read(defaultCurrencyProvider.notifier)
                 .setCurrency(picked);
           },
+        ),
+      ],
+    );
+  }
+}
+
+/// Wallet list entry point.
+class _WalletsCard extends ConsumerWidget {
+  const _WalletsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final wallets = ref.watch(walletsProvider).valueOrNull ?? const <Wallet>[];
+    final active = wallets.where((wallet) => !wallet.archived).length;
+    return _Card(
+      title: 'wallets',
+      children: <Widget>[
+        AppText(
+          'wallet.help',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.account_balance_wallet_outlined),
+          title: AppText(
+            'wallet.active_count',
+            params: <String, Object?>{'count': active},
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/wallets'),
+        ),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/wallets'),
+            icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+            label: const AppText('manage_wallets'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// FX rate status + manual override entry point.
+class _ExchangeRatesCard extends ConsumerWidget {
+  const _ExchangeRatesCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final asyncState = ref.watch(exchangeRatesProvider);
+    final base = ref.watch(defaultCurrencyProvider);
+    final state = asyncState.valueOrNull;
+    final snapshot = state?.snapshot;
+    final source = snapshot == null
+        ? null
+        : switch (snapshot.source) {
+            FxSource.frankfurter => 'fx.source_frankfurter',
+            FxSource.erApi => 'fx.source_er_api',
+            FxSource.none => 'fx.source_none',
+          };
+
+    return _Card(
+      title: 'exchange_rates',
+      children: <Widget>[
+        AppText(
+          'fx.help',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.currency_exchange_outlined),
+          title: AppText(
+            'fx.base_currency',
+            params: <String, Object?>{'code': base.code},
+          ),
+          subtitle: snapshot == null
+              ? null
+              : AppText(
+                  'fx.rates_as_of',
+                  params: <String, Object?>{
+                    'date': formatDateJa(snapshot.fetchedAt),
+                  },
+                ),
+        ),
+        if (source != null) AppText(source),
+        if (snapshot != null && snapshot.stale)
+          AppText(
+            'fx.stale_rates',
+            style: TextStyle(fontSize: 11, color: theme.colorScheme.error),
+          ),
+        if (snapshot != null && state!.overrides.isNotEmpty)
+          AppText(
+            'fx.manual_overrides_count',
+            params: <String, Object?>{'count': state.overrides.length},
+            style: theme.textTheme.labelSmall,
+          ),
+        const SizedBox(height: 8),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => context.push('/rates'),
+                icon: const Icon(Icons.tune_outlined, size: 18),
+                label: const AppText('fx.manage_rates'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: context.tr('fx.refresh'),
+              onPressed: () =>
+                  ref.read(exchangeRatesProvider.notifier).refresh(),
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
         ),
       ],
     );

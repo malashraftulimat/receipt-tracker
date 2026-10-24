@@ -10,6 +10,7 @@ import '../../core/utils/responsive.dart';
 import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../domain/models/receipt.dart';
+import '../../domain/models/wallet.dart';
 import '../dashboard/analytics_provider.dart';
 import '../dashboard/widgets/receipt_tile.dart';
 import '../review/review_page.dart';
@@ -52,6 +53,7 @@ class ReceiptDetailPage extends ConsumerWidget {
       await ref.read(receiptRepositoryProvider).delete(receipt.id);
       if (!context.mounted) return;
       ref.invalidate(receiptsProvider);
+      ref.invalidate(walletReceiptsProvider);
       ref.invalidate(analyticsProvider);
       ref.invalidate(receiptByIdProvider(receipt.id));
       ScaffoldMessenger.of(context).showSnackBar(
@@ -69,6 +71,8 @@ class ReceiptDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncReceipt = ref.watch(receiptByIdProvider(receiptId));
+    final wallets =
+        ref.watch(walletsProvider).valueOrNull ?? const <Wallet>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -134,16 +138,28 @@ class ReceiptDetailPage extends ConsumerWidget {
             ),
           ),
         ),
-        data: (receipt) => _DetailBody(receipt: receipt),
+        data: (receipt) => _DetailBody(
+          receipt: receipt,
+          wallet: _walletFor(wallets, receipt.walletId),
+        ),
       ),
     );
   }
 }
 
+Wallet? _walletFor(List<Wallet> wallets, String? id) {
+  if (id == null) return null;
+  for (final wallet in wallets) {
+    if (wallet.id == id) return wallet;
+  }
+  return null;
+}
+
 class _DetailBody extends StatelessWidget {
-  const _DetailBody({required this.receipt});
+  const _DetailBody({required this.receipt, this.wallet});
 
   final Receipt receipt;
+  final Wallet? wallet;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +251,23 @@ class _DetailBody extends StatelessWidget {
                             avatar: Icon(
                               receipt.paymentMethod!.icon,
                               size: 14,
+                            ),
+                          ),
+                        if (wallet != null)
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            label: AppText(
+                              wallet!.name,
+                              translate: false,
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            avatar: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: Color(wallet!.colorValue),
+                                shape: BoxShape.circle,
+                              ),
                             ),
                           ),
                         Chip(

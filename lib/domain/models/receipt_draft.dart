@@ -30,6 +30,7 @@ class ReceiptDraft {
     this.categoryId,
     this.note,
     this.paymentMethod,
+    this.walletId,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
     this.source = ReceiptSource.manual,
@@ -65,6 +66,9 @@ class ReceiptDraft {
 
   /// Optional for scanned receipts, required for quick (receiptless) payments.
   final PaymentMethod? paymentMethod;
+
+  /// Optional wallet / payment source chosen by the user.
+  final String? walletId;
 
   final String? rawOcrText;
   final List<ReceiptItem> items;
@@ -145,6 +149,7 @@ class ReceiptDraft {
       categoryId: receipt.categoryId,
       note: receipt.note,
       paymentMethod: receipt.paymentMethod,
+      walletId: receipt.walletId,
       rawOcrText: receipt.rawOcrText,
       items: receipt.items,
       source: receipt.source,
@@ -187,6 +192,7 @@ class ReceiptDraft {
         'category_id': categoryId,
         'note': (note ?? '').trim().isEmpty ? null : note!.trim(),
         'payment_method': paymentMethod?.wireName,
+        'wallet_id': walletId,
         'source': source.name,
         'raw_ocr_text': rawOcrText,
         if (includeItems)

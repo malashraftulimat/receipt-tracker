@@ -20,12 +20,14 @@ import '../../domain/models/payment_method.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
 import '../../domain/models/receipt_item.dart';
+import '../../domain/models/wallet.dart';
 import '../../domain/parser/category_guesser.dart';
 import '../../domain/parser/receipt_amount_check.dart';
 import '../../domain/parser/receipt_parser.dart';
 import 'widgets/item_editor_section.dart';
 import '../dashboard/analytics_provider.dart';
 import '../settings/widgets/currency_picker.dart';
+import '../wallets/widgets/wallet_selector.dart';
 import '../../core/localization/localization.dart';
 
 /// Arguments passed through `context.push('/review', extra: ...)`.
@@ -83,6 +85,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   /// Optional: how the receipt was paid (unset for older documents).
   PaymentMethod? _paymentMethod;
+
+  /// Optional wallet link (null for old documents).
+  String? _walletId;
 
   /// Coupon printed on the receipt; saved alongside a new receipt.
   ParsedCoupon? _coupon;
@@ -161,6 +166,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     _purchasedAt = draft?.purchasedAt ?? DateTime.now();
     _categoryId = draft?.categoryId;
     _paymentMethod = draft?.paymentMethod;
+    _walletId = draft?.walletId;
     _suggestedCategory = widget.args.parsed?.suggestedCategory;
     _coupon = widget.args.parsed?.coupon;
     _tax8Base = draft?.tax8Base;
@@ -236,7 +242,16 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       selected: currencyOrDefault(_currency.text),
     );
     if (picked == null || !mounted) return;
-    setState(() => _currency.text = picked.code);
+    final wallets =
+        ref.read(walletsProvider).valueOrNull ?? const <Wallet>[];
+    setState(() {
+      _currency.text = picked.code;
+      final walletStillMatches = wallets.any(
+        (wallet) =>
+            wallet.id == _walletId && wallet.currency == picked.code,
+      );
+      if (!walletStillMatches) _walletId = null;
+    });
   }
 
   /// Suggests categories from item names / merchant when none is chosen.
@@ -481,6 +496,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       categoryId: _categoryId,
       note: _note.text,
       paymentMethod: _paymentMethod,
+      walletId: _walletId,
       rawOcrText: _rawOcrText,
       items: items,
       source: _source,
@@ -520,6 +536,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
       if (!mounted) return;
       ref.invalidate(receiptsProvider);
+      ref.invalidate(walletReceiptsProvider);
       ref.invalidate(analyticsProvider);
       ref.invalidate(receiptByIdProvider(saved.id));
       ref.invalidate(upcomingDueProvider);
@@ -670,6 +687,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final theme = Theme.of(context);
     final categories =
         ref.watch(categoriesProvider).valueOrNull ?? const <ExpenseCategory>[];
+    final wallets =
+        ref.watch(walletsProvider).valueOrNull ?? const <Wallet>[];
 
     if (!_autoTagged && categories.isNotEmpty) {
       _autoTagged = true;
@@ -936,6 +955,13 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     },
                   ),
               ],
+            ),
+            const SizedBox(height: 12),
+            WalletSelector(
+              wallets: wallets,
+              selectedId: _walletId,
+              currency: _currencyCode,
+              onChanged: (value) => setState(() => _walletId = value),
             ),
           ],
         ),

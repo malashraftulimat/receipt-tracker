@@ -13,7 +13,10 @@ import '../../features/payments/add_payment_page.dart';
 import '../../features/receipts/receipt_detail_page.dart';
 import '../../features/review/review_page.dart';
 import '../../features/scan/scan_page.dart';
+import '../../features/settings/rates_page.dart';
 import '../../features/settings/settings_page.dart';
+import '../../features/wallets/wallet_detail_page.dart';
+import '../../features/wallets/wallets_page.dart';
 import 'app_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -124,6 +127,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ReceiptDetailPage(
           receiptId: state.pathParameters['id'] ?? '',
         ),
+      ),
+      GoRoute(
+        path: '/wallets',
+        name: 'wallets',
+        builder: (context, state) => const WalletsPage(),
+      ),
+      GoRoute(
+        path: '/wallet/:id',
+        name: 'wallet',
+        builder: (context, state) => WalletDetailPage(
+          walletId: state.pathParameters['id'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/rates',
+        name: 'rates',
+        builder: (context, state) => const RatesPage(),
       ),
     ],
   );

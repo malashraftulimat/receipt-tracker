@@ -44,7 +44,7 @@ class ReceiptRepository {
   CollectionReference<Map<String, dynamic>> get _categories =>
       _db.collection('users').doc(_userId).collection('categories');
 
-  Future<List<Receipt>> fetch(ReceiptFilter filter) async {
+  Future<List<Receipt>> fetch(ReceiptFilter filter, {int limit = 1000}) async {
     Query<Map<String, dynamic>> query = _receipts;
 
     final start = filter.rangeStart;
@@ -63,7 +63,7 @@ class ReceiptRepository {
     }
 
     final snapshot =
-        await query.orderBy('purchased_at', descending: true).limit(1000).get();
+        await query.orderBy('purchased_at', descending: true).limit(limit).get();
 
     final categories = await _categoryMap();
     var receipts = snapshot.docs

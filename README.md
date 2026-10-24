@@ -122,6 +122,7 @@ users/{userId}/receipts/{receiptId}
   payment_method (cash / credit_card / debit_card / bank_transfer /
                   direct_debit / qr_emoney / ic_card /
                   convenience_store / other, optional),
+  wallet_id (optional; null for old documents),
   items[], raw_ocr_text, source (barcode / ocr / manual),
   created_at, updated_at, ...
 
@@ -139,15 +140,30 @@ users/{userId}/budgets/{yyyy-MM}
 users/{userId}/income_sources/{sourceId}
   name, cycle (daily/weekly/monthly),
   weekly_start_weekday, monthly_pay_day,
-  amount_per_cycle, currency, wallet_id (null until Phase 2),
+  amount_per_cycle, currency, wallet_id (optional),
   active, defines_budget_period (exactly one), created_at, updated_at
 
 users/{userId}/income_entries/{entryId}
   amount, currency, received_at, source (free text),
-  note, wallet_id (null until Phase 2), created_at, updated_at
+  note, wallet_id (optional), created_at, updated_at
 
 users/{userId}/income_meta/state
   income_sources_migrated (one-time legacy migration marker)
+
+users/{userId}/wallets/{walletId}
+  name (free text), type (cash / bank / credit / debit / e_money /
+                        transit / savings / points / other),
+  currency, opening_balance, color_value, archived, last4 (optional),
+  include_in_total, reserved,
+  credit_limit, opening_available, closing_day, payment_due_day,
+  settlement_wallet_id (credit cards only), created_at, updated_at
+
+users/{userId}/wallet_transfers/{transferId}
+  from_wallet_id, to_wallet_id, from_amount, to_amount,
+  occurred_at, note, created_at, updated_at
+
+users/{userId}/wallet_adjustments/{adjustmentId}
+  wallet_id, amount, occurred_at, note, created_at, updated_at
 ```
 
 **No image field is written.** Older documents that still contain
@@ -172,6 +188,11 @@ document, so a receipt + items are written atomically.
 | Quick payment | Receiptless expense (rent, transfers, money lent) saved into the same collection as `source = manual`: amount, date, category, required payment method, note |
 | Coupons | Printed coupons extracted with name / validFrom / validUntil / discount, saved per receipt, daily reminders with **Mark as Used** / **Remind Tomorrow**, automatic expiry |
 | Income | Multiple recurring income sources (daily/weekly/monthly payday anchors), one source drives budget pacing, one-off **Add income** with free-text source autocomplete, monthly-equivalent totals |
+| Wallets | Cash, bank, debit, e-money, transit, savings, points and credit-card wallets; balances derived from transactions; optional last4 only |
+| Transfers | Wallet-to-wallet transfers, including cross-currency transfers with both amounts entered explicitly, and credit-card repayments |
+| Credit cards | Limit + available at setup, computed owed/available, closing and due days, settlement wallet, next payment due |
+| Dashboard money | Available money / after obligations / net worth, with an expandable per-wallet list and card-due warning |
+| FX | Display-currency conversion via Frankfurter v2 with open.er-api.com fallback, ~6h local cache, offline reuse and per-pair manual overrides |
 | Categorize | 8 seeded categories + custom categories with colour & icon |
 | Dashboard | Month/day grouping, list/grid views, monthly subtotals |
 | Search/Filter | Merchant/note/barcode search, category chips, payment-method filter, 今月/先月, custom ranges |
@@ -229,7 +250,8 @@ next payday, and both the period income and the monthly-equivalent total.
 The **支払いを追加 / Add payment** screen (dashboard app-bar button, scan screen
 button, route `/payment/new`) records expenses that have no receipt — rent,
 bank transfers, money lent to a friend, and so on. It asks for amount (required),
-date (defaults to today), category, payment method (required) and a note.
+date (defaults to today), category, payment method (required), an **optional
+wallet** and a note. Only wallets with the same currency are offered.
 
 There is no parallel payments store: the entry is written to
 `users/{uid}/receipts` with `source = manual`, so the dashboard list, monthly
@@ -244,6 +266,65 @@ payment and other. Scanned receipts can set the same field in the review screen
 (optional, default **未設定**); documents written before the field existed simply
 read back as unset. The dashboard shows a chip per list row, can filter by
 method, and analytics includes a current-month breakdown per method.
+
+### Wallets, credit cards, transfers and currencies
+
+Settings → **ウォレット / Wallets** (route `/wallets`) manages any number of
+wallets. Names, banks, card issuers and e-money services are **free text typed by
+the user**; the app ships no bank or payment-service database. A wallet stores:
+
+- type: cash, bank, credit, debit, e-money, transit IC, savings, points, other;
+- any ISO-4217 currency, opening balance, colour, archived flag and `reserved`;
+- an optional **last 4 digits only**. Full card numbers, CVV and PINs are never
+  requested or stored. Card form fields are limited to four digits.
+- `include_in_total`: default **false** for savings and points, **true** for the
+  other types; archived wallets are always excluded. The user can override it.
+
+**Balances are never stored.** Each wallet balance is computed as
+`opening balance + income − spending + transfers in − transfers out ± adjustments`.
+Receipts, quick payments and one-off income can select a matching-currency
+wallet. A manual correction uses the **Adjust balance** action and is written as
+an adjustment transaction (audit trail), not by editing a stored balance. Money
+remains in each wallet's own currency; conversion is display-only.
+
+**Transfers** (`wallet_transfers`) move money between wallets: withdrawing cash,
+topping up e-money, or paying a credit-card bill. If the two wallets use
+different currencies, both amounts are entered explicitly; no exchange rate is
+stored.
+
+**Credit cards** have no balance and are excluded from available money. At setup
+the user enters the credit limit and the currently available amount, so the
+starting owed amount is `limit − available`. Charges increase owed and reduce
+available credit; a transfer to the card is a repayment that restores available
+credit. Closing day, payment due day and an optional settlement bank wallet are
+stored. The wallet detail shows limit, available, total owed, owed this cycle,
+next due date and amount due.
+
+**Dashboard money card.** The top dashboard card has a remembered segmented
+control with three views:
+
+1. **Available money** — sum of non-archived wallets with `include_in_total`,
+   excluding credit cards, converted to the display currency.
+2. **After obligations** — available money minus card dues minus recurring
+   bills due before the next payday (recurring transactions arrive in Phase 4).
+3. **Net worth** — all non-archived wallets including savings, plus debts owed
+   to me, minus debts I owe, minus card dues.
+
+Under the headline it always shows **After card obligations: X**. The line turns
+into a warning colour when card dues are large relative to available money and
+the next due date is within a few days. The expandable wallet list shows each
+wallet's own-currency balance, the latest transaction and the converted value;
+tapping opens the wallet detail.
+
+**Display currency and rates.** Settings → **通貨 / Currency** chooses both the
+currency for new receipts/plans and the **base currency for converted totals**.
+Rates come from [Frankfurter v2](https://api.frankfurter.dev) (`/v2/rates`) with
+[open.er-api.com](https://open.er-api.com) as a CORS-enabled fallback. The table
+is cached locally for about six hours, reused offline, and the app shows
+**“Rates as of …”**. A **manual rate override per currency pair** always wins
+over fetched/cached rates and is marked as manual. If a currency has no rate,
+its wallet is shown in its own currency, excluded from the converted total, and
+a visible note explains why — the app never guesses.
 
 ### Duplicate detection and amount checks
 
@@ -399,6 +480,10 @@ numbers, coupon-number exclusion, duplicate fingerprints, the subtotal/tax item
 check and line-item extraction. Income tests cover source JSON round-trips,
 monthly-equivalent conversion, paydays inside a period, the single budget-period
 flag, legacy migration, period income totals and free-text source suggestions.
+Wallet tests cover computed balances, cross-currency transfers, credit-card
+owed/available and due dates, include-in-total rules, the three dashboard totals
+and old documents. FX tests cover cached/manual/missing rates, conversion and
+the six-hour cache window.
 
 ---
 

@@ -55,6 +55,7 @@ class Receipt {
     this.categoryId,
     this.note,
     this.paymentMethod,
+    this.walletId,
     this.source = ReceiptSource.manual,
     this.rawOcrText,
     this.items = const <ReceiptItem>[],
@@ -107,6 +108,9 @@ class Receipt {
   /// How the payment was made. Null for documents saved before this field
   /// existed (and for receipts where the user left it unset).
   final PaymentMethod? paymentMethod;
+
+  /// Optional wallet / payment source. Null for old documents.
+  final String? walletId;
 
   final ReceiptSource source;
   final String? rawOcrText;
@@ -203,6 +207,7 @@ class Receipt {
       categoryId: json['category_id'] as String?,
       note: json['note'] as String?,
       paymentMethod: PaymentMethod.tryParse(json['payment_method']),
+      walletId: json['wallet_id'] as String?,
       // Legacy image_base64 documents are tolerated but the photo is ignored.
       source: receiptSourceFromString(json['source'] as String?),
       rawOcrText: json['raw_ocr_text'] as String?,
@@ -256,6 +261,7 @@ class Receipt {
     String? categoryId,
     String? note,
     PaymentMethod? paymentMethod,
+    String? walletId,
     ReceiptSource? source,
     String? rawOcrText,
     List<ReceiptItem>? items,
@@ -285,6 +291,7 @@ class Receipt {
       categoryId: categoryId ?? this.categoryId,
       note: note ?? this.note,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      walletId: walletId ?? this.walletId,
       source: source ?? this.source,
       rawOcrText: rawOcrText ?? this.rawOcrText,
       items: items ?? this.items,

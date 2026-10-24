@@ -16,8 +16,10 @@ import '../../domain/models/category.dart';
 import '../../domain/models/payment_method.dart';
 import '../../domain/models/receipt.dart';
 import '../../domain/models/receipt_draft.dart';
+import '../../domain/models/wallet.dart';
 import '../dashboard/analytics_provider.dart';
 import '../settings/widgets/currency_picker.dart';
+import '../wallets/widgets/wallet_selector.dart';
 
 /// Quick entry for expenses that have no receipt (rent, money lent to a
 /// friend, bank transfers, ...).
@@ -41,6 +43,7 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
   late Currency _currency;
   String? _categoryId;
   PaymentMethod? _method;
+  String? _walletId;
   bool _saving = false;
   String? _error;
 
@@ -103,11 +106,13 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
         categoryId: _categoryId,
         note: note.isEmpty ? null : note,
         paymentMethod: _method,
+        walletId: _walletId,
         source: ReceiptSource.manual,
       );
 
       final saved = await ref.read(receiptRepositoryProvider).create(draft);
       ref.invalidate(receiptsProvider);
+      ref.invalidate(walletReceiptsProvider);
       ref.invalidate(analyticsProvider);
       ref.invalidate(
         budgetSummaryProvider(
@@ -133,6 +138,8 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
     final theme = Theme.of(context);
     final categories =
         ref.watch(categoriesProvider).valueOrNull ?? const <ExpenseCategory>[];
+    final wallets =
+        ref.watch(walletsProvider).valueOrNull ?? const <Wallet>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -208,7 +215,21 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                           context,
                           selected: _currency,
                         );
-                        if (picked != null) setState(() => _currency = picked);
+                        if (picked != null) {
+                          final wallets = ref
+                                  .read(walletsProvider)
+                                  .valueOrNull ??
+                              const <Wallet>[];
+                          setState(() {
+                            _currency = picked;
+                            final stillMatches = wallets.any(
+                              (wallet) =>
+                                  wallet.id == _walletId &&
+                                  wallet.currency == picked.code,
+                            );
+                            if (!stillMatches) _walletId = null;
+                          });
+                        }
                       },
                       icon: const Icon(Icons.currency_exchange_outlined,
                           size: 18),
@@ -218,6 +239,14 @@ class _AddPaymentPageState extends ConsumerState<AddPaymentPage> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    WalletSelector(
+                      wallets: wallets,
+                      selectedId: _walletId,
+                      currency: _currency.code,
+                      label: 'wallet_optional',
+                      onChanged: (value) => setState(() => _walletId = value),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(

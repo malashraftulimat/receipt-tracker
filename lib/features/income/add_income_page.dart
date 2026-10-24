@@ -11,6 +11,8 @@ import '../../core/utils/responsive.dart';
 import '../../core/widgets/language_switcher.dart';
 import '../../data/providers.dart';
 import '../../domain/models/income_entry.dart';
+import '../../domain/models/wallet.dart';
+import '../wallets/widgets/wallet_selector.dart';
 
 /// One-off income (sold an item, a single shift, a gift, ...).
 ///
@@ -31,6 +33,7 @@ class _AddIncomePageState extends ConsumerState<AddIncomePage> {
   final _sourceFocus = FocusNode();
 
   late DateTime _date;
+  String? _walletId;
   bool _saving = false;
   String? _error;
 
@@ -95,6 +98,7 @@ class _AddIncomePageState extends ConsumerState<AddIncomePage> {
               receivedAt: receivedAt,
               source: _source.text.trim(),
               note: note.isEmpty ? null : note,
+              walletId: _walletId,
               createdAt: now,
               updatedAt: now,
             ),
@@ -130,6 +134,8 @@ class _AddIncomePageState extends ConsumerState<AddIncomePage> {
     final theme = Theme.of(context);
     final currency = ref.watch(defaultCurrencyProvider);
     final suggestions = ref.watch(incomeSourceSuggestionsProvider);
+    final wallets =
+        ref.watch(walletsProvider).valueOrNull ?? const <Wallet>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -199,6 +205,14 @@ class _AddIncomePageState extends ConsumerState<AddIncomePage> {
                       onPressed: _pickDate,
                       icon: const Icon(Icons.event_outlined, size: 18),
                       label: AppText(formatDateJa(_date)),
+                    ),
+                    const SizedBox(height: 12),
+                    WalletSelector(
+                      wallets: wallets,
+                      selectedId: _walletId,
+                      currency: currency.code,
+                      label: 'wallet_optional',
+                      onChanged: (value) => setState(() => _walletId = value),
                     ),
                     const SizedBox(height: 12),
                     RawAutocomplete<String>(

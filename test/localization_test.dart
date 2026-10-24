@@ -63,6 +63,17 @@ void main() {
     expect(ja.translate('save_anyway'), '重複でも保存');
   });
 
+  test('wallet and FX strings are translated', () {
+    expect(en.translate('wallets'), 'Wallets');
+    expect(en.translate('wallet.type_credit'), 'Credit card');
+    expect(en.translate('money.net_worth'), 'Net worth');
+    expect(en.translate('fx.manual'), 'Manual rate');
+    expect(ar.translate('wallets'), 'المحافظ');
+    expect(ar.translate('money.net_worth'), 'صافي الثروة');
+    expect(ja.translate('wallets'), 'ウォレット');
+    expect(ja.translate('fx.rates_as_of'), 'レート取得日時: {date}');
+  });
+
   test('AI unavailable toast is localized', () {
     expect(
       en.translate('the_ai_service_is_getting_ready_please_try_a'),
