@@ -147,6 +147,15 @@ No.1234567890123
 ''');
       expect(result.receiptNumber, '00042');
       expect(result.registrationNumber, isNull);
+
+      final underExpiry = parser.parse('''
+店舗
+クーポン 次回10%引
+利用期限 2026/11/30
+No. 999888777
+合計 980
+''');
+      expect(underExpiry.receiptNumber, isNull);
     });
 
     test('a scanned T-number is a registration number, not a receipt number', () {

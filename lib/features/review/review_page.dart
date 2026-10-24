@@ -720,6 +720,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           items: _items,
           categories: categories,
           totalAmount: parseAmountInput(_total.text) ?? 0,
+          subtotalAmount: parseAmountInput(_subtotal.text),
           taxTotal: (parseAmountInput(_tax8.text) ?? 0) +
               (parseAmountInput(_tax10.text) ?? 0),
           currency: _currencyCode,
@@ -1008,22 +1009,25 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     controller: _subtotal,
                     label: 'subtotal_tax_excluded',
                     currency: _currencyCode,
+                    onChanged: () => setState(() {}),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _AmountField(
                     controller: _tax8,
-                    label: '消費税 8%（任意）',
+                    label: 'consumption_tax_8',
                     currency: _currencyCode,
+                    onChanged: () => setState(() {}),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _AmountField(
                     controller: _tax10,
-                    label: '消費税 10%（任意）',
+                    label: 'consumption_tax_10',
                     currency: _currencyCode,
+                    onChanged: () => setState(() {}),
                   ),
                 ),
               ],
@@ -1253,22 +1257,25 @@ class _AmountField extends StatelessWidget {
     required this.controller,
     required this.label,
     this.currency = kFallbackCurrencyCode,
+    this.onChanged,
   });
 
   final TextEditingController controller;
   final String label;
   final String currency;
+  final VoidCallback? onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
+      onChanged: onChanged == null ? null : (_) => onChanged!(),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: <TextInputFormatter>[
         FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
       ],
       decoration: InputDecoration(
-        labelText: label,
+        labelText: context.tr(label),
         isDense: true,
         prefixText: '${currencyOrDefault(currency).symbol} ',
       ),

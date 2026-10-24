@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:receipt_tracker/domain/models/receipt.dart';
 import 'package:receipt_tracker/domain/parser/receipt_amount_check.dart';
 import 'package:receipt_tracker/domain/parser/receipt_identity.dart';
 
@@ -32,6 +33,41 @@ void main() {
       expect(firstNumber, isNotNull);
       expect(secondNumber, isNotNull);
       expect(firstNumber, isNot(secondNumber));
+
+      // Even if a legacy document stored the T-number in barcode_id,
+      // Receipt.fromJson moves it to invoiceRegistrationNumber and clears
+      // receiptNumber so two receipts from the same shop never collide on T-number.
+      final firstReceipt = Receipt.fromJson(<String, dynamic>{
+        'id': 'r1',
+        'user_id': 'u1',
+        'merchant': 'セブン-イレブン',
+        'purchased_at': '2026-10-19T10:00:00Z',
+        'total_amount': 227,
+        'barcode_id': shopRegistration,
+      });
+      final secondReceipt = Receipt.fromJson(<String, dynamic>{
+        'id': 'r2',
+        'user_id': 'u1',
+        'merchant': 'セブン-イレブン',
+        'purchased_at': '2026-10-20T12:15:00Z',
+        'total_amount': 540,
+        'invoice_registration_number': shopRegistration,
+      });
+      expect(firstReceipt.receiptNumber, isNull);
+      expect(firstReceipt.invoiceRegistrationNumber, shopRegistration);
+      expect(secondReceipt.receiptNumber, isNull);
+      expect(secondReceipt.invoiceRegistrationNumber, shopRegistration);
+      expect(
+        ReceiptIdentity.matchesFallback(
+          merchantA: firstReceipt.merchant,
+          purchasedAtA: firstReceipt.purchasedAt,
+          totalA: firstReceipt.totalAmount,
+          merchantB: secondReceipt.merchant,
+          purchasedAtB: secondReceipt.purchasedAt,
+          totalB: secondReceipt.totalAmount,
+        ),
+        isFalse,
+      );
     });
 
     test('fallback fingerprint needs merchant, minute and total', () {

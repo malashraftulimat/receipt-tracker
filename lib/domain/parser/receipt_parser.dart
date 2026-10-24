@@ -882,6 +882,11 @@ class ReceiptParser {
       return markers.any((marker) => lower.contains(marker));
     }
 
+    final explicitReceiptLabel = RegExp(
+      r'(?:レシート|伝票|領収書|受付|注文|オーダー|receipt|slip)\s*'
+      r'(?:No\.?|NO\.?|番号)\s*[:#]?\s*([0-9]{3,20})',
+      caseSensitive: false,
+    );
     final labelled = RegExp(
       r'(?:レシート|伝票|領収書|受付|注文|オーダー|バーコード|barcode)?\s*'
       r'(?:No\.?|NO\.?|番号)\s*[:#]?\s*([0-9]{3,20})',
@@ -890,7 +895,23 @@ class ReceiptParser {
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
       if (containsAny(line, couponMarkers)) continue;
-      if (i > 0 && containsAny(lines[i - 1], couponHeadings)) continue;
+      final explicit = explicitReceiptLabel.firstMatch(line);
+      if (explicit != null) {
+        final value = explicit.group(1);
+        if (value != null) {
+          return ReceiptIdentity.normalizeReceiptNumber(value);
+        }
+      }
+      var underCoupon = false;
+      for (var back = 1; back <= 3 && i - back >= 0; back++) {
+        final prev = lines[i - back];
+        if (containsAny(prev, couponHeadings) ||
+            (back == 1 && containsAny(prev, couponMarkers))) {
+          underCoupon = true;
+          break;
+        }
+      }
+      if (underCoupon) continue;
       final match = labelled.firstMatch(line);
       if (match == null) continue;
       final value = match.group(1);

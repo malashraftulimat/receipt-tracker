@@ -6,6 +6,7 @@ import '../../../core/theme/app_palette.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../domain/models/category.dart';
 import '../../../domain/models/receipt_item.dart';
+import '../../../domain/parser/receipt_amount_check.dart';
 import '../../../core/localization/localization.dart';
 
 /// Mutable per-row state for the item editor.
@@ -80,6 +81,7 @@ class ItemEditorSection extends StatelessWidget {
     required this.items,
     required this.categories,
     required this.totalAmount,
+    this.subtotalAmount,
     required this.taxTotal,
     this.currency = kFallbackCurrencyCode,
     required this.onAdd,
@@ -91,6 +93,7 @@ class ItemEditorSection extends StatelessWidget {
   final List<ReceiptItemEditor> items;
   final List<ExpenseCategory> categories;
   final double totalAmount;
+  final double? subtotalAmount;
   final double taxTotal;
   final String currency;
   final VoidCallback onAdd;
@@ -109,7 +112,14 @@ class ItemEditorSection extends StatelessWidget {
     final directMatch = (itemsTotalValue - totalAmount).abs() <= 0.011;
     final taxMatch = (withTax - totalAmount).abs() <= 0.011;
     final hasItems = items.isNotEmpty;
-    final ok = hasItems && totalAmount > 0 && (directMatch || taxMatch);
+    final ok = hasItems &&
+        (totalAmount > 0 || (subtotalAmount ?? 0) > 0) &&
+        itemsTotalMatchesReceipt(
+          itemsTotal: itemsTotalValue,
+          subtotalAmount: subtotalAmount,
+          taxTotal: taxTotal,
+          totalAmount: totalAmount > 0 ? totalAmount : null,
+        );
 
     return Container(
       padding: const EdgeInsets.all(16),
